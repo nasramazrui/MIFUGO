@@ -1,0 +1,753 @@
+import React, { useState } from 'react';
+import { useApp } from '../context/AppContext';
+import { formatCurrency } from '../utils';
+import { Modal } from '../components/Modal';
+import { motion } from 'motion/react';
+import { db } from '../services/firebase';
+import { 
+  collection, 
+  updateDoc, 
+  doc, 
+  deleteDoc, 
+  serverTimestamp 
+} from 'firebase/firestore';
+import { 
+  LayoutDashboard,
+  BarChart3, 
+  Users, 
+  Store, 
+  Package, 
+  ClipboardList, 
+  Wallet, 
+  LogOut,
+  Check,
+  X,
+  TrendingUp,
+  MapPin,
+  ShoppingBag,
+  Bell
+} from 'lucide-react';
+import { cn } from '../utils';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  Cell,
+  PieChart,
+  Pie
+} from 'recharts';
+import { toast } from 'react-hot-toast';
+
+export const AdminPanel: React.FC = () => {
+  const { 
+    users, 
+    vendors, 
+    products, 
+    orders, 
+    activities, 
+    withdrawals,
+    logout, 
+    addActivity 
+  } = useApp();
+  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'wallet'>('over');
+  const [editingItem, setEditingItem] = useState<{ type: string, data: any } | null>(null);
+
+  const pendingVendors = vendors.filter(v => v.status === 'pending');
+  const COLORS = ['#d97706', '#059669', '#2563eb', '#7c3aed', '#db2777'];
+
+  // Dynamic Analytics
+  const totalRevenue = orders.filter(o => o.status === 'delivered').reduce((s, o) => s + o.total, 0);
+  
+  const regionStats = vendors.reduce((acc: any, v) => {
+    const reg = v.region || 'Unknown';
+    acc[reg] = (acc[reg] || 0) + 1;
+    return acc;
+  }, {});
+
+  const dynamicRegionData = Object.entries(regionStats).map(([name, value]) => ({ name, value }));
+
+  const topSellers = vendors
+    .map(v => ({
+      name: v.shopName || v.name,
+      sales: orders.filter(o => o.vendorId === v.id && o.status === 'delivered').reduce((s, o) => s + o.total, 0)
+    }))
+    .sort((a, b) => b.sales - a.sales)
+    .slice(0, 5);
+
+  const approveWithdrawal = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'kuku_withdrawals', id), { status: 'paid' });
+      addActivity('💸', `Malipo yameidhinishwa`);
+      toast.success('Malipo yameidhinishwa');
+    } catch (error: any) {
+      toast.error('Hitilafu wakati wa kuidhinisha');
+    }
+  };
+
+  const approveVendor = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'kuku_users', id), { status: 'approved' });
+      addActivity('✅', `Muuzaji ameidhinishwa`);
+      toast.success('Muuzaji ameidhinishwa');
+    } catch (error: any) {
+      toast.error('Hitilafu wakati wa kuidhinisha');
+    }
+  };
+
+  const rejectVendor = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'kuku_users', id), { status: 'rejected' });
+      addActivity('✕', `Maombi ya muuzaji yamekataliwa`);
+      toast.success('Maombi yamekataliwa');
+    } catch (error: any) {
+      toast.error('Hitilafu wakati wa kukataa');
+    }
+  };
+
+  const deleteUser = async (id: string) => {
+    if (!confirm('Una uhakika unataka kufuta mtumiaji huyu?')) return;
+    try {
+      await deleteDoc(doc(db, 'kuku_users', id));
+      toast.success('Mtumiaji amefutwa');
+    } catch (error: any) {
+      toast.error('Hitilafu wakati wa kufuta');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row">
+      {/* Sidebar */}
+      <aside className="w-full lg:w-72 bg-amber-950 text-amber-100 flex flex-col sticky top-0 lg:h-screen z-20">
+        <div className="p-8 border-b border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-500 rounded-2xl flex items-center justify-center text-amber-950 shadow-lg shadow-amber-500/20">
+              <BarChart3 size={24} />
+            </div>
+            <h1 className="font-serif italic text-2xl font-bold">Admin Panel</h1>
+          </div>
+        </div>
+
+        <nav className="flex-1 p-6 space-y-2 overflow-y-auto scrollbar-hide">
+          {[
+            { id: 'over', label: 'Muhtasari', icon: LayoutDashboard },
+            { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+            { id: 'vendors', label: 'Wauuzaji', icon: Store, badge: pendingVendors.length },
+            { id: 'prods', label: 'Bidhaa', icon: Package },
+            { id: 'orders', label: 'Maagizo', icon: ClipboardList },
+            { id: 'users', label: 'Watumiaji', icon: Users },
+            { id: 'wallet', label: 'Wallet', icon: Wallet },
+          ].map(item => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id as any)}
+              className={cn(
+                "w-full flex items-center justify-between px-5 py-4 rounded-2xl text-sm font-bold transition-all",
+                activeTab === item.id 
+                  ? "bg-amber-500 text-amber-950 shadow-lg shadow-amber-500/10" 
+                  : "text-amber-400/60 hover:bg-white/5 hover:text-amber-200"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <item.icon size={18} />
+                {item.label}
+              </div>
+              {item.badge ? (
+                <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">{item.badge}</span>
+              ) : null}
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-6 border-t border-white/5">
+          <button 
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-sm font-bold text-amber-400/60 hover:bg-red-500/10 hover:text-red-400 transition-all"
+          >
+            <LogOut size={18} />
+            Toka
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 p-6 lg:p-12 overflow-y-auto">
+        {activeTab === 'over' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-10">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900">Muhtasari wa Mfumo</h2>
+                <p className="text-slate-500">Hali ya sasa ya KukuMart Tanzania</p>
+              </div>
+              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-slate-100 shadow-sm">
+                <Bell size={18} className="text-amber-500" />
+                <span className="text-xs font-black text-slate-900">{activities.length} Notifications</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { label: 'Watumiaji', value: users.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+                { label: 'Wauuzaji', value: vendors.length, icon: Store, color: 'text-emerald-600', bg: 'bg-emerald-50', sub: `${pendingVendors.length} wanasubiri` },
+                { label: 'Bidhaa', value: products.length, icon: Package, color: 'text-amber-600', bg: 'bg-amber-50' },
+                { label: 'Maagizo', value: orders.length, icon: ClipboardList, color: 'text-red-600', bg: 'bg-red-50' },
+              ].map((stat, i) => (
+                <div key={i} className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
+                  <div className={cn("w-14 h-14 rounded-[20px] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform", stat.bg)}>
+                    <stat.icon className={stat.color} size={28} />
+                  </div>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
+                  <p className="text-4xl font-black text-slate-900 mb-1">{stat.value}</p>
+                  {stat.sub && <p className="text-[10px] font-bold text-amber-600">{stat.sub}</p>}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-10">
+              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+                <h3 className="font-black text-slate-900 mb-8 flex items-center gap-3">
+                  <Bell size={24} className="text-amber-500" /> Shughuli za Hivi Karibuni
+                </h3>
+                <div className="space-y-6">
+                  {activities.slice(0, 6).map(act => (
+                    <div key={act.id} className="flex items-start gap-4">
+                      <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-lg flex-shrink-0">
+                        {act.icon}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-slate-700 leading-snug">{act.text}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">{act.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+                <h3 className="font-black text-slate-900 mb-8 flex items-center gap-3">
+                  <Store size={24} className="text-emerald-500" /> Wauuzaji Wanasubiri
+                </h3>
+                <div className="space-y-4">
+                  {pendingVendors.length === 0 ? (
+                    <p className="text-center py-10 text-slate-400 text-sm">Hakuna maombi mapya.</p>
+                  ) : (
+                    pendingVendors.map(v => (
+                      <div key={v.id} className="bg-slate-50 rounded-[24px] p-5 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center font-black text-slate-900 shadow-sm">
+                            {(v.shopName || v.name)[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-slate-900">{v.shopName || v.name}</p>
+                            <p className="text-[10px] text-slate-400">📍 {v.location}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => approveVendor(v.id)}
+                            className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center hover:bg-emerald-600 transition-colors"
+                          >
+                            <Check size={20} />
+                          </button>
+                          <button 
+                            onClick={() => rejectVendor(v.id)}
+                            className="w-10 h-10 bg-red-500 text-white rounded-xl flex items-center justify-center hover:bg-red-600 transition-colors"
+                          >
+                            <X size={20} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'analytics' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+            <h2 className="text-3xl font-black text-slate-900">Analytics ya Biashara</h2>
+            
+            <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+              <div className="flex items-center justify-between mb-10">
+                <h3 className="font-black text-slate-900 flex items-center gap-2">
+                  <TrendingUp size={20} className="text-amber-500" /> Mapato ya Jumla (TZS)
+                </h3>
+                <div className="text-right">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Jumla ya Mauzo</p>
+                  <p className="text-2xl font-black text-amber-700">{formatCurrency(totalRevenue)}</p>
+                </div>
+              </div>
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topSellers}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }} 
+                      dy={10}
+                    />
+                    <YAxis hide />
+                    <Tooltip 
+                      cursor={{ fill: '#f8fafc' }}
+                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    />
+                    <Bar dataKey="sales" radius={[10, 10, 0, 0]}>
+                      {topSellers.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-8">
+              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+                <h3 className="font-black text-slate-900 mb-8 flex items-center gap-2">
+                  <MapPin size={20} className="text-blue-500" /> Mikoa Inayoongoza
+                </h3>
+                <div className="flex items-center gap-10">
+                  <div className="h-[200px] w-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={dynamicRegionData}
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {dynamicRegionData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex-1 space-y-4">
+                    {dynamicRegionData.map((reg, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                          <span className="text-sm font-bold text-slate-600">{reg.name}</span>
+                        </div>
+                        <span className="text-sm font-black text-slate-900">{reg.value} shops</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+                <h3 className="font-black text-slate-900 mb-8 flex items-center gap-2">
+                  <ShoppingBag size={20} className="text-emerald-500" /> Bidhaa Maarufu
+                </h3>
+                <div className="space-y-6">
+                  {[
+                    { name: 'Mayai ya Kuku', sales: 450, color: 'bg-amber-500' },
+                    { name: 'Kuku wa Nyama', sales: 320, color: 'bg-emerald-500' },
+                    { name: 'Vifaranga', sales: 280, color: 'bg-blue-500' },
+                    { name: 'Chakula cha Kuku', sales: 150, color: 'bg-purple-500' },
+                  ].map((item, i) => (
+                    <div key={i}>
+                      <div className="flex justify-between mb-2">
+                        <span className="text-sm font-bold text-slate-700">{item.name}</span>
+                        <span className="text-sm font-black text-slate-900">{item.sales} sold</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(item.sales / 450) * 100}%` }}
+                          className={cn("h-full rounded-full", item.color)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'vendors' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <h2 className="text-3xl font-black text-slate-900 mb-8">Wauuzaji Wote</h2>
+            <div className="space-y-4">
+              {vendors.length === 0 ? (
+                <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100">
+                  <Store size={48} className="mx-auto text-slate-200 mb-4" />
+                  <p className="text-slate-400">Hakuna wauzaji bado.</p>
+                </div>
+              ) : (
+                vendors.map(v => (
+                  <div key={v.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-2xl font-black text-amber-800">
+                        {(v.shopName || v.name)[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <h4 className="font-black text-slate-900">{v.shopName || v.name}</h4>
+                        <p className="text-xs text-slate-400">{v.email} · 📍 {v.location}</p>
+                        <span className={cn(
+                          "text-[9px] font-black px-2 py-0.5 rounded-full uppercase mt-1 inline-block",
+                          v.status === 'approved' ? "bg-emerald-100 text-emerald-700" : 
+                          v.status === 'pending' ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                        )}>
+                          {v.status}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {v.status === 'pending' && (
+                        <button 
+                          onClick={() => approveVendor(v.id)}
+                          className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center hover:bg-emerald-600 transition-colors"
+                        >
+                          <Check size={20} />
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => setEditingItem({ type: 'vendor', data: v })}
+                        className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center hover:bg-blue-100 transition-colors"
+                      >
+                        <TrendingUp size={18} />
+                      </button>
+                      <button 
+                        onClick={() => deleteUser(v.id)}
+                        className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-100 transition-colors"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'prods' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <h2 className="text-3xl font-black text-slate-900 mb-8">Bidhaa Zote</h2>
+            <div className="grid gap-4">
+              {products.length === 0 ? (
+                <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100">
+                  <Package size={48} className="mx-auto text-slate-200 mb-4" />
+                  <p className="text-slate-400">Hakuna bidhaa bado.</p>
+                </div>
+              ) : (
+                products.map(p => (
+                  <div key={p.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-2xl">
+                        {p.emoji}
+                      </div>
+                      <div>
+                        <h4 className="font-black text-slate-900">{p.name}</h4>
+                        <p className="text-xs text-slate-400">{p.vendorName} · {formatCurrency(p.price)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className={cn(
+                        "badge px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                        p.approved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                      )}>
+                        {p.approved ? "Active" : "Pending"}
+                      </span>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setEditingItem({ type: 'product', data: p })}
+                          className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center hover:bg-blue-100 transition-colors"
+                        >
+                          <TrendingUp size={18} />
+                        </button>
+                        {!p.approved && (
+                          <button 
+                            onClick={async () => {
+                              await updateDoc(doc(db, 'kuku_products', p.id), { approved: true });
+                              toast.success('Bidhaa imeidhinishwa');
+                            }}
+                            className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center hover:bg-emerald-600 transition-colors"
+                          >
+                            <Check size={20} />
+                          </button>
+                        )}
+                        <button 
+                          onClick={async () => {
+                            if(confirm('Futa bidhaa hii?')) {
+                              await deleteDoc(doc(db, 'kuku_products', p.id));
+                              toast.success('Bidhaa imefutwa');
+                            }
+                          }}
+                          className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-100 transition-colors"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'orders' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <h2 className="text-3xl font-black text-slate-900 mb-8">Maagizo Yote</h2>
+            <div className="grid gap-4">
+              {orders.length === 0 ? (
+                <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100">
+                  <ClipboardList size={48} className="mx-auto text-slate-200 mb-4" />
+                  <p className="text-slate-400">Hakuna maagizo bado.</p>
+                </div>
+              ) : (
+                orders.map(o => (
+                  <div key={o.id} className="bg-white rounded-[28px] border border-slate-100 p-6 shadow-sm">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-xl">
+                          {o.items[0].emoji}
+                        </div>
+                        <div>
+                          <h4 className="font-black text-slate-900">{o.userName}</h4>
+                          <p className="text-xs text-slate-400">#{o.id.substring(0,8)} · {o.date}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-amber-700">{formatCurrency(o.total)}</p>
+                        <div className="flex flex-col items-end gap-1 mt-1">
+                          <span className={cn(
+                            "badge px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider",
+                            o.status === 'delivered' ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                          )}>
+                            {o.status}
+                          </span>
+                          {o.paymentProof && (
+                            <span className={cn(
+                              "text-[8px] font-black px-2 py-0.5 rounded-full uppercase",
+                              o.paymentApproved ? "bg-blue-100 text-blue-800" : "bg-red-100 text-red-800"
+                            )}>
+                              {o.paymentApproved ? "💰 Paid & Verified" : "⚠️ Unverified Payment"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between pt-4 border-t border-slate-50 gap-4">
+                      <div className="flex-1 min-w-[200px]">
+                        <p className="text-xs text-slate-400 mb-1">Muuzaji: <span className="font-bold text-slate-600">{o.vendorName}</span></p>
+                        {o.paymentProof && (
+                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Proof of Payment</p>
+                            <p className="text-[10px] text-slate-600 italic break-all">{o.paymentProof}</p>
+                            {!o.paymentApproved && (
+                              <button 
+                                onClick={async (e) => {
+                                  e.preventDefault();
+                                  try {
+                                    await updateDoc(doc(db, 'kuku_orders', o.id), { paymentApproved: true });
+                                    toast.success('Malipo yamethibitishwa!');
+                                    addActivity('💰', `Malipo ya agizo #${o.id.substring(0,8)} yamethibitishwa na Admin`);
+                                  } catch (err) {
+                                    console.error(err);
+                                    toast.error('Imeshindwa kuthibitisha malipo');
+                                  }
+                                }}
+                                className="mt-2 text-[9px] font-black text-blue-600 hover:underline bg-blue-50 px-2 py-1 rounded-lg"
+                              >
+                                THIBITISHA MALIPO HAPA
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => window.open(`https://wa.me/${o.userContact.replace(/\+/g,'')}?text=Habari ${o.userName}, kuhusu agizo lako #${o.id.substring(0,8)}...`)}
+                          className="bg-green-100 text-green-700 px-3 py-1.5 rounded-xl text-[10px] font-black hover:bg-green-200 transition-all"
+                        >
+                          WA MTEJA
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            if(confirm('Futa agizo hili?')) {
+                              await deleteDoc(doc(db, 'kuku_orders', o.id));
+                              toast.success('Agizo limefutwa');
+                            }
+                          }}
+                          className="text-red-400 hover:text-red-600 transition-colors"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'users' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <h2 className="text-3xl font-black text-slate-900 mb-8">Watumiaji Wote</h2>
+            <div className="grid gap-4">
+              {users.map(u => (
+                <div key={u.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex items-center justify-between shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-2xl font-black text-blue-800">
+                      {u.name[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="font-black text-slate-900">{u.name}</h4>
+                      <p className="text-xs text-slate-400">{u.email} · {u.contact || 'No contact'}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setEditingItem({ type: 'user', data: u })}
+                      className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-blue-50 hover:text-blue-500 transition-all"
+                    >
+                      <TrendingUp size={18} />
+                    </button>
+                    <button 
+                      onClick={() => deleteUser(u.id)}
+                      className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'wallet' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <h2 className="text-3xl font-black text-slate-900 mb-8">Maombi ya Malipo (Withdraw)</h2>
+            <div className="space-y-4">
+              {withdrawals.length === 0 ? (
+                <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100">
+                  <Wallet size={48} className="mx-auto text-slate-200 mb-4" />
+                  <p className="text-slate-400">Hakuna maombi ya malipo kwa sasa.</p>
+                </div>
+              ) : (
+                withdrawals.map(w => (
+                  <div key={w.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-xl">💸</div>
+                      <div>
+                        <h4 className="font-black text-slate-900">{w.vendorName}</h4>
+                        <p className="text-xs text-slate-400">{formatCurrency(w.amount)} · {w.date}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={cn(
+                        "text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider",
+                        w.status === 'paid' ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                      )}>
+                        {w.status}
+                      </span>
+                      {w.status === 'pending' && (
+                        <button 
+                          onClick={() => approveWithdrawal(w.id)}
+                          className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-emerald-700 transition-all"
+                        >
+                          LIPA SASA
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+      </main>
+      {/* Edit Modal */}
+      {editingItem && (
+        <Modal 
+          isOpen={!!editingItem} 
+          onClose={() => setEditingItem(null)}
+          title={`Hariri ${editingItem.type === 'user' ? 'Mtumiaji' : editingItem.type === 'vendor' ? 'Muuzaji' : 'Bidhaa'}`}
+        >
+          <div className="space-y-4">
+            {editingItem.type === 'user' || editingItem.type === 'vendor' ? (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Jina</label>
+                  <input 
+                    type="text" 
+                    defaultValue={editingItem.data.name}
+                    onBlur={async (e) => {
+                      await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { name: e.target.value });
+                      toast.success('Jina limebadilishwa');
+                    }}
+                    className="input-field" 
+                  />
+                </div>
+                {editingItem.type === 'vendor' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Jina la Duka</label>
+                    <input 
+                      type="text" 
+                      defaultValue={editingItem.data.shopName}
+                      onBlur={async (e) => {
+                        await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { shopName: e.target.value });
+                        toast.success('Jina la duka limebadilishwa');
+                      }}
+                      className="input-field" 
+                    />
+                  </div>
+                )}
+              </>
+            ) : editingItem.type === 'product' ? (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Jina la Bidhaa</label>
+                  <input 
+                    type="text" 
+                    defaultValue={editingItem.data.name}
+                    onBlur={async (e) => {
+                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { name: e.target.value });
+                      toast.success('Jina limebadilishwa');
+                    }}
+                    className="input-field" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Bei</label>
+                  <input 
+                    type="number" 
+                    defaultValue={editingItem.data.price}
+                    onBlur={async (e) => {
+                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { price: Number(e.target.value) });
+                      toast.success('Bei imebadilishwa');
+                    }}
+                    className="input-field" 
+                  />
+                </div>
+              </>
+            ) : null}
+            <button 
+              onClick={() => setEditingItem(null)}
+              className="w-full btn-primary mt-4"
+            >
+              Kamilisha
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
