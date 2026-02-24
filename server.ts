@@ -3,7 +3,6 @@ import { createServer as createViteServer } from 'vite';
 import ImageKit from 'imagekit';
 import dotenv from 'dotenv';
 import cors from 'cors';
-
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -30,37 +29,35 @@ try {
   console.error('Failed to initialize ImageKit:', err);
 }
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-  app.use(cors());
-  app.use(express.json());
+// ImageKit Auth Endpoint
+app.get('/api/imagekit/auth', (req, res) => {
+  if (!ik) {
+    return res.status(503).json({ error: 'ImageKit not configured' });
+  }
+  try {
+    const result = ik.getAuthenticationParameters();
+    res.send(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get auth parameters' });
+  }
+});
 
-  // ImageKit Auth Endpoint
-  app.get('/api/imagekit/auth', (req, res) => {
-    if (!ik) {
-      return res.status(503).json({ error: 'ImageKit not configured' });
-    }
-    try {
-      const result = ik.getAuthenticationParameters();
-      res.send(result);
-    } catch (err) {
-      res.status(500).json({ error: 'Failed to get auth parameters' });
-    }
+// API Health Check
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    time: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'development',
+    vercel: !!process.env.VERCEL
   });
+});
 
-  // API Health Check
-  app.get('/api/health', (req, res) => {
-    res.json({ 
-      status: 'ok', 
-      time: new Date().toISOString(),
-      env: process.env.NODE_ENV || 'development'
-    });
-  });
-
-  // Vite middleware for development
-  const isProd = process.env.NODE_ENV === 'production';
+async function setupVite() {
+  const isProd = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
   const distExists = fs.existsSync(path.join(__dirname, 'dist'));
   
   if (!isProd || !distExists) {
@@ -77,12 +74,16 @@ async function startServer() {
       res.sendFile('dist/index.html', { root: '.' });
     });
   }
+}
 
+// Only setup Vite if we are not on Vercel (Vercel handles static files separately)
+if (!process.env.VERCEL) {
+  setupVite().catch(err => console.error('Vite setup failed:', err));
+  
+  const PORT = 3000;
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 }
 
-startServer().catch(err => {
-  console.error('Failed to start server:', err);
-});
+export default app;

@@ -154,9 +154,20 @@ export const AdminPanel: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row">
-      {/* Sidebar */}
-      <aside className="w-full lg:w-72 bg-amber-950 text-amber-100 flex flex-col sticky top-0 lg:h-screen z-20">
+    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row pb-20 lg:pb-0">
+      {/* Mobile Header */}
+      <header className="lg:hidden bg-amber-950 text-amber-100 px-6 py-4 sticky top-0 z-30 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BarChart3 size={20} className="text-amber-500" />
+          <h1 className="font-serif italic text-lg font-bold">Admin Panel</h1>
+        </div>
+        <button onClick={logout} className="text-amber-400/60 p-2">
+          <LogOut size={20} />
+        </button>
+      </header>
+
+      {/* Sidebar (Desktop) */}
+      <aside className="hidden lg:flex w-72 bg-amber-950 text-amber-100 flex-col sticky top-0 h-screen z-20">
         <div className="p-8 border-b border-white/5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-amber-500 rounded-2xl flex items-center justify-center text-amber-950 shadow-lg shadow-amber-500/20">
@@ -372,8 +383,8 @@ export const AdminPanel: React.FC = () => {
                 <h3 className="font-black text-slate-900 mb-8 flex items-center gap-2">
                   <MapPin size={20} className="text-blue-500" /> Mikoa Inayoongoza
                 </h3>
-                <div className="flex items-center gap-10">
-                  <div className="h-[200px] w-[200px]">
+                <div className="flex flex-col sm:flex-row items-center gap-10">
+                  <div className="h-[200px] w-[200px] flex-shrink-0">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -775,6 +786,38 @@ export const AdminPanel: React.FC = () => {
           </motion.div>
         )}
       </main>
+
+      {/* Mobile Bottom Nav */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-amber-950 border-t border-white/5 px-4 py-3 z-40 flex justify-between items-center overflow-x-auto scrollbar-hide">
+        {[
+          { id: 'over', icon: LayoutDashboard, label: 'Dash' },
+          { id: 'analytics', icon: TrendingUp, label: 'Stats' },
+          { id: 'vendors', icon: Store, label: 'Wauzaji', badge: pendingVendors.length },
+          { id: 'prods', icon: Package, label: 'Bidhaa' },
+          { id: 'orders', icon: ClipboardList, label: 'Oda' },
+          { id: 'users', icon: Users, label: 'Watu' },
+          { id: 'wallet', icon: Wallet, label: 'Pesa' },
+        ].map(item => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id as any)}
+            className={cn(
+              "flex flex-col items-center gap-1 transition-all flex-shrink-0 min-w-[50px]",
+              activeTab === item.id ? "text-amber-500 scale-110" : "text-amber-400/40"
+            )}
+          >
+            <div className="relative">
+              <item.icon size={18} />
+              {item.badge ? (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-3 h-3 flex items-center justify-center rounded-full">
+                  {item.badge}
+                </span>
+              ) : null}
+            </div>
+            <span className="text-[8px] font-black uppercase">{item.label}</span>
+          </button>
+        ))}
+      </nav>
       {/* Edit Modal */}
       {editingItem && (
         <Modal 

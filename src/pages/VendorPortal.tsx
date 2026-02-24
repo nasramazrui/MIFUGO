@@ -275,9 +275,20 @@ export const VendorPortal: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
-      {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-white border-r border-slate-100 flex flex-col sticky top-0 md:h-screen z-20">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row pb-20 md:pb-0">
+      {/* Mobile Header */}
+      <header className="md:hidden bg-white border-b border-slate-100 px-6 py-4 sticky top-0 z-30 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🏪</span>
+          <h1 className="font-serif italic text-lg text-emerald-800 font-bold">Vendor Portal</h1>
+        </div>
+        <button onClick={logout} className="text-red-400 p-2">
+          <LogOut size={20} />
+        </button>
+      </header>
+
+      {/* Sidebar (Desktop) */}
+      <aside className="hidden md:flex w-64 bg-white border-r border-slate-100 flex-col sticky top-0 h-screen z-20">
         <div className="p-6 border-b border-slate-50">
           <div className="flex items-center gap-2">
             <span className="text-2xl">🏪</span>
@@ -723,6 +734,29 @@ export const VendorPortal: React.FC = () => {
           </motion.div>
         )}
       </main>
+
+      {/* Mobile Bottom Nav */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-6 py-3 z-40 flex justify-between items-center">
+        {[
+          { id: 'dash', icon: LayoutDashboard, label: 'Dash' },
+          { id: 'products', icon: Package, label: 'Bidhaa' },
+          { id: 'orders', icon: ClipboardList, label: 'Oda' },
+          { id: 'wallet', icon: Wallet, label: 'Wallet' },
+          { id: 'settings', icon: Clock, label: 'Saa' },
+        ].map(item => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id as any)}
+            className={cn(
+              "flex flex-col items-center gap-1 transition-all",
+              activeTab === item.id ? "text-emerald-600 scale-110" : "text-slate-400"
+            )}
+          >
+            <item.icon size={20} />
+            <span className="text-[9px] font-black uppercase">{item.label}</span>
+          </button>
+        ))}
+      </nav>
 
       {/* Add Product Modal */}
       <Modal 
