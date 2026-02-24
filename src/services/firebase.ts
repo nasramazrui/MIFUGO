@@ -13,6 +13,7 @@ const firebaseConfig = {
   appId: "1:763957167114:web:dd7a26ed4ada24c74c0bf3"
 };
 
+console.log("Initializing Firebase with project:", firebaseConfig.projectId);
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);

@@ -21,6 +21,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const { addActivity } = useApp();
   const [view, setView] = useState<'choice' | 'login' | 'register'>('choice');
   const [loading, setLoading] = useState(false);
+  const [serverStatus, setServerStatus] = useState<'checking' | 'ok' | 'fail'>('checking');
+
+  React.useEffect(() => {
+    fetch('/api/health')
+      .then(r => r.ok ? setServerStatus('ok') : setServerStatus('fail'))
+      .catch(() => setServerStatus('fail'));
+  }, []);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -107,6 +114,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               ✨ Hapana — Jisajili Bure
             </button>
           </div>
+          {serverStatus === 'fail' && (
+            <div className="mt-4 p-3 bg-red-50 text-red-600 text-[10px] font-bold rounded-xl border border-red-100">
+              ⚠️ Server haijibu. Tafadhali subiri kidogo au wasiliana na msaada.
+            </div>
+          )}
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <p className="text-xs text-slate-400 mb-3">Unataka kuuza bidhaa zako?</p>
             <button 

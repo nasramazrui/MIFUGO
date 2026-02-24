@@ -101,12 +101,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const qProducts = query(collection(db, 'kuku_products'), orderBy('createdAt', 'desc'));
     const unsubProducts = onSnapshot(qProducts, (snap) => {
       setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
+    }, (err) => {
+      console.error("Firestore Products Error:", err);
     });
 
     // Orders
     const qOrders = query(collection(db, 'kuku_orders'), orderBy('createdAt', 'desc'));
     const unsubOrders = onSnapshot(qOrders, (snap) => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as Order)));
+    }, (err) => {
+      console.error("Firestore Orders Error:", err);
     });
 
     // Users & Vendors
@@ -115,6 +119,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
       setUsers(all.filter(u => u.role === 'user'));
       setVendors(all.filter(u => u.role === 'vendor'));
+    }, (err) => {
+      console.error("Firestore Users Error:", err);
     });
 
     // Activities

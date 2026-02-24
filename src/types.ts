@@ -23,13 +23,17 @@ export interface User {
   createdAt: string;
 }
 
+export type ProductUnit = 'Piece' | 'Kg' | 'Tray' | 'Half' | 'Quarter';
+
 export interface Product {
   id: string;
   name: string;
   price: number;
   stock: number;
-  category: 'mayai' | 'nyama' | 'vifaranga' | 'chakula';
+  category: string;
+  unit: ProductUnit;
   emoji: string;
+  image?: string;
   desc: string;
   location: string;
   region: string;
@@ -45,7 +49,9 @@ export interface OrderItem {
   name: string;
   qty: number;
   price: number;
+  unit?: string;
   emoji: string;
+  image?: string;
 }
 
 export type OrderStatus = 'pending' | 'processing' | 'waiting' | 'onway' | 'pickup' | 'delivered';
@@ -84,13 +90,22 @@ export interface Review {
   date: string;
 }
 
+export type WithdrawalStatus = 'pending' | 'paid' | 'rejected';
+
 export interface Withdrawal {
   id: string;
   vendorId: string;
   vendorName: string;
   amount: number;
-  status: 'pending' | 'paid';
+  method: 'mobile' | 'bank';
+  network?: 'M-Pesa' | 'Tigo Pesa' | 'Airtel Money' | 'HaloPesa';
+  phoneNumber?: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
+  status: WithdrawalStatus;
   date: string;
+  createdAt: any;
 }
 
 export interface Activity {

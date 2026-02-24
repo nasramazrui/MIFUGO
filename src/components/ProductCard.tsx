@@ -18,8 +18,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
       onClick={onClick}
       className="bg-white rounded-[24px] border border-amber-100 overflow-hidden cursor-pointer shadow-sm hover:shadow-xl hover:shadow-amber-100/50 transition-all duration-300"
     >
-      <div className="aspect-square bg-gradient-to-br from-amber-50 to-amber-100 flex items-center justify-center text-6xl relative">
-        {product.emoji}
+      <div className="aspect-square bg-gradient-to-br from-amber-50 to-amber-100 flex items-center justify-center text-6xl relative overflow-hidden">
+        {product.image ? (
+          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+        ) : (
+          product.emoji
+        )}
         {!isOpen && (
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center">
             <span className="bg-red-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
@@ -47,6 +51,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
         <div className="flex items-center justify-between">
           <p className="text-sm font-black text-amber-700">
             {formatCurrency(product.price)}
+            <span className="text-[10px] font-normal text-slate-400 ml-1">/ {product.unit}</span>
           </p>
           <div className={cn(
             "w-2 h-2 rounded-full",

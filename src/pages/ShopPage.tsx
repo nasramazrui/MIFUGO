@@ -6,7 +6,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion } from 'motion/react';
-import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut } from 'lucide-react';
+import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment } from 'firebase/firestore';
@@ -19,6 +19,7 @@ export const ShopPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isVendorRegModalOpen, setIsVendorRegModalOpen] = useState(false);
   const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
@@ -127,21 +128,37 @@ export const ShopPage: React.FC = () => {
 
   const isStoreOpen = (vendorId: string) => {
     const vendor = vendors.find(v => v.id === vendorId);
-    if (!vendor || !vendor.openDays || !vendor.openTime || !vendor.closeTime) return true;
+    // If vendor doesn't exist or hasn't set any settings, assume open
+    if (!vendor) return true;
+    if (!vendor.openTime || !vendor.closeTime) return true;
+    
+    // If openDays is missing or empty, assume open every day
+    if (!vendor.openDays || vendor.openDays.length === 0) return true;
     
     const now = new Date();
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const today = dayNames[now.getDay()];
     
+    // Check if today is a working day
     if (!vendor.openDays.includes(today)) return false;
     
-    const [openH, openM] = vendor.openTime.split(':').map(Number);
-    const [closeH, closeM] = vendor.closeTime.split(':').map(Number);
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const openMinutes = openH * 60 + openM;
-    const closeMinutes = closeH * 60 + closeM;
-    
-    return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+    try {
+      const [openH, openM] = vendor.openTime.split(':').map(Number);
+      const [closeH, closeM] = vendor.closeTime.split(':').map(Number);
+      
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const openMinutes = openH * 60 + openM;
+      const closeMinutes = closeH * 60 + closeM;
+      
+      // Handle overnight shifts (e.g., 22:00 to 06:00)
+      if (closeMinutes < openMinutes) {
+        return currentMinutes >= openMinutes || currentMinutes < closeMinutes;
+      }
+      
+      return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+    } catch (e) {
+      return true; // Fallback to open on error
+    }
   };
 
   const handleBuyClick = () => {
@@ -171,7 +188,11 @@ export const ShopPage: React.FC = () => {
     setIsOrderLoading(true);
     const deliveryFee = deliveryMethod === 'city' ? p.deliveryCity : 
                        deliveryMethod === 'out' ? p.deliveryOut : 0;
-    const total = (p.price * qty) + deliveryFee;
+    
+    const subtotal = p.price * qty;
+    const adminCommission = subtotal * 0.06;
+    const vendorNet = subtotal - adminCommission;
+    const total = subtotal + deliveryFee;
 
     const orderData = {
       userId: user.id,
@@ -179,7 +200,7 @@ export const ShopPage: React.FC = () => {
       userContact: user.contact || user.email,
       userWA: payPhone,
       payPhone,
-      items: [{ name: p.name, qty, price: p.price, emoji: p.emoji }],
+      items: [{ name: p.name, qty, price: p.price, unit: p.unit, emoji: p.emoji, image: p.image }],
       productId: p.id,
       vendorId: p.vendorId,
       vendorName: p.vendorName,
@@ -187,6 +208,8 @@ export const ShopPage: React.FC = () => {
       qty,
       deliveryFee,
       deliveryMethod,
+      adminCommission,
+      vendorNet,
       total,
       payMethod,
       paymentProof,
@@ -382,9 +405,18 @@ export const ShopPage: React.FC = () => {
                    orders.filter(o => o.userId === user.id).map(order => (
                      <div key={order.id} className="bg-white rounded-[32px] border border-slate-100 p-6 shadow-sm">
                        <div className="flex justify-between items-start mb-4">
-                         <div>
-                           <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Agizo #{order.id.substring(0,8)}</p>
-                           <h4 className="font-black text-slate-900">{order.items[0].name}</h4>
+                         <div className="flex items-center gap-4">
+                           <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-2xl overflow-hidden">
+                             {order.items[0].image ? (
+                               <img src={order.items[0].image} alt="" className="w-full h-full object-cover" />
+                             ) : (
+                               order.items[0].emoji
+                             )}
+                           </div>
+                           <div>
+                             <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Agizo #{order.id.substring(0,8)}</p>
+                             <h4 className="font-black text-slate-900">{order.items[0].name} × {order.qty} {order.items[0].unit || 'pcs'}</h4>
+                           </div>
                          </div>
                          <span className={cn(
                            "badge px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
@@ -438,8 +470,54 @@ export const ShopPage: React.FC = () => {
             <Package size={20} />
             <span className="text-[10px] font-black">Oda</span>
           </button>
+          <button 
+            onClick={() => setShowDebug(!showDebug)}
+            className="flex flex-col items-center gap-1 text-slate-300"
+          >
+            <Info size={20} />
+            <span className="text-[10px] font-black">Hali</span>
+          </button>
         </div>
       </nav>
+
+      {/* Debug Info */}
+      {showDebug && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="bg-white rounded-[32px] w-full max-w-md p-8 overflow-y-auto max-h-[80vh]">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-slate-900">Hali ya Mfumo</h3>
+              <button onClick={() => setShowDebug(false)} className="text-slate-400">✕</button>
+            </div>
+            <div className="space-y-4 text-sm">
+              <div className="p-4 bg-slate-50 rounded-2xl">
+                <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Muunganisho wa Data</p>
+                <p className="font-bold text-slate-700">Wauuzaji: {vendors.length}</p>
+                <p className="font-bold text-slate-700">Bidhaa: {products.length}</p>
+                <p className="font-bold text-slate-700">Maagizo: {orders.length}</p>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-2xl">
+                <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Mtumiaji wa Sasa</p>
+                <p className="font-bold text-slate-700">{user ? `${user.name} (${user.role})` : 'Hujaingia'}</p>
+              </div>
+              <div className="p-4 bg-amber-50 rounded-2xl text-amber-900">
+                <p className="text-[10px] font-black text-amber-400 uppercase mb-1">Kidokezo cha Msaada</p>
+                <p className="text-xs leading-relaxed">
+                  Ikiwa huoni bidhaa, hakikisha kuwa:
+                  <br/>1. Umeunganishwa na Internet.
+                  <br/>2. Firebase Security Rules zinaruhusu kusoma.
+                  <br/>3. Kuna data kwenye Firestore collection 'kuku_products'.
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowDebug(false)}
+              className="w-full mt-6 bg-slate-900 text-white font-black py-4 rounded-2xl"
+            >
+              FUNGA
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Vendor KYC Modal */}
       <Modal 
@@ -674,13 +752,13 @@ export const ShopPage: React.FC = () => {
               <div className="flex flex-wrap gap-1 mt-2">
                 {DAYS.map(day => (
                   <span 
-                    key={day} 
+                    key={day.key} 
                     className={cn(
                       "text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase",
-                      selectedVendor.openDays?.includes(day) ? "bg-amber-100 text-amber-700" : "bg-slate-200 text-slate-400"
+                      selectedVendor.openDays?.includes(day.key) ? "bg-amber-100 text-amber-700" : "bg-slate-200 text-slate-400"
                     )}
                   >
-                    {day}
+                    {day.label}
                   </span>
                 ))}
               </div>
@@ -735,8 +813,12 @@ export const ShopPage: React.FC = () => {
       >
         {selectedProduct && (
           <div className="space-y-6">
-            <div className="aspect-square bg-amber-50 rounded-[28px] flex items-center justify-center text-8xl relative">
-              {selectedProduct.emoji}
+            <div className="aspect-square bg-amber-50 rounded-[28px] flex items-center justify-center text-8xl relative overflow-hidden">
+              {selectedProduct.image ? (
+                <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-cover" />
+              ) : (
+                selectedProduct.emoji
+              )}
               <div className="absolute bottom-4 left-4">
                 <span className={cn(
                   "badge px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
@@ -831,11 +913,14 @@ export const ShopPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Bei</p>
-                <p className="text-xl font-black text-amber-700">{formatCurrency(selectedProduct.price)}</p>
+                <p className="text-xl font-black text-amber-700">
+                  {formatCurrency(selectedProduct.price)}
+                  <span className="text-xs font-normal text-slate-400 ml-1">/ {selectedProduct.unit}</span>
+                </p>
               </div>
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Stock</p>
-                <p className="text-xl font-black text-slate-700">{selectedProduct.stock} pcs</p>
+                <p className="text-xl font-black text-slate-700">{selectedProduct.stock} {selectedProduct.unit === 'Kg' ? 'Kg' : 'pcs'}</p>
               </div>
             </div>
 

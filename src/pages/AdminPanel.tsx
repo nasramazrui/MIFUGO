@@ -61,6 +61,9 @@ export const AdminPanel: React.FC = () => {
 
   // Dynamic Analytics
   const totalRevenue = orders.filter(o => o.status === 'delivered').reduce((s, o) => s + o.total, 0);
+  const totalAdminEarnings = orders
+    .filter(o => o.status === 'delivered')
+    .reduce((s, o) => s + (o.adminCommission || (o.total - (o.deliveryFee || 0)) * 0.06), 0);
   
   const regionStats = vendors.reduce((acc: any, v) => {
     const reg = v.region || 'Unknown';
@@ -78,6 +81,28 @@ export const AdminPanel: React.FC = () => {
     .sort((a, b) => b.sales - a.sales)
     .slice(0, 5);
 
+  const salesByDate = orders
+    .filter(o => o.status === 'delivered')
+    .reduce((acc: any, o) => {
+      const date = o.date || 'Unknown';
+      acc[date] = (acc[date] || 0) + o.total;
+      return acc;
+    }, {});
+
+  const salesHistoryData = Object.entries(salesByDate)
+    .map(([date, amount]) => ({ date, amount }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-7);
+
+  const popularProductsData = products
+    .map(p => ({
+      name: p.name,
+      sales: orders.filter(o => o.productId === p.id && o.status === 'delivered').length,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)]
+    }))
+    .sort((a, b) => b.sales - a.sales)
+    .slice(0, 4);
+
   const approveWithdrawal = async (id: string) => {
     try {
       await updateDoc(doc(db, 'kuku_withdrawals', id), { status: 'paid' });
@@ -85,6 +110,16 @@ export const AdminPanel: React.FC = () => {
       toast.success('Malipo yameidhinishwa');
     } catch (error: any) {
       toast.error('Hitilafu wakati wa kuidhinisha');
+    }
+  };
+
+  const rejectWithdrawal = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'kuku_withdrawals', id), { status: 'rejected' });
+      addActivity('✕', `Maombi ya malipo yamekataliwa`);
+      toast.success('Maombi yamekataliwa');
+    } catch (error: any) {
+      toast.error('Hitilafu wakati wa kukataa');
     }
   };
 
@@ -188,12 +223,13 @@ export const AdminPanel: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
               {[
                 { label: 'Watumiaji', value: users.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
                 { label: 'Wauuzaji', value: vendors.length, icon: Store, color: 'text-emerald-600', bg: 'bg-emerald-50', sub: `${pendingVendors.length} wanasubiri` },
                 { label: 'Bidhaa', value: products.length, icon: Package, color: 'text-amber-600', bg: 'bg-amber-50' },
                 { label: 'Maagizo', value: orders.length, icon: ClipboardList, color: 'text-red-600', bg: 'bg-red-50' },
+                { label: 'Mapato Admin (6%)', value: formatCurrency(totalAdminEarnings), icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
               ].map((stat, i) => (
                 <div key={i} className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
                   <div className={cn("w-14 h-14 rounded-[20px] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform", stat.bg)}>
@@ -272,39 +308,62 @@ export const AdminPanel: React.FC = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
             <h2 className="text-3xl font-black text-slate-900">Analytics ya Biashara</h2>
             
-            <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
-              <div className="flex items-center justify-between mb-10">
-                <h3 className="font-black text-slate-900 flex items-center gap-2">
-                  <TrendingUp size={20} className="text-amber-500" /> Mapato ya Jumla (TZS)
-                </h3>
-                <div className="text-right">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Jumla ya Mauzo</p>
-                  <p className="text-2xl font-black text-amber-700">{formatCurrency(totalRevenue)}</p>
+            <div className="grid lg:grid-cols-2 gap-8">
+              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+                <div className="flex items-center justify-between mb-10">
+                  <h3 className="font-black text-slate-900 flex items-center gap-2">
+                    <TrendingUp size={20} className="text-amber-500" /> Mauzo ya Siku 7 (TZS)
+                  </h3>
+                </div>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={salesHistoryData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="date" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }} 
+                        dy={10}
+                      />
+                      <YAxis hide />
+                      <Tooltip 
+                        cursor={{ fill: '#f8fafc' }}
+                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                      />
+                      <Bar dataKey="amount" fill="#d97706" radius={[10, 10, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topSellers}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis 
-                      dataKey="name" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }} 
-                      dy={10}
-                    />
-                    <YAxis hide />
-                    <Tooltip 
-                      cursor={{ fill: '#f8fafc' }}
-                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                    />
-                    <Bar dataKey="sales" radius={[10, 10, 0, 0]}>
-                      {topSellers.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+
+              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+                <div className="flex items-center justify-between mb-10">
+                  <h3 className="font-black text-slate-900 flex items-center gap-2">
+                    <Store size={20} className="text-emerald-500" /> Wauuzaji Bora (Sales)
+                  </h3>
+                </div>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={topSellers} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                      <XAxis type="number" hide />
+                      <YAxis 
+                        dataKey="name" 
+                        type="category" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }}
+                        width={100}
+                      />
+                      <Tooltip 
+                        cursor={{ fill: '#f8fafc' }}
+                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                      />
+                      <Bar dataKey="sales" fill="#059669" radius={[0, 10, 10, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
 
@@ -350,26 +409,25 @@ export const AdminPanel: React.FC = () => {
                   <ShoppingBag size={20} className="text-emerald-500" /> Bidhaa Maarufu
                 </h3>
                 <div className="space-y-6">
-                  {[
-                    { name: 'Mayai ya Kuku', sales: 450, color: 'bg-amber-500' },
-                    { name: 'Kuku wa Nyama', sales: 320, color: 'bg-emerald-500' },
-                    { name: 'Vifaranga', sales: 280, color: 'bg-blue-500' },
-                    { name: 'Chakula cha Kuku', sales: 150, color: 'bg-purple-500' },
-                  ].map((item, i) => (
-                    <div key={i}>
-                      <div className="flex justify-between mb-2">
-                        <span className="text-sm font-bold text-slate-700">{item.name}</span>
-                        <span className="text-sm font-black text-slate-900">{item.sales} sold</span>
+                  {popularProductsData.length === 0 ? (
+                    <p className="text-center py-10 text-slate-400 text-sm">Hakuna data ya bidhaa bado.</p>
+                  ) : (
+                    popularProductsData.map((item, i) => (
+                      <div key={i}>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-sm font-bold text-slate-700">{item.name}</span>
+                          <span className="text-sm font-black text-slate-900">{item.sales} sold</span>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(item.sales / (popularProductsData[0].sales || 1)) * 100}%` }}
+                            className={cn("h-full rounded-full", item.color)}
+                          />
+                        </div>
                       </div>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${(item.sales / 450) * 100}%` }}
-                          className={cn("h-full rounded-full", item.color)}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -634,7 +692,7 @@ export const AdminPanel: React.FC = () => {
         {activeTab === 'wallet' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <h2 className="text-3xl font-black text-slate-900 mb-8">Maombi ya Malipo (Withdraw)</h2>
-            <div className="space-y-4">
+            <div className="space-y-6">
               {withdrawals.length === 0 ? (
                 <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100">
                   <Wallet size={48} className="mx-auto text-slate-200 mb-4" />
@@ -642,30 +700,74 @@ export const AdminPanel: React.FC = () => {
                 </div>
               ) : (
                 withdrawals.map(w => (
-                  <div key={w.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex items-center justify-between shadow-sm">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-xl">💸</div>
-                      <div>
-                        <h4 className="font-black text-slate-900">{w.vendorName}</h4>
-                        <p className="text-xs text-slate-400">{formatCurrency(w.amount)} · {w.date}</p>
+                  <div key={w.id} className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-6 mb-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-2xl">💸</div>
+                        <div>
+                          <h4 className="font-black text-slate-900 text-lg">{w.vendorName}</h4>
+                          <p className="text-sm font-black text-emerald-700">{formatCurrency(w.amount)}</p>
+                          <p className="text-xs text-slate-400 mt-1">{w.date}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <span className={cn(
+                          "text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider",
+                          w.status === 'paid' ? "bg-emerald-100 text-emerald-800" : 
+                          w.status === 'pending' ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"
+                        )}>
+                          {w.status}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className={cn(
-                        "text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider",
-                        w.status === 'paid' ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                      )}>
-                        {w.status}
-                      </span>
-                      {w.status === 'pending' && (
-                        <button 
-                          onClick={() => approveWithdrawal(w.id)}
-                          className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-emerald-700 transition-all"
-                        >
-                          LIPA SASA
-                        </button>
+
+                    <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 mb-6">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Taarifa za Malipo</p>
+                      {w.method === 'mobile' ? (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-[10px] text-slate-400 uppercase">Mtandao</p>
+                            <p className="text-sm font-black text-slate-900">{w.network}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 uppercase">Namba ya Simu</p>
+                            <p className="text-sm font-black text-slate-900">{w.phoneNumber}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <p className="text-[10px] text-slate-400 uppercase">Benki</p>
+                            <p className="text-sm font-black text-slate-900">{w.bankName}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 uppercase">Akaunti</p>
+                            <p className="text-sm font-black text-slate-900">{w.accountNumber}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 uppercase">Jina</p>
+                            <p className="text-sm font-black text-slate-900">{w.accountName}</p>
+                          </div>
+                        </div>
                       )}
                     </div>
+
+                    {w.status === 'pending' && (
+                      <div className="flex gap-3">
+                        <button 
+                          onClick={() => approveWithdrawal(w.id)}
+                          className="flex-1 bg-emerald-600 text-white py-4 rounded-xl text-xs font-black hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+                        >
+                          THIBITISHA MALIPO (PAID)
+                        </button>
+                        <button 
+                          onClick={() => rejectWithdrawal(w.id)}
+                          className="bg-red-50 text-red-500 px-6 py-4 rounded-xl text-xs font-black hover:bg-red-100 transition-all"
+                        >
+                          KATAA
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -695,19 +797,57 @@ export const AdminPanel: React.FC = () => {
                     className="input-field" 
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Simu</label>
+                  <input 
+                    type="text" 
+                    defaultValue={editingItem.data.phone}
+                    onBlur={async (e) => {
+                      await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { phone: e.target.value });
+                      toast.success('Namba ya simu imebadilishwa');
+                    }}
+                    className="input-field" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Eneo</label>
+                  <input 
+                    type="text" 
+                    defaultValue={editingItem.data.location}
+                    onBlur={async (e) => {
+                      await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { location: e.target.value });
+                      toast.success('Eneo limebadilishwa');
+                    }}
+                    className="input-field" 
+                  />
+                </div>
                 {editingItem.type === 'vendor' && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Jina la Duka</label>
-                    <input 
-                      type="text" 
-                      defaultValue={editingItem.data.shopName}
-                      onBlur={async (e) => {
-                        await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { shopName: e.target.value });
-                        toast.success('Jina la duka limebadilishwa');
-                      }}
-                      className="input-field" 
-                    />
-                  </div>
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Jina la Duka</label>
+                      <input 
+                        type="text" 
+                        defaultValue={editingItem.data.shopName}
+                        onBlur={async (e) => {
+                          await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { shopName: e.target.value });
+                          toast.success('Jina la duka limebadilishwa');
+                        }}
+                        className="input-field" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Mkoa</label>
+                      <input 
+                        type="text" 
+                        defaultValue={editingItem.data.region}
+                        onBlur={async (e) => {
+                          await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { region: e.target.value });
+                          toast.success('Mkoa umebadilishwa');
+                        }}
+                        className="input-field" 
+                      />
+                    </div>
+                  </>
                 )}
               </>
             ) : editingItem.type === 'product' ? (
