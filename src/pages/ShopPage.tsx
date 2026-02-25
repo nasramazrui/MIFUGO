@@ -354,8 +354,27 @@ export const ShopPage: React.FC = () => {
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-amber-100 px-4 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-3xl">🚜</span>
-            <h1 className="font-serif italic text-2xl text-amber-900 font-bold">FarmConnect</h1>
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-xl shadow-amber-100 border border-amber-50 overflow-hidden">
+              {systemSettings?.app_logo ? (
+                <img 
+                  src={systemSettings.app_logo} 
+                  alt="FarmConnect Logo" 
+                  className="w-full h-full object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <img 
+                  src="https://cdn-icons-png.flaticon.com/512/2329/2329113.png" 
+                  alt="FarmConnect Logo" 
+                  className="w-8 h-8 object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              )}
+            </div>
+            <div className="flex flex-col -gap-1">
+              <h1 className="font-serif italic text-2xl text-amber-900 font-bold tracking-tight">FarmConnect</h1>
+              <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">Soko la Kilimo</span>
+            </div>
           </div>
           <div className="flex-1 max-w-md relative hidden sm:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -368,6 +387,12 @@ export const ShopPage: React.FC = () => {
             />
           </div>
           <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsVendorRegModalOpen(true)}
+              className="hidden md:flex bg-gradient-to-r from-amber-500 to-amber-600 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 shadow-md shadow-amber-100 animate-pulse hover:animate-none"
+            >
+              Sajili Duka Lako
+            </button>
             {user ? (
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -417,40 +442,21 @@ export const ShopPage: React.FC = () => {
         )}
         {activeTab === 'browse' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            {/* Hero */}
-            <div className="bg-gradient-to-br from-amber-600 to-amber-800 rounded-[32px] p-8 text-white mb-8 relative overflow-hidden shadow-2xl shadow-amber-200">
-              <div className="relative z-10">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-200 mb-2 block">Premium Marketplace</span>
-                <h2 className="font-serif italic text-4xl mb-4 leading-tight">Soko la Kilimo & Mifugo<br />Tanzania Kiganjani Mwako</h2>
-                <p className="text-amber-100 text-sm max-w-md mb-6">Pata bidhaa bora za mifugo na mazao moja kwa moja kutoka kwa wakulima waliohakikiwa nchi nzima.</p>
-                <div className="flex flex-wrap gap-3">
-                  <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl text-[10px] font-bold border border-white/10">✓ Verified Vendors</div>
-                  <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl text-[10px] font-bold border border-white/10">✓ Real-time Tracking</div>
-                  <button 
-                    onClick={() => setIsVendorRegModalOpen(true)}
-                    className="bg-amber-400 text-amber-950 px-4 py-2 rounded-xl text-[10px] font-black hover:bg-amber-300 transition-all shadow-lg shadow-amber-900/20"
-                  >
-                    SAJILI DUKA LAKO
-                  </button>
-                </div>
-              </div>
-              <div className="absolute right-[-20px] bottom-[-40px] text-[200px] opacity-10 select-none pointer-events-none">🚜</div>
-            </div>
-
             {/* Categories */}
-            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide mb-6">
+            <div className="flex gap-3 overflow-x-auto pb-6 scrollbar-hide mb-8 -mx-4 px-4 sm:mx-0 sm:px-0">
               {CATEGORIES.map(cat => (
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCat(cat.id)}
                   className={cn(
-                    "flex-shrink-0 px-6 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2",
+                    "flex-shrink-0 px-6 py-4 rounded-[24px] font-black text-xs transition-all flex flex-col items-center gap-2 min-w-[100px] border-2",
                     selectedCat === cat.id 
-                      ? "bg-amber-600 text-white shadow-lg shadow-amber-100" 
-                      : "bg-white text-slate-600 border border-slate-100 hover:border-amber-200"
+                      ? "bg-amber-600 text-white border-amber-600 shadow-xl shadow-amber-100 scale-105" 
+                      : "bg-white text-slate-500 border-slate-100 hover:border-amber-200 hover:bg-amber-50/30"
                   )}
                 >
-                  <span>{cat.emoji}</span> {cat.label}
+                  <span className="text-2xl">{cat.emoji}</span>
+                  <span className="uppercase tracking-wider">{cat.label}</span>
                 </button>
               ))}
             </div>

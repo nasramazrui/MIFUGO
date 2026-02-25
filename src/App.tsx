@@ -6,15 +6,33 @@ import { AdminPanel } from './pages/AdminPanel';
 import { Toaster } from 'react-hot-toast';
 
 const AppContent: React.FC = () => {
-  const { user, loading } = useApp();
+  const { user, loading, systemSettings } = useApp();
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#fafaf8]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="text-6xl animate-bounce">🐔</div>
-          <div className="w-12 h-12 border-4 border-amber-200 border-t-amber-600 rounded-full animate-spin" />
-          <p className="font-serif italic text-xl text-amber-900">KukuMart Tanzania...</p>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-8">
+          <div className="relative">
+            <div className="text-8xl animate-pulse select-none">
+              {systemSettings?.loading_icon || '🚜'}
+            </div>
+            {!systemSettings?.loading_icon && (
+              <div className="absolute -bottom-2 -right-2 text-4xl animate-bounce">🌱</div>
+            )}
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <h1 className="text-4xl font-black text-amber-900 tracking-tighter">FarmConnect</h1>
+            <div className="flex gap-1">
+              {[0, 1, 2].map((i) => (
+                <div 
+                  key={i} 
+                  className="w-2 h-2 bg-amber-600 rounded-full animate-bounce" 
+                  style={{ animationDelay: `${i * 0.2}s` }}
+                />
+              ))}
+            </div>
+          </div>
+          <p className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">Inapakia Soko la Kilimo...</p>
         </div>
       </div>
     );

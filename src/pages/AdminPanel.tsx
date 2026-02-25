@@ -28,7 +28,8 @@ import {
   Bell,
   Settings,
   Camera,
-  Save
+  Save,
+  Star
 } from 'lucide-react';
 import { cn } from '../utils';
 import { 
@@ -69,7 +70,9 @@ export const AdminPanel: React.FC = () => {
     firebase_api_key: '',
     firebase_auth_domain: '',
     firebase_project_id: '',
-    banners: [] as { image: string, link: string }[]
+    banners: [] as { image: string, link: string }[],
+    app_logo: '',
+    loading_icon: ''
   });
 
   useEffect(() => {
@@ -81,7 +84,9 @@ export const AdminPanel: React.FC = () => {
         firebase_api_key: systemSettings.firebase_api_key || '',
         firebase_auth_domain: systemSettings.firebase_auth_domain || '',
         firebase_project_id: systemSettings.firebase_project_id || '',
-        banners: systemSettings.banners || []
+        banners: systemSettings.banners || [],
+        app_logo: systemSettings.app_logo || '',
+        loading_icon: systemSettings.loading_icon || ''
       });
     }
   }, [systemSettings]);
@@ -849,6 +854,43 @@ export const AdminPanel: React.FC = () => {
             <p className="text-slate-500 mb-10">Weka funguo za ImageKit na Firebase hapa. Mabadiliko yataathiri mfumo mzima.</p>
 
             <div className="space-y-8">
+              {/* Branding Section */}
+              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                  <div className="w-8 h-8 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
+                    <Star size={18} />
+                  </div>
+                  Branding & Identity
+                </h3>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">App Logo (URL)</label>
+                    <input 
+                      type="text"
+                      value={localSettings.app_logo}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, app_logo: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="https://link.to/logo.png"
+                    />
+                    {localSettings.app_logo && (
+                      <div className="mt-2 w-12 h-12 rounded-xl border border-slate-100 overflow-hidden bg-white flex items-center justify-center">
+                        <img src={localSettings.app_logo} alt="Preview" className="w-full h-full object-contain" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Loading Icon (Emoji/Icon)</label>
+                    <input 
+                      type="text"
+                      value={localSettings.loading_icon}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, loading_icon: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="🚜 au 🐔"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* ImageKit Section */}
               <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
                 <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
