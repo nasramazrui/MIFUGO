@@ -6,7 +6,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion } from 'motion/react';
-import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera } from 'lucide-react';
+import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
@@ -14,9 +14,21 @@ import { createUserWithEmailAndPassword, updateProfile, deleteUser } from 'fireb
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT } from '../services/imageKitService';
 
+interface CartItem {
+  id: string;
+  productId: string;
+  name: string;
+  price: number;
+  qty: number;
+  image: string;
+  vendorId: string;
+}
+
 export const ShopPage: React.FC = () => {
   const { products, user, vendors, orders, setOrders, addActivity, reviews, logout, systemSettings } = useApp();
-  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders'>('browse');
+  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'cart'>('browse');
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [selectedCat, setSelectedCat] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -231,6 +243,33 @@ export const ShopPage: React.FC = () => {
     } else {
       setIsPaymentModalOpen(true);
     }
+  };
+
+  const addToCart = (product: any, quantity: number) => {
+    const existing = cart.find(item => item.productId === product.id);
+    if (existing) {
+      setCart(cart.map(item => 
+        item.productId === product.id 
+          ? { ...item, qty: item.qty + quantity } 
+          : item
+      ));
+    } else {
+      setCart([...cart, {
+        id: Math.random().toString(36).substr(2, 9),
+        productId: product.id,
+        name: product.name,
+        price: product.price,
+        qty: quantity,
+        image: product.image,
+        vendorId: product.vendorId
+      }]);
+    }
+    toast.success('Imeongezwa kwenye kikapu! 🛒');
+    setSelectedProduct(null);
+  };
+
+  const removeFromCart = (id: string) => {
+    setCart(cart.filter(item => item.id !== id));
   };
 
   const [isOrderLoading, setIsOrderLoading] = useState(false);
@@ -527,6 +566,27 @@ export const ShopPage: React.FC = () => {
             <Store size={20} />
             <span className="text-[10px] font-black">Maduka</span>
           </button>
+
+          {/* Raised Cart Button */}
+          <div className="relative -top-6">
+            <button 
+              onClick={() => setIsCartModalOpen(true)}
+              className={cn(
+                "w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 border-4 border-white",
+                cart.length > 0 ? "bg-amber-600 text-white shadow-amber-200" : "bg-slate-100 text-slate-400"
+              )}
+            >
+              <div className="relative">
+                <ShoppingBag size={28} />
+                {cart.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-bounce">
+                    {cart.reduce((sum, item) => sum + item.qty, 0)}
+                  </span>
+                )}
+              </div>
+            </button>
+          </div>
+
           <button 
             onClick={() => setActiveTab('orders')}
             className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'orders' ? "text-amber-600 scale-110" : "text-slate-400")}
@@ -1101,20 +1161,136 @@ export const ShopPage: React.FC = () => {
               </div>
             </div>
 
-            <button 
-              disabled={!isStoreOpen(selectedProduct.vendorId)}
-              onClick={handleBuyClick}
-              className={cn(
-                "w-full py-5 rounded-[24px] font-black text-lg transition-all shadow-xl",
-                isStoreOpen(selectedProduct.vendorId) 
-                  ? "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-100 active:scale-95" 
-                  : "bg-slate-200 text-slate-400 cursor-not-allowed"
-              )}
-            >
-              {isStoreOpen(selectedProduct.vendorId) ? "NUNUA SASA 🛒" : "DUKA LIMEFUNGA 🔒"}
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                disabled={!isStoreOpen(selectedProduct.vendorId)}
+                onClick={() => addToCart(selectedProduct, qty)}
+                className={cn(
+                  "py-5 rounded-[24px] font-black text-sm transition-all border-2",
+                  isStoreOpen(selectedProduct.vendorId) 
+                    ? "border-amber-600 text-amber-600 hover:bg-amber-50 active:scale-95" 
+                    : "border-slate-200 text-slate-400 cursor-not-allowed"
+                )}
+              >
+                WEKA KIKAPUNI 🛒
+              </button>
+              <button 
+                disabled={!isStoreOpen(selectedProduct.vendorId)}
+                onClick={handleBuyClick}
+                className={cn(
+                  "py-5 rounded-[24px] font-black text-sm transition-all shadow-xl",
+                  isStoreOpen(selectedProduct.vendorId) 
+                    ? "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-100 active:scale-95" 
+                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                )}
+              >
+                NUNUA SASA 🚀
+              </button>
+            </div>
           </div>
         )}
+      </Modal>
+
+      {/* Cart Modal */}
+      <Modal 
+        isOpen={isCartModalOpen} 
+        onClose={() => setIsCartModalOpen(false)}
+        title="Kikapu Chako 🛒"
+      >
+        <div className="space-y-6">
+          {cart.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <ShoppingBag size={32} className="text-slate-300" />
+              </div>
+              <p className="text-slate-500 font-bold">Kikapu chako kiko wazi</p>
+              <button 
+                onClick={() => setIsCartModalOpen(false)}
+                className="mt-4 text-amber-600 font-black text-sm uppercase tracking-widest"
+              >
+                Anza Kununua
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
+                {cart.map(item => (
+                  <div key={item.id} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 group">
+                    <div className="w-16 h-16 bg-white rounded-xl overflow-hidden border border-slate-100 flex-shrink-0">
+                      {item.image ? (
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-black text-slate-900 truncate">{item.name}</h4>
+                      <p className="text-xs font-bold text-amber-600">{formatCurrency(item.price)}</p>
+                      <div className="flex items-center gap-3 mt-2">
+                        <button 
+                          onClick={() => {
+                            if (item.qty > 1) {
+                              setCart(cart.map(c => c.id === item.id ? { ...c, qty: c.qty - 1 } : c));
+                            } else {
+                              removeFromCart(item.id);
+                            }
+                          }}
+                          className="w-6 h-6 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors"
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <span className="text-sm font-black w-4 text-center">{item.qty}</span>
+                        <button 
+                          onClick={() => setCart(cart.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c))}
+                          className="w-6 h-6 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-50 transition-colors"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => removeFromCart(item.id)}
+                      className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-slate-100 pt-6">
+                <div className="flex justify-between items-center mb-6">
+                  <span className="text-slate-500 font-bold">Jumla Kuu:</span>
+                  <span className="text-2xl font-black text-slate-900">
+                    {formatCurrency(cart.reduce((sum, item) => sum + (item.price * item.qty), 0))}
+                  </span>
+                </div>
+                <button 
+                  onClick={() => {
+                    if (!user) {
+                      setIsCartModalOpen(false);
+                      setIsAuthModalOpen(true);
+                    } else {
+                      // For simplicity, we'll process the first item in cart for checkout
+                      // In a real app, we'd handle multiple items/vendors
+                      const firstItem = cart[0];
+                      const product = products.find(p => p.id === firstItem.productId);
+                      if (product) {
+                        setSelectedProduct(product);
+                        setQty(firstItem.qty);
+                        setIsCartModalOpen(false);
+                        setIsPaymentModalOpen(true);
+                      }
+                    }
+                  }}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-5 rounded-[24px] shadow-xl shadow-amber-100 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  ENDELEA NA MALIPO <ShoppingBag size={20} />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </Modal>
 
       {/* Payment Modal */}
