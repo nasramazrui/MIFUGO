@@ -6,42 +6,50 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import admin from 'firebase-admin';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
-// Initialize ImageKit only if keys are provided
-let ik: ImageKit | null = null;
-try {
-  if (process.env.VITE_IMAGEKIT_PUBLIC_KEY && process.env.IMAGEKIT_PRIVATE_KEY) {
-    ik = new ImageKit({
-      publicKey: process.env.VITE_IMAGEKIT_PUBLIC_KEY,
-      privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
-      urlEndpoint: process.env.VITE_IMAGEKIT_URL_ENDPOINT || '',
-    });
-    console.log('ImageKit initialized successfully');
-  } else {
-    console.warn('ImageKit keys missing, image upload features will be limited');
-  }
-} catch (err) {
-  console.error('Failed to initialize ImageKit:', err);
+// Initialize Firebase Admin
+if (!admin.apps.length) {
+  admin.initializeApp({
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'kuku-market-default'
+  });
 }
+const db = admin.firestore();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 // ImageKit Auth Endpoint
-app.get('/api/imagekit/auth', (req, res) => {
-  if (!ik) {
-    return res.status(503).json({ error: 'ImageKit not configured' });
-  }
+app.get('/api/imagekit/auth', async (req, res) => {
   try {
+    // Try to get config from Firestore first
+    const configDoc = await db.collection('kuku_config').doc('settings').get();
+    const config = configDoc.exists ? configDoc.data() : null;
+
+    const publicKey = config?.imagekit_public_key || process.env.VITE_IMAGEKIT_PUBLIC_KEY;
+    const privateKey = config?.imagekit_private_key || process.env.IMAGEKIT_PRIVATE_KEY;
+    const urlEndpoint = config?.imagekit_url_endpoint || process.env.VITE_IMAGEKIT_URL_ENDPOINT;
+
+    if (!publicKey || !privateKey) {
+      return res.status(503).json({ error: 'ImageKit not configured' });
+    }
+
+    const ik = new ImageKit({
+      publicKey,
+      privateKey,
+      urlEndpoint: urlEndpoint || '',
+    });
+
     const result = ik.getAuthenticationParameters();
     res.send(result);
   } catch (err) {
+    console.error('ImageKit Auth Error:', err);
     res.status(500).json({ error: 'Failed to get auth parameters' });
   }
 });

@@ -274,6 +274,8 @@ export const VendorPortal: React.FC = () => {
     }
   };
 
+  const isIKConfigured = isImageKitConfigured || (systemSettings?.imagekit_public_key && systemSettings?.imagekit_url_endpoint);
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row pb-20 md:pb-0">
       {/* Mobile Header */}
@@ -860,11 +862,14 @@ export const VendorPortal: React.FC = () => {
                 )}
               </div>
             <div className="flex-1">
-              {isImageKitConfigured ? (
+              {isIKConfigured ? (
                 <IKContext 
                   publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
                   urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
-                  authenticationEndpoint={IMAGEKIT_AUTH_ENDPOINT}
+                  authenticator={async () => {
+                    const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
+                    return await res.json();
+                  }}
                 >
                     <IKUpload
                       fileName={`product_${Date.now()}.png`}
@@ -1036,11 +1041,14 @@ export const VendorPortal: React.FC = () => {
                   )}
                 </div>
                 <div className="flex-1">
-                  {isImageKitConfigured ? (
+                  {isIKConfigured ? (
                     <IKContext 
                       publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
                       urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
-                      authenticationEndpoint={IMAGEKIT_AUTH_ENDPOINT}
+                      authenticator={async () => {
+                        const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
+                        return await res.json();
+                      }}
                     >
                       <IKUpload
                         fileName={`edit_product_${Date.now()}.png`}

@@ -12,7 +12,7 @@ import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, updateProfile, deleteUser } from 'firebase/auth';
 import { IKContext, IKUpload } from 'imagekitio-react';
-import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT } from '../services/imageKitService';
+import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
 
 interface CartItem {
   id: string;
@@ -346,6 +346,8 @@ export const ShopPage: React.FC = () => {
     }
   };
 
+  const isIKConfigured = isImageKitConfigured || (systemSettings?.imagekit_public_key && systemSettings?.imagekit_url_endpoint);
+
   return (
     <div className="min-h-screen pb-24">
       {/* Header */}
@@ -634,10 +636,11 @@ export const ShopPage: React.FC = () => {
                       <div className="w-full h-full flex items-center justify-center text-3xl">👤</div>
                     )}
                   </div>
-                  <IKContext 
-                    publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
-                    urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
-                    authenticator={async () => {
+                  {isIKConfigured ? (
+                    <IKContext 
+                      publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
+                      urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
+                      authenticator={async () => {
                         try {
                           const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
                           if (!res.ok) {
@@ -667,6 +670,11 @@ export const ShopPage: React.FC = () => {
                         />
                       </label>
                     </IKContext>
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/5 rounded-[32px]">
+                      <span className="text-[8px] text-slate-400">Config missing</span>
+                    </div>
+                  )}
                 </div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gusa kamera kubadili picha</p>
               </div>
