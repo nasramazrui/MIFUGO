@@ -3,6 +3,7 @@ export interface User {
   name: string;
   email: string;
   role: 'user' | 'vendor' | 'admin';
+  avatar?: string;
   contact?: string;
   hasWhatsApp?: boolean;
   status?: 'pending' | 'approved' | 'rejected';

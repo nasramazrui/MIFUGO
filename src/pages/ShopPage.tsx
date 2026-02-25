@@ -6,20 +6,84 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion } from 'motion/react';
-import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info } from 'lucide-react';
+import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
-import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, updateProfile, deleteUser } from 'firebase/auth';
+import { IKContext, IKUpload } from 'imagekitio-react';
+import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT } from '../services/imageKitService';
 
 export const ShopPage: React.FC = () => {
-  const { products, user, vendors, orders, setOrders, addActivity, reviews, logout } = useApp();
+  const { products, user, vendors, orders, setOrders, addActivity, reviews, logout, systemSettings } = useApp();
   const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders'>('browse');
   const [selectedCat, setSelectedCat] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: user?.name || '',
+    contact: user?.contact || '',
+    avatar: user?.avatar || ''
+  });
+
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        name: user.name,
+        contact: user.contact || '',
+        avatar: user.avatar || ''
+      });
+    }
+  }, [user]);
+
+  const handleUpdateProfile = async () => {
+    if (!user) return;
+    setIsProfileLoading(true);
+    try {
+      await updateDoc(doc(db, 'kuku_users', user.id), {
+        name: profileData.name,
+        contact: profileData.contact,
+        avatar: profileData.avatar
+      });
+      toast.success('Wasifu umesasishwa!');
+    } catch (error) {
+      toast.error('Hitilafu wakati wa kusasisha wasifu');
+    } finally {
+      setIsProfileLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    if (!confirm('Je, una uhakika unataka kufuta akaunti yako? Hatua hii haiwezi kurudishwa.')) return;
+    
+    try {
+      const userId = user.id;
+      // 1. Delete Auth user first (it might fail due to recent login)
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await deleteUser(currentUser);
+      }
+      
+      // 2. Delete Firestore doc
+      await deleteDoc(doc(db, 'kuku_users', userId));
+      
+      toast.success('Akaunti imefutwa kwa mafanikio');
+      logout();
+      setIsProfileModalOpen(false);
+    } catch (error: any) {
+      console.error(error);
+      if (error.code === 'auth/requires-recent-login') {
+        toast.error('Tafadhali toka na uingie tena ili kufuta akaunti yako kwa usalama.');
+      } else {
+        toast.error('Hitilafu wakati wa kufuta akaunti');
+      }
+    }
+  };
+
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isVendorRegModalOpen, setIsVendorRegModalOpen] = useState(false);
   const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
@@ -471,50 +535,144 @@ export const ShopPage: React.FC = () => {
             <span className="text-[10px] font-black">Oda</span>
           </button>
           <button 
-            onClick={() => setShowDebug(!showDebug)}
-            className="flex flex-col items-center gap-1 text-slate-300"
+            onClick={() => {
+              if (!user) {
+                setIsAuthModalOpen(true);
+              } else {
+                setIsProfileModalOpen(true);
+              }
+            }}
+            className={cn("flex flex-col items-center gap-1 transition-all", isProfileModalOpen ? "text-amber-600 scale-110" : "text-slate-400")}
           >
-            <Info size={20} />
-            <span className="text-[10px] font-black">Hali</span>
+            {user?.avatar ? (
+              <img src={user.avatar} alt="" className="w-5 h-5 rounded-full object-cover border border-amber-200" />
+            ) : (
+              <UserIcon size={20} />
+            )}
+            <span className="text-[10px] font-black">Wasifu</span>
           </button>
         </div>
       </nav>
 
-      {/* Debug Info */}
-      {showDebug && (
+      {/* Profile Modal */}
+      {isProfileModalOpen && user && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="bg-white rounded-[32px] w-full max-w-md p-8 overflow-y-auto max-h-[80vh]">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-black text-slate-900">Hali ya Mfumo</h3>
-              <button onClick={() => setShowDebug(false)} className="text-slate-400">✕</button>
+          <div className="bg-white rounded-[32px] w-full max-w-md p-8 overflow-y-auto max-h-[90vh]">
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-2xl font-black text-slate-900">Wasifu Wangu</h3>
+              <button onClick={() => setIsProfileModalOpen(false)} className="text-slate-400 p-2 hover:bg-slate-50 rounded-full transition-all">✕</button>
             </div>
-            <div className="space-y-4 text-sm">
-              <div className="p-4 bg-slate-50 rounded-2xl">
-                <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Muunganisho wa Data</p>
-                <p className="font-bold text-slate-700">Wauuzaji: {vendors.length}</p>
-                <p className="font-bold text-slate-700">Bidhaa: {products.length}</p>
-                <p className="font-bold text-slate-700">Maagizo: {orders.length}</p>
+
+            <div className="space-y-6">
+              {/* Avatar Upload */}
+              <div className="flex flex-col items-center gap-4 py-4">
+                <div className="relative group">
+                  <div className="w-24 h-24 bg-amber-50 rounded-[32px] overflow-hidden border-4 border-white shadow-xl">
+                    {profileData.avatar ? (
+                      <img src={profileData.avatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-3xl">👤</div>
+                    )}
+                  </div>
+                  <IKContext 
+                    publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
+                    urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
+                    authenticator={async () => {
+                        try {
+                          const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
+                          if (!res.ok) {
+                            const errorData = await res.json();
+                            throw new Error(errorData.error || 'Auth failed');
+                          }
+                          return res.json();
+                        } catch (err: any) {
+                          console.error('ImageKit Auth Error:', err);
+                          throw err;
+                        }
+                      }}
+                    >
+                      <label className="absolute bottom-0 right-0 bg-amber-600 text-white p-2 rounded-2xl shadow-lg cursor-pointer hover:bg-amber-700 transition-all active:scale-90">
+                        <Camera size={16} />
+                        <IKUpload 
+                          className="hidden" 
+                          fileName={`avatar_${user.id}_${Date.now()}`}
+                          onSuccess={(res: any) => {
+                            setProfileData(prev => ({ ...prev, avatar: res.url }));
+                            toast.success('Picha imepakiwa!');
+                          }}
+                          onError={(err: any) => {
+                            console.error('Upload Error:', err);
+                            toast.error('Imeshindwa kupakia picha. Hakikisha umeunganisha ImageKit Keys kwenye Secrets.');
+                          }}
+                        />
+                      </label>
+                    </IKContext>
+                </div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gusa kamera kubadili picha</p>
               </div>
-              <div className="p-4 bg-slate-50 rounded-2xl">
-                <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Mtumiaji wa Sasa</p>
-                <p className="font-bold text-slate-700">{user ? `${user.name} (${user.role})` : 'Hujaingia'}</p>
+
+              {/* Form Fields */}
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">Jina Lako</label>
+                  <input 
+                    type="text"
+                    value={profileData.name}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">Namba ya WhatsApp</label>
+                  <input 
+                    type="tel"
+                    placeholder="255..."
+                    value={profileData.contact}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, contact: e.target.value }))}
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold"
+                  />
+                </div>
+                <div className="p-4 bg-slate-50 rounded-2xl">
+                  <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Barua Pepe (Email)</p>
+                  <p className="font-bold text-slate-700">{user.email}</p>
+                </div>
               </div>
-              <div className="p-4 bg-amber-50 rounded-2xl text-amber-900">
-                <p className="text-[10px] font-black text-amber-400 uppercase mb-1">Kidokezo cha Msaada</p>
-                <p className="text-xs leading-relaxed">
-                  Ikiwa huoni bidhaa, hakikisha kuwa:
-                  <br/>1. Umeunganishwa na Internet.
-                  <br/>2. Firebase Security Rules zinaruhusu kusoma.
-                  <br/>3. Kuna data kwenye Firestore collection 'kuku_products'.
-                </p>
+
+              <div className="pt-6 space-y-3">
+                <button 
+                  onClick={handleUpdateProfile}
+                  disabled={isProfileLoading}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-4 rounded-2xl shadow-lg shadow-amber-100 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {isProfileLoading ? 'INAHIFADHI...' : 'HIFADHI MABADILIKO'}
+                </button>
+                
+                <div className="flex gap-3">
+                  <button 
+                    onClick={logout}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black py-4 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <LogOut size={18} /> TOKA
+                  </button>
+                  <button 
+                    onClick={handleDeleteAccount}
+                    className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-black py-4 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={18} /> FUTA AKAUNTI
+                  </button>
+                </div>
               </div>
+
+              {/* System Info (Moved here from Hali) */}
+              <button 
+                onClick={() => {
+                  alert(`Hali ya Mfumo:\nWauuzaji: ${vendors.length}\nBidhaa: ${products.length}\nOda: ${orders.length}`);
+                }}
+                className="w-full text-[10px] font-black text-slate-300 uppercase tracking-widest pt-4 hover:text-slate-400 transition-all"
+              >
+                Angalia Hali ya Mfumo
+              </button>
             </div>
-            <button 
-              onClick={() => setShowDebug(false)}
-              className="w-full mt-6 bg-slate-900 text-white font-black py-4 rounded-2xl"
-            >
-              FUNGA
-            </button>
           </div>
         </div>
       )}

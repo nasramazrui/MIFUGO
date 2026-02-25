@@ -37,7 +37,7 @@ import {
 import { toast } from 'react-hot-toast';
 
 export const VendorPortal: React.FC = () => {
-  const { user, products, orders, withdrawals, logout, addActivity } = useApp();
+  const { user, products, orders, withdrawals, logout, addActivity, systemSettings } = useApp();
   const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings'>('dash');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -323,8 +323,12 @@ export const VendorPortal: React.FC = () => {
         <div className="p-4 border-t border-slate-50">
           <div className="bg-slate-50 rounded-2xl p-4 mb-4">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center text-white font-black text-xs">
-                {user.name[0].toUpperCase()}
+              <div className="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center text-white font-black text-xs overflow-hidden">
+                {user.avatar ? (
+                  <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  user.name[0].toUpperCase()
+                )}
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-black text-slate-900 truncate">{user.shopName || user.name}</p>
@@ -858,19 +862,25 @@ export const VendorPortal: React.FC = () => {
             <div className="flex-1">
               {isImageKitConfigured ? (
                 <IKContext 
-                  publicKey={IMAGEKIT_PUBLIC_KEY} 
-                  urlEndpoint={IMAGEKIT_URL_ENDPOINT} 
+                  publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
+                  urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
                   authenticationEndpoint={IMAGEKIT_AUTH_ENDPOINT}
                 >
-                  <IKUpload
-                    fileName={`product_${Date.now()}.png`}
-                    tags={["product"]}
-                    useUniqueFileName={true}
-                    onSuccess={(res) => setNewProduct({...newProduct, image: res.url})}
-                    onError={(err) => toast.error('Imeshindwa kupakia picha')}
-                    className="hidden"
-                    id="product-image"
-                  />
+                    <IKUpload
+                      fileName={`product_${Date.now()}.png`}
+                      tags={["product"]}
+                      useUniqueFileName={true}
+                      onSuccess={(res) => {
+                        setNewProduct({...newProduct, image: res.url});
+                        toast.success('Picha imepakiwa!');
+                      }}
+                      onError={(err) => {
+                        console.error('Upload Error:', err);
+                        toast.error('Imeshindwa kupakia picha. Hakikisha ImageKit Keys zipo kwenye Secrets.');
+                      }}
+                      className="hidden"
+                      id="product-image"
+                    />
                 </IKContext>
               ) : (
                 <input 
@@ -1028,16 +1038,22 @@ export const VendorPortal: React.FC = () => {
                 <div className="flex-1">
                   {isImageKitConfigured ? (
                     <IKContext 
-                      publicKey={IMAGEKIT_PUBLIC_KEY} 
-                      urlEndpoint={IMAGEKIT_URL_ENDPOINT} 
+                      publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
+                      urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
                       authenticationEndpoint={IMAGEKIT_AUTH_ENDPOINT}
                     >
                       <IKUpload
                         fileName={`edit_product_${Date.now()}.png`}
                         tags={["product"]}
                         useUniqueFileName={true}
-                        onSuccess={(res) => setEditingProduct({...editingProduct, image: res.url})}
-                        onError={(err) => toast.error('Imeshindwa kupakia picha')}
+                        onSuccess={(res) => {
+                          setEditingProduct({...editingProduct, image: res.url});
+                          toast.success('Picha imesasishwa!');
+                        }}
+                        onError={(err) => {
+                          console.error('Upload Error:', err);
+                          toast.error('Imeshindwa kupakia picha. Hakikisha ImageKit Keys zipo kwenye Secrets.');
+                        }}
                         className="hidden"
                         id="edit-product-image"
                       />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { formatCurrency } from '../utils';
 import { Modal } from '../components/Modal';
@@ -25,7 +25,10 @@ import {
   TrendingUp,
   MapPin,
   ShoppingBag,
-  Bell
+  Bell,
+  Settings,
+  Camera,
+  Save
 } from 'lucide-react';
 import { cn } from '../utils';
 import { 
@@ -44,17 +47,54 @@ import { toast } from 'react-hot-toast';
 
 export const AdminPanel: React.FC = () => {
   const { 
+    user,
     users, 
     vendors, 
     products, 
     orders, 
     activities, 
     withdrawals,
+    systemSettings,
+    updateSystemSettings,
     logout, 
     addActivity 
   } = useApp();
-  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'wallet'>('over');
+  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'wallet' | 'settings'>('over');
   const [editingItem, setEditingItem] = useState<{ type: string, data: any } | null>(null);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [localSettings, setLocalSettings] = useState({
+    imagekit_public_key: '',
+    imagekit_private_key: '',
+    imagekit_url_endpoint: '',
+    firebase_api_key: '',
+    firebase_auth_domain: '',
+    firebase_project_id: '',
+  });
+
+  useEffect(() => {
+    if (systemSettings) {
+      setLocalSettings({
+        imagekit_public_key: systemSettings.imagekit_public_key || '',
+        imagekit_private_key: systemSettings.imagekit_private_key || '',
+        imagekit_url_endpoint: systemSettings.imagekit_url_endpoint || '',
+        firebase_api_key: systemSettings.firebase_api_key || '',
+        firebase_auth_domain: systemSettings.firebase_auth_domain || '',
+        firebase_project_id: systemSettings.firebase_project_id || '',
+      });
+    }
+  }, [systemSettings]);
+
+  const handleSaveSettings = async () => {
+    setIsSavingSettings(true);
+    try {
+      await updateSystemSettings(localSettings);
+      toast.success('Mipangilio imehifadhiwa!');
+    } catch (error) {
+      toast.error('Imeshindwa kuhifadhi mipangilio');
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const pendingVendors = vendors.filter(v => v.status === 'pending');
   const COLORS = ['#d97706', '#059669', '#2563eb', '#7c3aed', '#db2777'];
@@ -186,6 +226,7 @@ export const AdminPanel: React.FC = () => {
             { id: 'orders', label: 'Maagizo', icon: ClipboardList },
             { id: 'users', label: 'Watumiaji', icon: Users },
             { id: 'wallet', label: 'Wallet', icon: Wallet },
+            { id: 'settings', label: 'Mipangilio', icon: Settings },
           ].map(item => (
             <button
               key={item.id}
@@ -209,6 +250,21 @@ export const AdminPanel: React.FC = () => {
         </nav>
 
         <div className="p-6 border-t border-white/5">
+          {user && (
+            <div className="flex items-center gap-3 mb-6 px-2">
+              <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-amber-950 font-black overflow-hidden">
+                {user.avatar ? (
+                  <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  user.name[0].toUpperCase()
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-black text-white truncate">{user.name}</p>
+                <p className="text-[10px] text-amber-400/60 truncate">Administrator</p>
+              </div>
+            </div>
+          )}
           <button 
             onClick={logout}
             className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-sm font-bold text-amber-400/60 hover:bg-red-500/10 hover:text-red-400 transition-all"
@@ -785,6 +841,102 @@ export const AdminPanel: React.FC = () => {
             </div>
           </motion.div>
         )}
+        {activeTab === 'settings' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl">
+            <h2 className="text-3xl font-black text-slate-900 mb-2">Mipangilio ya Mfumo</h2>
+            <p className="text-slate-500 mb-10">Weka funguo za ImageKit na Firebase hapa. Mabadiliko yataathiri mfumo mzima.</p>
+
+            <div className="space-y-8">
+              {/* ImageKit Section */}
+              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                  <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600">
+                    <Camera size={18} />
+                  </div>
+                  ImageKit Configuration
+                </h3>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Public Key</label>
+                    <input 
+                      type="text"
+                      value={localSettings.imagekit_public_key}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, imagekit_public_key: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="Weka Public Key..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">URL Endpoint</label>
+                    <input 
+                      type="text"
+                      value={localSettings.imagekit_url_endpoint}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, imagekit_url_endpoint: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="https://ik.imagekit.io/your_id/"
+                    />
+                  </div>
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Private Key (Sensitive)</label>
+                    <input 
+                      type="password"
+                      value={localSettings.imagekit_private_key}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, imagekit_private_key: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="Weka Private Key..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Firebase Section */}
+              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                  <div className="w-8 h-8 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600">
+                    <Settings size={18} />
+                  </div>
+                  Firebase Configuration
+                </h3>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">API Key</label>
+                    <input 
+                      type="text"
+                      value={localSettings.firebase_api_key}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, firebase_api_key: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Project ID</label>
+                    <input 
+                      type="text"
+                      value={localSettings.firebase_project_id}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, firebase_project_id: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-6">
+                <button 
+                  onClick={handleSaveSettings}
+                  disabled={isSavingSettings}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-black px-12 py-5 rounded-3xl shadow-xl shadow-amber-100 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-3"
+                >
+                  {isSavingSettings ? (
+                    'INAHIFADHI...'
+                  ) : (
+                    <>
+                      <Save size={20} /> HIFADHI MIPANGILIO YOTE
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </main>
 
       {/* Mobile Bottom Nav */}
@@ -797,6 +949,7 @@ export const AdminPanel: React.FC = () => {
           { id: 'orders', icon: ClipboardList, label: 'Oda' },
           { id: 'users', icon: Users, label: 'Watu' },
           { id: 'wallet', icon: Wallet, label: 'Pesa' },
+          { id: 'settings', icon: Settings, label: 'Setti' },
         ].map(item => (
           <button
             key={item.id}

@@ -34,6 +34,8 @@ interface AppContextType {
   addActivity: (icon: string, text: string) => void;
   withdrawals: Withdrawal[];
   setWithdrawals: React.Dispatch<React.SetStateAction<Withdrawal[]>>;
+  systemSettings: any;
+  updateSystemSettings: (settings: any) => Promise<void>;
   logout: () => void;
   loading: boolean;
 }
@@ -49,6 +51,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [systemSettings, setSystemSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   // Auth Listener
@@ -141,6 +144,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() } as Review)));
     });
 
+    // System Settings
+    const unsubSettings = onSnapshot(doc(db, 'kuku_config', 'settings'), (snap) => {
+      if (snap.exists()) {
+        setSystemSettings(snap.data());
+      }
+    });
+
     return () => {
       unsubProducts();
       unsubOrders();
@@ -148,6 +158,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubActs();
       unsubWithdraws();
       unsubReviews();
+      unsubSettings();
     };
   }, []);
 
@@ -161,6 +172,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     } catch (e) {
       console.error("Error adding activity: ", e);
+    }
+  };
+
+  const updateSystemSettings = async (settings: any) => {
+    try {
+      await setDoc(doc(db, 'kuku_config', 'settings'), {
+        ...settings,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (e) {
+      console.error("Error updating settings: ", e);
+      throw e;
     }
   };
 
@@ -178,6 +201,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       reviews, setReviews,
       activities, addActivity,
       withdrawals, setWithdrawals,
+      systemSettings, updateSystemSettings,
       logout,
       loading
     }}>
