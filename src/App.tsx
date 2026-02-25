@@ -13,15 +13,26 @@ const AppContent: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-8">
           <div className="relative">
-            <div className="text-8xl animate-pulse select-none">
-              {systemSettings?.loading_icon || '🚜'}
+            <div className="text-8xl animate-pulse select-none flex items-center justify-center">
+              {systemSettings?.loading_url ? (
+                <img 
+                  src={systemSettings.loading_url} 
+                  alt="Loading..." 
+                  className="w-32 h-32 object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                systemSettings?.loading_icon || '🚜'
+              )}
             </div>
-            {!systemSettings?.loading_icon && (
+            {!systemSettings?.loading_icon && !systemSettings?.loading_url && (
               <div className="absolute -bottom-2 -right-2 text-4xl animate-bounce">🌱</div>
             )}
           </div>
           <div className="flex flex-col items-center gap-2">
-            <h1 className="text-4xl font-black text-amber-900 tracking-tighter">FarmConnect</h1>
+            <h1 className="text-4xl font-black text-amber-900 tracking-tighter">
+              {systemSettings?.app_name || 'FarmConnect'}
+            </h1>
             <div className="flex gap-1">
               {[0, 1, 2].map((i) => (
                 <div 

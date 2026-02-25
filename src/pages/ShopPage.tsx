@@ -150,7 +150,7 @@ export const ShopPage: React.FC = () => {
       addActivity('🏪', `Muuzaji mpya "${vendorFormData.shopName}" amejisajili`);
       toast.success('Usajili umekamilika! Subiri idhini ya Admin.');
       
-      const msg = `*Maombi Mapya ya Muuzaji — KukuMart*\n\nJina la Duka: ${vendorFormData.shopName}\nMmiliki: ${vendorFormData.ownerName}\nSimu: ${vendorFormData.phone}\n\nTafadhali nihakikie.`;
+      const msg = `*Maombi Mapya ya Muuzaji — ${systemSettings?.app_name || 'FarmConnect'}*\n\nJina la Duka: ${vendorFormData.shopName}\nMmiliki: ${vendorFormData.ownerName}\nSimu: ${vendorFormData.phone}\n\nTafadhali nihakikie.`;
       window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
       
       setIsVendorRegModalOpen(false);
@@ -337,7 +337,7 @@ export const ShopPage: React.FC = () => {
       toast.success('Agizo limekamilika!');
       
       // WhatsApp redirect
-      const msg = `*Uthibitisho wa Agizo — KukuMart* 🐔\n\nHabari, agizo langu #${docRef.id.substring(0,8)} limepokewa!\n\nBidhaa: *${p.name}* × ${qty}\nJumla: *${formatCurrency(total)}*\nNjia: *${payMethod}*\n\nAsante!`;
+      const msg = `*Uthibitisho wa Agizo — ${systemSettings?.app_name || 'FarmConnect'}* 🐔\n\nHabari, agizo langu #${docRef.id.substring(0,8)} limepokewa!\n\nBidhaa: *${p.name}* × ${qty}\nJumla: *${formatCurrency(total)}*\nNjia: *${payMethod}*\n\nAsante!`;
       window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
     } catch (error: any) {
       toast.error('Hitilafu wakati wa kutuma agizo');
@@ -372,7 +372,9 @@ export const ShopPage: React.FC = () => {
               )}
             </div>
             <div className="flex flex-col -gap-1">
-              <h1 className="font-serif italic text-2xl text-amber-900 font-bold tracking-tight">FarmConnect</h1>
+              <h1 className="font-serif italic text-2xl text-amber-900 font-bold tracking-tight">
+                {systemSettings?.app_name || 'FarmConnect'}
+              </h1>
               <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">Soko la Kilimo</span>
             </div>
           </div>
@@ -389,7 +391,7 @@ export const ShopPage: React.FC = () => {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setIsVendorRegModalOpen(true)}
-              className="hidden md:flex bg-gradient-to-r from-amber-500 to-amber-600 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 shadow-md shadow-amber-100 animate-pulse hover:animate-none"
+              className="flex bg-gradient-to-r from-amber-500 to-amber-600 text-white px-4 md:px-6 py-2 md:py-2.5 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 shadow-md shadow-amber-100 animate-pulse hover:animate-none whitespace-nowrap"
             >
               Sajili Duka Lako
             </button>
@@ -619,6 +621,16 @@ export const ShopPage: React.FC = () => {
             <Package size={20} />
             <span className="text-[10px] font-black">Oda</span>
           </button>
+
+          <button 
+            onClick={() => setIsVendorRegModalOpen(true)}
+            className="flex flex-col items-center gap-1 text-amber-600 md:hidden"
+          >
+            <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+              <Plus size={18} />
+            </div>
+            <span className="text-[8px] font-black uppercase">Sajili Duka</span>
+          </button>
           <button 
             onClick={() => {
               if (!user) {
@@ -769,7 +781,7 @@ export const ShopPage: React.FC = () => {
           <div className="bg-green-50 p-4 rounded-2xl border border-green-100 flex items-start gap-3 mb-4">
             <span className="text-2xl">🏪</span>
             <p className="text-xs text-green-800 leading-relaxed">
-              Karibu KukuMart! Ili kuanza kuuza, tunahitaji maelezo ya biashara yako. 
+              Karibu {systemSettings?.app_name || 'FarmConnect'}! Ili kuanza kuuza, tunahitaji maelezo ya biashara yako. 
               Admin atahakiki maelezo haya kabla ya duka lako kuwa hewani.
             </p>
           </div>
@@ -1035,7 +1047,7 @@ export const ShopPage: React.FC = () => {
 
             <button 
               onClick={() => {
-                const msg = `Habari ${selectedVendor.shopName || selectedVendor.name}, nimeona duka lenu KukuMart na ningependa kuuliza kuhusu bidhaa zenu.`;
+                const msg = `Habari ${selectedVendor.shopName || selectedVendor.name}, nimeona duka lenu ${systemSettings?.app_name || 'FarmConnect'} na ningependa kuuliza kuhusu bidhaa zenu.`;
                 window.open(`https://wa.me/${(selectedVendor.phone || '').replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
               }}
               className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"

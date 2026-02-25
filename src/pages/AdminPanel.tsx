@@ -72,7 +72,9 @@ export const AdminPanel: React.FC = () => {
     firebase_project_id: '',
     banners: [] as { image: string, link: string }[],
     app_logo: '',
-    loading_icon: ''
+    app_name: '',
+    loading_icon: '',
+    loading_url: ''
   });
 
   useEffect(() => {
@@ -86,7 +88,9 @@ export const AdminPanel: React.FC = () => {
         firebase_project_id: systemSettings.firebase_project_id || '',
         banners: systemSettings.banners || [],
         app_logo: systemSettings.app_logo || '',
-        loading_icon: systemSettings.loading_icon || ''
+        app_name: systemSettings.app_name || '',
+        loading_icon: systemSettings.loading_icon || '',
+        loading_url: systemSettings.loading_url || ''
       });
     }
   }, [systemSettings]);
@@ -289,7 +293,7 @@ export const AdminPanel: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-3xl font-black text-slate-900">Muhtasari wa Mfumo</h2>
-                <p className="text-slate-500">Hali ya sasa ya KukuMart Tanzania</p>
+                <p className="text-slate-500">Hali ya sasa ya {systemSettings?.app_name || 'FarmConnect'} Tanzania</p>
               </div>
               <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-slate-100 shadow-sm">
                 <Bell size={18} className="text-amber-500" />
@@ -863,6 +867,16 @@ export const AdminPanel: React.FC = () => {
                   Branding & Identity
                 </h3>
                 <div className="grid md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">App Name</label>
+                    <input 
+                      type="text"
+                      value={localSettings.app_name}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, app_name: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="FarmConnect"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">App Logo (URL)</label>
                     <input 
@@ -887,6 +901,21 @@ export const AdminPanel: React.FC = () => {
                       className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
                       placeholder="🚜 au 🐔"
                     />
+                  </div>
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Loading Animation/Image (URL)</label>
+                    <input 
+                      type="text"
+                      value={localSettings.loading_url}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, loading_url: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="https://link.to/animation.gif"
+                    />
+                    {localSettings.loading_url && (
+                      <div className="mt-2 w-32 h-32 rounded-2xl border border-slate-100 overflow-hidden bg-white flex items-center justify-center">
+                        <img src={localSettings.loading_url} alt="Preview" className="w-full h-full object-contain" />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

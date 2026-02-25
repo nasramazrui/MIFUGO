@@ -94,7 +94,7 @@ export const VendorPortal: React.FC = () => {
           </div>
           <h2 className="text-2xl font-black text-slate-900 mb-4">Ombi Lako Linahakikiwa</h2>
           <p className="text-slate-500 leading-relaxed mb-8">
-            Asante kwa kujiunga na KukuMart! Admin anahakiki maelezo yako. 
+            Asante kwa kujiunga na {systemSettings?.app_name || 'FarmConnect'}! Admin anahakiki maelezo yako. 
             Utapewa uwezo wa kuongeza bidhaa pindi tu utakapoidhinishwa.
           </p>
           <button 
@@ -193,13 +193,13 @@ export const VendorPortal: React.FC = () => {
       const shopName = user.shopName || user.name;
 
       if (status === 'processing') {
-        template = `Habari *${order.userName}*, oda yako namba *#${orderId}* imeshapokelewa rasmi! 🐔\n\nHALI: Sasa hivi inaandaliwa.\nBIDHAA: *${itemName}* x ${itemQty}\nMUUZAJI: *${shopName}*\n\nTunafanya kazi kwa haraka ili mzigo wako uwe tayari. Utapata update mara tu itakapoanza safari. Asante kwa kutumia KukuMart!`;
+        template = `Habari *${order.userName}*, oda yako namba *#${orderId}* imeshapokelewa rasmi! 🐔\n\nHALI: Sasa hivi inaandaliwa.\nBIDHAA: *${itemName}* x ${itemQty}\nMUUZAJI: *${shopName}*\n\nTunafanya kazi kwa haraka ili mzigo wako uwe tayari. Utapata update mara tu itakapoanza safari. Asante kwa kutumia ${systemSettings?.app_name || 'FarmConnect'}!`;
       } else if (status === 'waiting') {
         template = `Habari *${order.userName}*, oda yako *#${orderId}* imeshakamilika kuandaliwa na *${shopName}*! 📦\n\nHALI: Inasubiri msafirishaji aichukue.\nBIDHAA: *${itemName}*\n\nMsafirishaji akishachukua mzigo, utatumiwa namba yake ya simu kwa ajili ya mawasiliano zaidi. Kaa karibu na simu yako!`;
       } else if (status === 'onway') {
-        template = `Habari *${order.userName}*, habari njema! Oda yako *#${orderId}* imeshatoka kuelekea kwako sasa hivi! 🚚💨\n\nMUUZAJI: *${shopName}*\nBIDHAA: *${itemName}* (${itemQty})\nHALI: Iko njiani (On the Way).\n\nUnaweza kufuatilia safari ya mzigo wako kupitia App ya KukuMart. Mpokeaji awe tayari kupokea simu ya msafirishaji. Asante!`;
+        template = `Habari *${order.userName}*, habari njema! Oda yako *#${orderId}* imeshatoka kuelekea kwako sasa hivi! 🚚💨\n\nMUUZAJI: *${shopName}*\nBIDHAA: *${itemName}* (${itemQty})\nHALI: Iko njiani (On the Way).\n\nUnaweza kufuatilia safari ya mzigo wako kupitia App ya ${systemSettings?.app_name || 'FarmConnect'}. Mpokeaji awe tayari kupokea simu ya msafirishaji. Asante!`;
       } else if (status === 'delivered') {
-        template = `Hongera *${order.userName}*! 🎊 Oda yako *#${orderId}* imeshawasilishwa kwako.\n\nMUHTASARI:\nBidhaa: *${itemName}*\nKutoka: *${shopName}*\n\nTunakuomba uingie kwenye App ya KukuMart kuthibitisha kuwa umepokea mzigo ili muuzaji aweze kulipwa. Karibu tena!`;
+        template = `Hongera *${order.userName}*! 🎊 Oda yako *#${orderId}* imeshawasilishwa kwako.\n\nMUHTASARI:\nBidhaa: *${itemName}*\nKutoka: *${shopName}*\n\nTunakuomba uingie kwenye App ya ${systemSettings?.app_name || 'FarmConnect'} kuthibitisha kuwa umepokea mzigo ili muuzaji aweze kulipwa. Karibu tena!`;
       }
 
       if (template) {
@@ -556,7 +556,7 @@ export const VendorPortal: React.FC = () => {
 
                     <button 
                       onClick={() => {
-                        const msg = `Habari *${order.userName}*, oda yako #${order.id.substring(0,8)} imebadilishwa hali kuwa *${order.status.toUpperCase()}*! 🐔\n\nAsante kwa kutumia KukuMart!`;
+                        const msg = `Habari *${order.userName}*, oda yako #${order.id.substring(0,8)} imebadilishwa hali kuwa *${order.status.toUpperCase()}*! 🐔\n\nAsante kwa kutumia ${systemSettings?.app_name || 'FarmConnect'}!`;
                         window.open(`https://wa.me/${order.userContact?.replace(/\+/,'')}?text=${encodeURIComponent(msg)}`);
                       }}
                       className="flex items-center gap-2 bg-emerald-100 text-emerald-700 px-4 py-2 rounded-xl text-xs font-black hover:bg-emerald-200 transition-all"

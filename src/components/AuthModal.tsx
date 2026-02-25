@@ -18,7 +18,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { addActivity } = useApp();
+  const { addActivity, systemSettings } = useApp();
   const [view, setView] = useState<'choice' | 'login' | 'register'>('choice');
   const [loading, setLoading] = useState(false);
   const [serverStatus, setServerStatus] = useState<'checking' | 'ok' | 'fail'>('checking');
@@ -98,7 +98,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       {view === 'choice' && (
         <div className="text-center py-4">
           <div className="text-6xl mb-6">🐔</div>
-          <h2 className="text-2xl font-black text-slate-900 mb-2">Karibu KukuMart!</h2>
+          <h2 className="text-2xl font-black text-slate-900 mb-2">Karibu {systemSettings?.app_name || 'FarmConnect'}!</h2>
           <p className="text-slate-500 text-sm mb-8">Unahitaji akaunti ili uweze kununua bidhaa. Je, tayari una akaunti?</p>
           <div className="space-y-3">
             <button 
