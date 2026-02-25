@@ -69,6 +69,7 @@ export const AdminPanel: React.FC = () => {
     firebase_api_key: '',
     firebase_auth_domain: '',
     firebase_project_id: '',
+    banners: [] as { image: string, link: string }[]
   });
 
   useEffect(() => {
@@ -80,6 +81,7 @@ export const AdminPanel: React.FC = () => {
         firebase_api_key: systemSettings.firebase_api_key || '',
         firebase_auth_domain: systemSettings.firebase_auth_domain || '',
         firebase_project_id: systemSettings.firebase_project_id || '',
+        banners: systemSettings.banners || []
       });
     }
   }, [systemSettings]);
@@ -886,6 +888,61 @@ export const AdminPanel: React.FC = () => {
                       placeholder="Weka Private Key..."
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Banners Section */}
+              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                  <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
+                    <LayoutDashboard size={18} />
+                  </div>
+                  Slide Banners
+                </h3>
+                <div className="space-y-4">
+                  {localSettings.banners.map((banner, idx) => (
+                    <div key={idx} className="flex gap-4 items-start bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                      <div className="flex-1 space-y-4">
+                        <input 
+                          type="text"
+                          value={banner.image}
+                          onChange={(e) => {
+                            const newBanners = [...localSettings.banners];
+                            newBanners[idx].image = e.target.value;
+                            setLocalSettings(prev => ({ ...prev, banners: newBanners }));
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold"
+                          placeholder="Image URL..."
+                        />
+                        <input 
+                          type="text"
+                          value={banner.link}
+                          onChange={(e) => {
+                            const newBanners = [...localSettings.banners];
+                            newBanners[idx].link = e.target.value;
+                            setLocalSettings(prev => ({ ...prev, banners: newBanners }));
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold"
+                          placeholder="Link (Optional)..."
+                        />
+                      </div>
+                      <button 
+                        onClick={() => {
+                          const newBanners = localSettings.banners.filter((_, i) => i !== idx);
+                          setLocalSettings(prev => ({ ...prev, banners: newBanners }));
+                        }}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  ))}
+                  <button 
+                    onClick={() => setLocalSettings(prev => ({ ...prev, banners: [...prev.banners, { image: '', link: '' }] }))}
+                    className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-black text-xs hover:border-amber-500 hover:text-amber-500 transition-all"
+                  >
+                    + ONGEZA BANNER MPYA
+                  </button>
                 </div>
               </div>
 

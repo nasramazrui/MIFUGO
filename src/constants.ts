@@ -6,13 +6,13 @@ export const CATEGORIES = [
   { id: 'all', label: 'Zote', emoji: '🏪' },
   { id: 'mayai', label: 'Mayai', emoji: '🥚' },
   { id: 'chakula', label: 'Chakula cha Mifugo', emoji: '🌾' },
+  { id: 'dawa_mifugo', label: 'Dawa za Mifugo', emoji: '💊' },
   // Wa Kula (Meat/Food)
   { id: 'kuku_kula', label: 'Kuku wa Kula', emoji: '🍗' },
   { id: 'ngombe_nyama', label: 'Ng’ombe wa Nyama', emoji: '🥩' },
   { id: 'mbuzi_nyama', label: 'Mbuzi wa Nyama', emoji: '🍖' },
   { id: 'kondoo_nyama', label: 'Kondoo wa Nyama', emoji: '🐑' },
   { id: 'ngamia_nyama', label: 'Ngamia wa Nyama', emoji: '🐫' },
-  { id: 'nguruwe_nyama', label: 'Nguruwe wa Nyama', emoji: '🐖' },
   { id: 'bata_kula', label: 'Bata wa Kula', emoji: '🦆' },
   { id: 'kware_kula', label: 'Kware wa Kula', emoji: '🐦' },
   { id: 'sungura_kula', label: 'Sungura wa Kula', emoji: '🐇' },
@@ -24,11 +24,11 @@ export const CATEGORIES = [
   { id: 'kondoo_kufuga', label: 'Kondoo wa Kufuga', emoji: '🐏' },
   { id: 'ngamia_kufuga', label: 'Ngamia wa Kufuga', emoji: '🐪' },
   { id: 'farasi_kufuga', label: 'Farasi wa Kufuga', emoji: '🐎' },
-  { id: 'nguruwe_kufuga', label: 'Nguruwe wa Kufuga', emoji: '🐖' },
   { id: 'bata_kufuga', label: 'Bata wa Kufuga', emoji: '🦆' },
   { id: 'kware_kufuga', label: 'Kware wa Kufuga', emoji: '🐦' },
   { id: 'sungura_kufuga', label: 'Sungura wa Kufuga', emoji: '🐇' },
   { id: 'kanga_kufuga', label: 'Kanga wa Kufuga', emoji: '🦃' },
+  { id: 'paka', label: 'Paka (Cat)', emoji: '🐱' },
 ];
 
 export const ORDER_STATUSES = [

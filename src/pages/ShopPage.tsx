@@ -354,8 +354,8 @@ export const ShopPage: React.FC = () => {
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-amber-100 px-4 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-3xl">🐔</span>
-            <h1 className="font-serif italic text-2xl text-amber-900 font-bold">KukuMart</h1>
+            <span className="text-3xl">🚜</span>
+            <h1 className="font-serif italic text-2xl text-amber-900 font-bold">FarmConnect</h1>
           </div>
           <div className="flex-1 max-w-md relative hidden sm:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -398,14 +398,31 @@ export const ShopPage: React.FC = () => {
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-6">
+        {/* Banner Slider */}
+        {systemSettings?.banners?.length > 0 && (
+          <div className="mb-10 relative group overflow-hidden rounded-[40px] aspect-[21/9] shadow-2xl">
+            <div className="flex transition-transform duration-700 ease-in-out h-full" style={{ transform: `translateX(-${(Math.floor(Date.now() / 5000) % systemSettings.banners.length) * 100}%)` }}>
+              {systemSettings.banners.map((banner: any, idx: number) => (
+                <a key={idx} href={banner.link || '#'} className="min-w-full h-full block">
+                  <img src={banner.image} alt="" className="w-full h-full object-cover" />
+                </a>
+              ))}
+            </div>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+              {systemSettings.banners.map((_: any, idx: number) => (
+                <div key={idx} className={cn("w-2 h-2 rounded-full transition-all", (Math.floor(Date.now() / 5000) % systemSettings.banners.length) === idx ? "bg-white w-6" : "bg-white/40")} />
+              ))}
+            </div>
+          </div>
+        )}
         {activeTab === 'browse' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             {/* Hero */}
             <div className="bg-gradient-to-br from-amber-600 to-amber-800 rounded-[32px] p-8 text-white mb-8 relative overflow-hidden shadow-2xl shadow-amber-200">
               <div className="relative z-10">
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-200 mb-2 block">Premium Marketplace</span>
-                <h2 className="font-serif italic text-4xl mb-4 leading-tight">Soko la Kuku Bora<br />Tanzania Kiganjani Mwako</h2>
-                <p className="text-amber-100 text-sm max-w-md mb-6">Pata bidhaa bora za kuku moja kwa moja kutoka kwa wafugaji waliohakikiwa nchi nzima.</p>
+                <h2 className="font-serif italic text-4xl mb-4 leading-tight">Soko la Kilimo & Mifugo<br />Tanzania Kiganjani Mwako</h2>
+                <p className="text-amber-100 text-sm max-w-md mb-6">Pata bidhaa bora za mifugo na mazao moja kwa moja kutoka kwa wakulima waliohakikiwa nchi nzima.</p>
                 <div className="flex flex-wrap gap-3">
                   <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl text-[10px] font-bold border border-white/10">✓ Verified Vendors</div>
                   <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl text-[10px] font-bold border border-white/10">✓ Real-time Tracking</div>
@@ -417,7 +434,7 @@ export const ShopPage: React.FC = () => {
                   </button>
                 </div>
               </div>
-              <div className="absolute right-[-20px] bottom-[-40px] text-[200px] opacity-10 select-none pointer-events-none">🐔</div>
+              <div className="absolute right-[-20px] bottom-[-40px] text-[200px] opacity-10 select-none pointer-events-none">🚜</div>
             </div>
 
             {/* Categories */}
@@ -626,57 +643,48 @@ export const ShopPage: React.FC = () => {
             </div>
 
             <div className="space-y-6">
-              {/* Avatar Upload */}
+              {/* Avatar Selection */}
               <div className="flex flex-col items-center gap-4 py-4">
                 <div className="relative group">
-                  <div className="w-24 h-24 bg-amber-50 rounded-[32px] overflow-hidden border-4 border-white shadow-xl">
-                    {profileData.avatar ? (
+                  <div className="w-24 h-24 bg-amber-50 rounded-[32px] overflow-hidden border-4 border-white shadow-xl flex items-center justify-center text-4xl">
+                    {profileData.avatar?.startsWith('http') ? (
                       <img src={profileData.avatar} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-3xl">👤</div>
+                      profileData.avatar || '👤'
                     )}
                   </div>
-                  {isIKConfigured ? (
-                    <IKContext 
-                      publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
-                      urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
-                      authenticator={async () => {
-                        try {
-                          const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
-                          if (!res.ok) {
-                            const errorData = await res.json();
-                            throw new Error(errorData.error || 'Auth failed');
-                          }
-                          return res.json();
-                        } catch (err: any) {
-                          console.error('ImageKit Auth Error:', err);
-                          throw err;
-                        }
-                      }}
-                    >
-                      <label className="absolute bottom-0 right-0 bg-amber-600 text-white p-2 rounded-2xl shadow-lg cursor-pointer hover:bg-amber-700 transition-all active:scale-90">
-                        <Camera size={16} />
-                        <IKUpload 
-                          className="hidden" 
-                          fileName={`avatar_${user.id}_${Date.now()}`}
-                          onSuccess={(res: any) => {
-                            setProfileData(prev => ({ ...prev, avatar: res.url }));
-                            toast.success('Picha imepakiwa!');
-                          }}
-                          onError={(err: any) => {
-                            console.error('Upload Error:', err);
-                            toast.error('Imeshindwa kupakia picha. Hakikisha umeunganisha ImageKit Keys kwenye Secrets.');
-                          }}
-                        />
-                      </label>
-                    </IKContext>
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/5 rounded-[32px]">
-                      <span className="text-[8px] text-slate-400">Config missing</span>
-                    </div>
-                  )}
                 </div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gusa kamera kubadili picha</p>
+                
+                <div className="w-full space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2 block">Chagua Emoji</label>
+                    <div className="flex flex-wrap gap-2 justify-center bg-slate-50 p-4 rounded-2xl">
+                      {['👨‍🌾', '👩‍🌾', '🤠', '😎', '🤩', '🦁', '🐯', '🦊', '🐻', '🐼', '🐮', '🐷', '🐸', '🐔', '🐧'].map(emoji => (
+                        <button 
+                          key={emoji}
+                          onClick={() => setProfileData(prev => ({ ...prev, avatar: emoji }))}
+                          className={cn(
+                            "w-10 h-10 flex items-center justify-center text-xl rounded-xl transition-all hover:scale-110",
+                            profileData.avatar === emoji ? "bg-amber-600 shadow-lg scale-110" : "bg-white border border-slate-100"
+                          )}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">Au Weka Link ya Picha (URL)</label>
+                    <input 
+                      type="text"
+                      value={profileData.avatar?.startsWith('http') ? profileData.avatar : ''}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, avatar: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="https://picha.com/yangu.jpg"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Form Fields */}
