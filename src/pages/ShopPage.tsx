@@ -434,10 +434,10 @@ export const ShopPage: React.FC = () => {
   return (
     <div className="min-h-screen pb-24 dark:bg-slate-950 transition-colors duration-300">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-amber-100 dark:border-slate-800 px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center shadow-xl shadow-amber-100 dark:shadow-none border border-amber-50 dark:border-slate-700 overflow-hidden">
+      <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-4 py-3">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-amber-100/50 dark:shadow-none border border-amber-50 dark:border-slate-700 overflow-hidden">
               {systemSettings?.app_logo ? (
                 <img 
                   src={systemSettings.app_logo} 
@@ -449,16 +449,16 @@ export const ShopPage: React.FC = () => {
                 <img 
                   src="https://cdn-icons-png.flaticon.com/512/2329/2329113.png" 
                   alt="Logo" 
-                  className="w-8 h-8 object-contain"
+                  className="w-7 h-7 sm:w-8 sm:h-8 object-contain"
                   referrerPolicy="no-referrer"
                 />
               )}
             </div>
-            <div className="flex flex-col -gap-1">
-              <h1 className="font-serif italic text-xl sm:text-2xl text-amber-900 dark:text-amber-500 font-bold tracking-tight">
+            <div className="flex flex-col -gap-1 hidden xs:flex">
+              <h1 className="font-serif italic text-lg sm:text-2xl text-amber-900 dark:text-amber-500 font-bold tracking-tight leading-tight">
                 {systemSettings?.app_name || 'FarmConnect'}
               </h1>
-              <span className="text-[8px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest hidden sm:block">Soko la Kilimo</span>
+              <span className="text-[7px] sm:text-[8px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest hidden sm:block">Soko la Kilimo</span>
             </div>
           </div>
           <div className="flex-1 max-w-md relative hidden md:block">
@@ -510,33 +510,40 @@ export const ShopPage: React.FC = () => {
             {user && (user.role === 'admin' || user.role === 'vendor') && (
               <button 
                 onClick={() => setView('dashboard')}
-                className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 border border-slate-200 dark:border-slate-700"
+                className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-2xl font-black text-[7px] sm:text-[10px] uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 border border-slate-200 dark:border-slate-700"
               >
-                <LayoutDashboard size={14} />
-                Dashboard
+                <LayoutDashboard size={12} className="sm:w-3.5 sm:h-3.5" />
+                <span className="hidden xs:inline">Dashboard</span>
               </button>
             )}
 
             <button 
               onClick={() => setIsVendorRegModalOpen(true)}
-              className="flex bg-gradient-to-r from-amber-500 to-amber-600 text-white px-3 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 shadow-md shadow-amber-100 animate-pulse hover:animate-none whitespace-nowrap"
+              className="flex bg-gradient-to-r from-amber-500 to-amber-600 text-white px-2 sm:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-2xl font-black text-[7px] sm:text-[10px] uppercase tracking-widest hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 shadow-md shadow-amber-100 animate-pulse hover:animate-none whitespace-nowrap"
             >
               Sajili Duka
             </button>
             {user ? (
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-amber-600 rounded-full flex items-center justify-center text-white font-black text-xs sm:text-sm overflow-hidden border-2 border-white dark:border-slate-700">
-                    {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : user.name[0].toUpperCase()}
+              <div className="flex items-center gap-2 sm:gap-4">
+                <div className="flex items-center gap-2 sm:gap-3 group cursor-pointer" onClick={() => setIsProfileModalOpen(true)}>
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 bg-amber-600 rounded-2xl flex items-center justify-center text-white font-black text-sm sm:text-base overflow-hidden border-2 border-white dark:border-slate-700 shadow-lg group-hover:scale-105 transition-transform">
+                    {user.avatar ? (
+                      <img src={user.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      user.name[0].toUpperCase()
+                    )}
                   </div>
-                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300 hidden lg:block truncate max-w-[100px]">{user.name}</span>
+                  <div className="flex flex-col -gap-1 hidden lg:flex">
+                    <span className="text-sm font-black text-slate-900 dark:text-white truncate max-w-[120px]">{user.name}</span>
+                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-wider">{user.role}</span>
+                  </div>
                 </div>
                 <button 
                   onClick={logout}
-                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+                  className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all active:scale-90"
                   title="Toka"
                 >
-                  <LogOut size={18} />
+                  <LogOut size={20} />
                 </button>
               </div>
             ) : (
@@ -761,9 +768,9 @@ export const ShopPage: React.FC = () => {
             className={cn("flex flex-col items-center gap-1 transition-all", isProfileModalOpen ? "text-amber-600 scale-110" : "text-slate-400")}
           >
             {user?.avatar ? (
-              <img src={user.avatar} alt="" className="w-5 h-5 rounded-full object-cover border border-amber-200" />
+              <img src={user.avatar} alt="" className="w-6 h-6 rounded-lg object-cover border border-amber-200 shadow-sm" referrerPolicy="no-referrer" />
             ) : (
-              <UserIcon size={20} />
+              <UserIcon size={22} />
             )}
             <span className="text-[10px] font-black">{t('profile')}</span>
           </button>
@@ -781,14 +788,17 @@ export const ShopPage: React.FC = () => {
 
             <div className="space-y-6">
               {/* Avatar Selection */}
-              <div className="flex flex-col items-center gap-4 py-4">
+              <div className="flex flex-col items-center gap-6 py-6">
                 <div className="relative group">
-                  <div className="w-24 h-24 bg-amber-50 dark:bg-slate-800 rounded-[32px] overflow-hidden border-4 border-white dark:border-slate-700 shadow-xl flex items-center justify-center text-4xl">
+                  <div className="w-32 h-32 bg-amber-50 dark:bg-slate-800 rounded-[40px] overflow-hidden border-4 border-white dark:border-slate-700 shadow-2xl flex items-center justify-center text-5xl">
                     {profileData.avatar?.startsWith('http') ? (
-                      <img src={profileData.avatar} alt="" className="w-full h-full object-cover" />
+                      <img src={profileData.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
                       <span className="dark:text-white">{profileData.avatar || '👤'}</span>
                     )}
+                  </div>
+                  <div className="absolute -bottom-2 -right-2 bg-amber-600 text-white p-3 rounded-2xl shadow-lg border-4 border-white dark:border-slate-900">
+                    <Camera size={20} />
                   </div>
                 </div>
                 

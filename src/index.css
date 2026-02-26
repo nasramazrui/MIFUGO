@@ -10,20 +10,24 @@
   --color-amber-200: #fde68a;
   --color-amber-300: #fcd34d;
   --color-amber-400: #fbbf24;
-  --color-amber-50: #f59e0b;
+  --color-amber-500: #f59e0b;
   --color-amber-600: #d97706;
   --color-amber-700: #b45309;
   --color-amber-800: #92400e;
   --color-amber-900: #78350f;
 }
 
+:root {
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
 @layer base {
   body {
-    @apply bg-[#fafaf8] text-slate-900 antialiased transition-colors duration-300;
-  }
-  
-  .dark body {
-    @apply bg-slate-950 text-slate-100;
+    @apply bg-[#fafaf8] text-slate-900 antialiased transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100;
   }
 }
 

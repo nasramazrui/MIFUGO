@@ -376,25 +376,26 @@ export const VendorPortal: React.FC = () => {
         </nav>
 
         <div className="p-4 border-t border-slate-50 dark:border-slate-800">
-          <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 mb-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center text-white font-black text-xs overflow-hidden border-2 border-white dark:border-slate-700">
+          <div className="bg-slate-50 dark:bg-slate-800 rounded-3xl p-4 mb-4 border border-slate-100 dark:border-slate-700/50 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-11 h-11 bg-emerald-600 rounded-2xl flex items-center justify-center text-white font-black text-sm overflow-hidden border-2 border-white dark:border-slate-700 shadow-md">
                 {user.avatar ? (
-                  <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                  <img src={user.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                   user.name[0].toUpperCase()
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-black text-slate-900 dark:text-white truncate">{user.shopName || user.name}</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">{user.email}</p>
+                <p className="text-sm font-black text-slate-900 dark:text-white truncate">{user.shopName || user.name}</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate font-bold">{user.email}</p>
               </div>
             </div>
             <div className={cn(
-              "text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full inline-block",
+              "text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5",
               user.status === 'approved' ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
             )}>
-              {user.status === 'approved' ? "✓ Approved" : "⏳ Pending"}
+              <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", user.status === 'approved' ? "bg-emerald-500" : "bg-amber-500")} />
+              {user.status === 'approved' ? "Approved" : "Pending Approval"}
             </div>
           </div>
           <button 

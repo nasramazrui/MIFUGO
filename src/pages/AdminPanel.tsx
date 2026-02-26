@@ -325,17 +325,17 @@ export const AdminPanel: React.FC = () => {
 
         <div className="p-6 border-t border-white/5">
           {user && (
-            <div className="flex items-center gap-3 mb-6 px-2">
-              <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-amber-950 font-black overflow-hidden">
+            <div className="flex items-center gap-4 mb-8 px-2 group cursor-pointer">
+              <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-amber-950 font-black overflow-hidden shadow-lg group-hover:scale-105 transition-transform border-2 border-white/10">
                 {user.avatar ? (
-                  <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                  <img src={user.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                   user.name[0].toUpperCase()
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-black text-white truncate">{user.name}</p>
-                <p className="text-[10px] text-amber-400/60 truncate">Administrator</p>
+                <p className="text-sm font-black text-white truncate">{user.name}</p>
+                <p className="text-[10px] text-amber-400/60 truncate uppercase tracking-widest font-bold">Administrator</p>
               </div>
             </div>
           )}
