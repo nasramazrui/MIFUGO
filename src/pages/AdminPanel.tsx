@@ -29,9 +29,11 @@ import {
   Settings,
   Camera,
   Save,
-  Star
+  Star,
+  Trash2
 } from 'lucide-react';
 import { cn } from '../utils';
+import { CATEGORIES } from '../constants';
 import { 
   BarChart, 
   Bar, 
@@ -601,20 +603,23 @@ export const AdminPanel: React.FC = () => {
                         <button 
                           onClick={() => setEditingItem({ type: 'product', data: p })}
                           className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center hover:bg-blue-100 transition-colors"
+                          title="Hariri"
                         >
-                          <TrendingUp size={18} />
+                          <Settings size={18} />
                         </button>
-                        {!p.approved && (
-                          <button 
-                            onClick={async () => {
-                              await updateDoc(doc(db, 'kuku_products', p.id), { approved: true });
-                              toast.success('Bidhaa imeidhinishwa');
-                            }}
-                            className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center hover:bg-emerald-600 transition-colors"
-                          >
-                            <Check size={20} />
-                          </button>
-                        )}
+                        <button 
+                          onClick={async () => {
+                            await updateDoc(doc(db, 'kuku_products', p.id), { approved: !p.approved });
+                            toast.success(p.approved ? 'Bidhaa imefichwa' : 'Bidhaa inaonekana sasa');
+                          }}
+                          className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
+                            p.approved ? "bg-amber-50 text-amber-500 hover:bg-amber-100" : "bg-emerald-500 text-white hover:bg-emerald-600"
+                          )}
+                          title={p.approved ? "Ficha" : "Onyesha"}
+                        >
+                          {p.approved ? <X size={20} /> : <Check size={20} />}
+                        </button>
                         <button 
                           onClick={async () => {
                             if(confirm('Futa bidhaa hii?')) {
@@ -623,8 +628,9 @@ export const AdminPanel: React.FC = () => {
                             }
                           }}
                           className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-100 transition-colors"
+                          title="Futa"
                         >
-                          <X size={20} />
+                          <Trash2 size={18} />
                         </button>
                       </div>
                     </div>
@@ -1175,8 +1181,8 @@ export const AdminPanel: React.FC = () => {
                 )}
               </>
             ) : editingItem.type === 'product' ? (
-              <>
-                <div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Jina la Bidhaa</label>
                   <input 
                     type="text" 
@@ -1200,7 +1206,80 @@ export const AdminPanel: React.FC = () => {
                     className="input-field" 
                   />
                 </div>
-              </>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Stock</label>
+                  <input 
+                    type="number" 
+                    defaultValue={editingItem.data.stock}
+                    onBlur={async (e) => {
+                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { stock: Number(e.target.value) });
+                      toast.success('Stock imebadilishwa');
+                    }}
+                    className="input-field" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Kategoria</label>
+                  <select 
+                    defaultValue={editingItem.data.category}
+                    onChange={async (e) => {
+                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { category: e.target.value });
+                      toast.success('Kategoria imebadilishwa');
+                    }}
+                    className="input-field"
+                  >
+                    {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Unit</label>
+                  <select 
+                    defaultValue={editingItem.data.unit}
+                    onChange={async (e) => {
+                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { unit: e.target.value });
+                      toast.success('Unit imebadilishwa');
+                    }}
+                    className="input-field"
+                  >
+                    {['Piece', 'Kg', 'Tray', 'Half', 'Quarter'].map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Maelezo (Description)</label>
+                  <textarea 
+                    defaultValue={editingItem.data.desc}
+                    onBlur={async (e) => {
+                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { desc: e.target.value });
+                      toast.success('Maelezo yamebadilishwa');
+                    }}
+                    className="input-field min-h-[100px]" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Emoji</label>
+                  <input 
+                    type="text" 
+                    defaultValue={editingItem.data.emoji}
+                    onBlur={async (e) => {
+                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { emoji: e.target.value });
+                      toast.success('Emoji imebadilishwa');
+                    }}
+                    className="input-field" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Picha (URL)</label>
+                  <input 
+                    type="text" 
+                    defaultValue={editingItem.data.image}
+                    onBlur={async (e) => {
+                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { image: e.target.value });
+                      toast.success('Picha imebadilishwa');
+                    }}
+                    className="input-field" 
+                  />
+                </div>
+              </div>
             ) : null}
             <button 
               onClick={() => setEditingItem(null)}

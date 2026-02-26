@@ -25,7 +25,7 @@ interface CartItem {
 }
 
 export const ShopPage: React.FC = () => {
-  const { products, user, vendors, orders, setOrders, addActivity, reviews, logout, systemSettings } = useApp();
+  const { products, user, vendors, orders, setOrders, addActivity, reviews, logout, systemSettings, t } = useApp();
   const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'cart'>('browse');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
@@ -38,7 +38,9 @@ export const ShopPage: React.FC = () => {
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     contact: user?.contact || '',
-    avatar: user?.avatar || ''
+    avatar: user?.avatar || '',
+    language: user?.language || 'sw',
+    theme: user?.theme || 'light'
   });
 
   useEffect(() => {
@@ -46,8 +48,16 @@ export const ShopPage: React.FC = () => {
       setProfileData({
         name: user.name,
         contact: user.contact || '',
-        avatar: user.avatar || ''
+        avatar: user.avatar || '',
+        language: user.language || 'sw',
+        theme: user.theme || 'light'
       });
+      
+      if (user.theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
     }
   }, [user]);
 
@@ -58,7 +68,9 @@ export const ShopPage: React.FC = () => {
       await updateDoc(doc(db, 'kuku_users', user.id), {
         name: profileData.name,
         contact: profileData.contact,
-        avatar: profileData.avatar
+        avatar: profileData.avatar,
+        language: profileData.language,
+        theme: profileData.theme
       });
       toast.success('Wasifu umesasishwa!');
     } catch (error) {
@@ -382,7 +394,7 @@ export const ShopPage: React.FC = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text"
-              placeholder="Tafuta kuku, mayai, chakula..."
+              placeholder={t('search')}
               className="w-full bg-slate-100 border-none rounded-2xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-amber-500 transition-all"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
@@ -584,14 +596,14 @@ export const ShopPage: React.FC = () => {
             className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'browse' ? "text-amber-600 scale-110" : "text-slate-400")}
           >
             <ShoppingBag size={20} />
-            <span className="text-[10px] font-black">Soko</span>
+            <span className="text-[10px] font-black">{t('market')}</span>
           </button>
           <button 
             onClick={() => setActiveTab('stores')}
             className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'stores' ? "text-amber-600 scale-110" : "text-slate-400")}
           >
             <Store size={20} />
-            <span className="text-[10px] font-black">Maduka</span>
+            <span className="text-[10px] font-black">{t('stores')}</span>
           </button>
 
           {/* Raised Cart Button */}
@@ -619,18 +631,9 @@ export const ShopPage: React.FC = () => {
             className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'orders' ? "text-amber-600 scale-110" : "text-slate-400")}
           >
             <Package size={20} />
-            <span className="text-[10px] font-black">Oda</span>
+            <span className="text-[10px] font-black">{t('orders')}</span>
           </button>
 
-          <button 
-            onClick={() => setIsVendorRegModalOpen(true)}
-            className="flex flex-col items-center gap-1 text-amber-600 md:hidden"
-          >
-            <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-              <Plus size={18} />
-            </div>
-            <span className="text-[8px] font-black uppercase">Sajili Duka</span>
-          </button>
           <button 
             onClick={() => {
               if (!user) {
@@ -646,7 +649,7 @@ export const ShopPage: React.FC = () => {
             ) : (
               <UserIcon size={20} />
             )}
-            <span className="text-[10px] font-black">Wasifu</span>
+            <span className="text-[10px] font-black">{t('profile')}</span>
           </button>
         </div>
       </nav>
@@ -654,10 +657,10 @@ export const ShopPage: React.FC = () => {
       {/* Profile Modal */}
       {isProfileModalOpen && user && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="bg-white rounded-[32px] w-full max-w-md p-8 overflow-y-auto max-h-[90vh]">
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] w-full max-w-md p-8 overflow-y-auto max-h-[90vh]">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-black text-slate-900">Wasifu Wangu</h3>
-              <button onClick={() => setIsProfileModalOpen(false)} className="text-slate-400 p-2 hover:bg-slate-50 rounded-full transition-all">✕</button>
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white">{t('my_profile')}</h3>
+              <button onClick={() => setIsProfileModalOpen(false)} className="text-slate-400 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full transition-all">✕</button>
             </div>
 
             <div className="space-y-6">
@@ -726,6 +729,44 @@ export const ShopPage: React.FC = () => {
                     className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold"
                   />
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">{t('language')}</label>
+                    <select 
+                      value={profileData.language}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, language: e.target.value as any }))}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl px-4 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm dark:text-white"
+                    >
+                      <option value="sw">Kiswahili</option>
+                      <option value="en">English</option>
+                      <option value="ar">العربية (Arabic)</option>
+                      <option value="hi">हिन्दी (Hindi)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">{t('theme')}</label>
+                    <button 
+                      onClick={() => {
+                        const newTheme = profileData.theme === 'light' ? 'dark' : 'light';
+                        setProfileData(prev => ({ ...prev, theme: newTheme }));
+                        if (newTheme === 'dark') {
+                          document.documentElement.classList.add('dark');
+                        } else {
+                          document.documentElement.classList.remove('dark');
+                        }
+                      }}
+                      className={cn(
+                        "w-full flex items-center justify-between px-4 py-4 rounded-2xl border-2 transition-all font-bold text-sm",
+                        profileData.theme === 'dark' ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-100 text-slate-700"
+                      )}
+                    >
+                      <span>{profileData.theme === 'dark' ? t('dark_mode') : t('light_mode')}</span>
+                      <span>{profileData.theme === 'dark' ? '🌙' : '☀️'}</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="p-4 bg-slate-50 rounded-2xl">
                   <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Barua Pepe (Email)</p>
                   <p className="font-bold text-slate-700">{user.email}</p>
@@ -738,15 +779,15 @@ export const ShopPage: React.FC = () => {
                   disabled={isProfileLoading}
                   className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-4 rounded-2xl shadow-lg shadow-amber-100 transition-all active:scale-95 disabled:opacity-50"
                 >
-                  {isProfileLoading ? 'INAHIFADHI...' : 'HIFADHI MABADILIKO'}
+                  {isProfileLoading ? '...' : t('save_changes')}
                 </button>
                 
                 <div className="flex gap-3">
                   <button 
                     onClick={logout}
-                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black py-4 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                    className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-black py-4 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
                   >
-                    <LogOut size={18} /> TOKA
+                    <LogOut size={18} /> {t('logout')}
                   </button>
                   <button 
                     onClick={handleDeleteAccount}

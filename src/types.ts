@@ -21,6 +21,8 @@ export interface User {
   deliveryOut?: number;
   revenue?: number;
   walletBalance?: number;
+  language?: 'sw' | 'en' | 'ar' | 'hi';
+  theme?: 'light' | 'dark';
   createdAt: string;
 }
 

@@ -139,7 +139,7 @@ export const VendorPortal: React.FC = () => {
       region: user.region || '',
       vendorId: user.id,
       vendorName: user.shopName || user.name,
-      approved: user.status === 'approved',
+      approved: true,
       deliveryCity: user.deliveryCity || 0,
       deliveryOut: user.deliveryOut || 0,
       createdAt: new Date().toISOString(),

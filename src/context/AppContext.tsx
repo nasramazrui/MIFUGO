@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Product, Order, Review, Activity, Withdrawal } from '../types';
 import { generateId } from '../utils';
-import { ADMIN_EMAIL, ADMIN_PASS } from '../constants';
+import { ADMIN_EMAIL, ADMIN_PASS, TRANSLATIONS } from '../constants';
 import { auth, db } from '../services/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { 
@@ -37,6 +37,7 @@ interface AppContextType {
   systemSettings: any;
   updateSystemSettings: (settings: any) => Promise<void>;
   logout: () => void;
+  t: (key: string) => string;
   loading: boolean;
 }
 
@@ -191,6 +192,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     signOut(auth);
   };
 
+  const t = (key: string) => {
+    const lang = user?.language || 'sw';
+    return TRANSLATIONS[lang]?.[key] || TRANSLATIONS['sw']?.[key] || key;
+  };
+
   return (
     <AppContext.Provider value={{
       user, setUser,
@@ -203,6 +209,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       withdrawals, setWithdrawals,
       systemSettings, updateSystemSettings,
       logout,
+      t,
       loading
     }}>
       {children}
