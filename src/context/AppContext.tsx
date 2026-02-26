@@ -14,6 +14,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
   where
 } from 'firebase/firestore';
 
@@ -39,6 +40,12 @@ interface AppContextType {
   logout: () => void;
   t: (key: string) => string;
   loading: boolean;
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
+  language: 'sw' | 'en' | 'ar' | 'hi';
+  setLanguage: (lang: 'sw' | 'en' | 'ar' | 'hi') => void;
+  view: 'auto' | 'shop' | 'dashboard';
+  setView: (view: 'auto' | 'shop' | 'dashboard') => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -54,6 +61,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [systemSettings, setSystemSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [theme, setThemeState] = useState<'light' | 'dark'>((localStorage.getItem('theme') as 'light' | 'dark') || 'light');
+  const [language, setLanguageState] = useState<'sw' | 'en' | 'ar' | 'hi'>((localStorage.getItem('language') as 'sw' | 'en' | 'ar' | 'hi') || 'sw');
+  const [view, setView] = useState<'auto' | 'shop' | 'dashboard'>('auto');
+
+  const setTheme = (newTheme: 'light' | 'dark') => {
+    setThemeState(newTheme);
+    localStorage.setItem('theme', newTheme);
+    if (user) {
+      updateDoc(doc(db, 'kuku_users', user.id), { theme: newTheme });
+    }
+  };
+
+  const setLanguage = (newLang: 'sw' | 'en' | 'ar' | 'hi') => {
+    setLanguageState(newLang);
+    localStorage.setItem('language', newLang);
+    if (user) {
+      updateDoc(doc(db, 'kuku_users', user.id), { language: newLang });
+    }
+  };
+
+  // Sync theme and language with user profile
+  useEffect(() => {
+    if (user) {
+      if (user.theme && user.theme !== theme) setThemeState(user.theme);
+      if (user.language && user.language !== language) setLanguageState(user.language);
+    }
+  }, [user]);
+
+  // Apply theme to document
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
   // Auth Listener
   useEffect(() => {
@@ -76,6 +119,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 name: 'Admin',
                 email: ADMIN_EMAIL,
                 role: 'admin',
+                theme,
+                language,
                 createdAt: new Date().toISOString()
               };
               await setDoc(doc(db, 'kuku_users', fbUser.uid), adminData);
@@ -193,7 +238,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const t = (key: string) => {
-    const lang = user?.language || 'sw';
+    const lang = language || 'sw';
     return TRANSLATIONS[lang]?.[key] || TRANSLATIONS['sw']?.[key] || key;
   };
 
@@ -210,7 +255,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       systemSettings, updateSystemSettings,
       logout,
       t,
-      loading
+      loading,
+      theme,
+      setTheme,
+      language,
+      setLanguage,
+      view,
+      setView
     }}>
       {children}
     </AppContext.Provider>

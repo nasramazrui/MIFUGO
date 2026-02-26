@@ -21,7 +21,11 @@ import {
   Trash2,
   Edit2,
   Save,
-  Send
+  Send,
+  Moon,
+  Sun,
+  Globe,
+  ArrowLeft
 } from 'lucide-react';
 import { cn } from '../utils';
 
@@ -37,7 +41,7 @@ import {
 import { toast } from 'react-hot-toast';
 
 export const VendorPortal: React.FC = () => {
-  const { user, products, orders, withdrawals, logout, addActivity, systemSettings } = useApp();
+  const { user, products, orders, withdrawals, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t } = useApp();
   const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings'>('dash');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -280,22 +284,71 @@ export const VendorPortal: React.FC = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col md:flex-row pb-20 md:pb-0 transition-colors duration-300">
       {/* Mobile Header */}
       <header className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-6 py-4 sticky top-0 z-30 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🏪</span>
-          <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor Portal</h1>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setView('shop')}
+            className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-emerald-600 dark:text-emerald-500"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor</h1>
         </div>
-        <button onClick={logout} className="text-red-400 p-2">
-          <LogOut size={20} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            className="p-2 text-slate-600 dark:text-slate-400"
+          >
+            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
+          <button onClick={logout} className="text-red-400 p-2">
+            <LogOut size={20} />
+          </button>
+        </div>
       </header>
 
       {/* Sidebar (Desktop) */}
       <aside className="hidden md:flex w-64 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex-col sticky top-0 h-screen z-20">
         <div className="p-6 border-b border-slate-50 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🏪</span>
-            <h1 className="font-serif italic text-xl text-emerald-800 dark:text-emerald-500 font-bold">Vendor Portal</h1>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🏪</span>
+              <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor</h1>
+            </div>
+            <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 p-1 rounded-xl">
+              <button 
+                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all text-slate-600 dark:text-slate-400"
+              >
+                {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
+              </button>
+              <div className="relative group">
+                <button className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all text-slate-600 dark:text-slate-400">
+                  <Globe size={14} />
+                </button>
+                <div className="absolute top-full left-0 mt-2 hidden group-hover:block bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 rounded-xl p-1 z-50 min-w-[100px]">
+                  {['sw', 'en', 'ar', 'hi'].map(lang => (
+                    <button 
+                      key={lang}
+                      onClick={() => setLanguage(lang as any)}
+                      className={cn(
+                        "w-full text-left px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase",
+                        language === lang ? "bg-emerald-600 text-white" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      )}
+                    >
+                      {lang}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
+          <button 
+            onClick={() => setView('shop')}
+            className="w-full flex items-center gap-2 px-4 py-3 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-2xl text-xs font-bold text-emerald-700 dark:text-emerald-500 transition-all border border-slate-100 dark:border-slate-800"
+          >
+            <ArrowLeft size={14} />
+            Nenda Sokoni
+          </button>
         </div>
         
         <nav className="flex-1 p-4 space-y-1">

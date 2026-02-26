@@ -18,7 +18,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { addActivity, systemSettings, t } = useApp();
+  const { addActivity, systemSettings, t, theme, language } = useApp();
   const [view, setView] = useState<'choice' | 'login' | 'register'>('choice');
   const [loading, setLoading] = useState(false);
   const [serverStatus, setServerStatus] = useState<'checking' | 'ok' | 'fail'>('checking');
@@ -76,6 +76,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         role: 'user',
         contact: formData.contact,
         hasWhatsApp: formData.hasWhatsApp,
+        theme,
+        language,
         createdAt: new Date().toISOString(),
         serverCreatedAt: serverTimestamp()
       };

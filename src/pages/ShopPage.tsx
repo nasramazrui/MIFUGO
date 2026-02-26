@@ -6,7 +6,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion } from 'motion/react';
-import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile } from 'lucide-react';
+import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
@@ -25,7 +25,7 @@ interface CartItem {
 }
 
 export const ShopPage: React.FC = () => {
-  const { products, user, vendors, orders, setOrders, addActivity, reviews, logout, systemSettings, t } = useApp();
+  const { products, user, vendors, orders, setOrders, addActivity, reviews, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView } = useApp();
   const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'cart'>('browse');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
@@ -38,9 +38,7 @@ export const ShopPage: React.FC = () => {
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     contact: user?.contact || '',
-    avatar: user?.avatar || '',
-    language: user?.language || 'sw',
-    theme: user?.theme || 'light'
+    avatar: user?.avatar || ''
   });
 
   useEffect(() => {
@@ -48,20 +46,10 @@ export const ShopPage: React.FC = () => {
       setProfileData({
         name: user.name,
         contact: user.contact || '',
-        avatar: user.avatar || '',
-        language: user.language || 'sw',
-        theme: user.theme || 'light'
+        avatar: user.avatar || ''
       });
     }
   }, [user]);
-
-  useEffect(() => {
-    if (profileData.theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [profileData.theme]);
 
   const handleUpdateProfile = async () => {
     if (!user) return;
@@ -71,8 +59,8 @@ export const ShopPage: React.FC = () => {
         name: profileData.name,
         contact: profileData.contact,
         avatar: profileData.avatar,
-        language: profileData.language,
-        theme: profileData.theme
+        language,
+        theme
       });
       toast.success('Wasifu umesasishwa!');
     } catch (error) {
@@ -155,6 +143,8 @@ export const ShopPage: React.FC = () => {
           openTime: vendorFormData.openTime,
           closeTime: vendorFormData.closeTime,
           openDays: vendorFormData.openDays,
+          theme,
+          language,
           createdAt: new Date().toISOString(),
           serverCreatedAt: serverTimestamp()
         };
@@ -482,6 +472,51 @@ export const ShopPage: React.FC = () => {
             />
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Theme & Language Toggles */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl sm:rounded-2xl">
+              <button 
+                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                className="p-1.5 sm:p-2 hover:bg-white dark:hover:bg-slate-700 rounded-lg sm:rounded-xl transition-all text-slate-600 dark:text-slate-300"
+                title={theme === 'light' ? 'Night Mode' : 'Light Mode'}
+              >
+                {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+              </button>
+              <div className="relative group">
+                <button className="p-1.5 sm:p-2 hover:bg-white dark:hover:bg-slate-700 rounded-lg sm:rounded-xl transition-all text-slate-600 dark:text-slate-300">
+                  <Globe size={16} />
+                </button>
+                <div className="absolute top-full right-0 mt-2 hidden group-hover:block bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 rounded-2xl p-2 z-50 min-w-[120px]">
+                  {[
+                    { id: 'sw', label: 'Kiswahili' },
+                    { id: 'en', label: 'English' },
+                    { id: 'ar', label: 'العربية' },
+                    { id: 'hi', label: 'हिन्दी' }
+                  ].map(lang => (
+                    <button 
+                      key={lang.id}
+                      onClick={() => setLanguage(lang.id as any)}
+                      className={cn(
+                        "w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all",
+                        language === lang.id ? "bg-amber-600 text-white" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      )}
+                    >
+                      {lang.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {user && (user.role === 'admin' || user.role === 'vendor') && (
+              <button 
+                onClick={() => setView('dashboard')}
+                className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 border border-slate-200 dark:border-slate-700"
+              >
+                <LayoutDashboard size={14} />
+                Dashboard
+              </button>
+            )}
+
             <button 
               onClick={() => setIsVendorRegModalOpen(true)}
               className="flex bg-gradient-to-r from-amber-500 to-amber-600 text-white px-3 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 shadow-md shadow-amber-100 animate-pulse hover:animate-none whitespace-nowrap"
@@ -815,8 +850,8 @@ export const ShopPage: React.FC = () => {
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">{t('language')}</label>
                     <select 
-                      value={profileData.language}
-                      onChange={(e) => setProfileData(prev => ({ ...prev, language: e.target.value as any }))}
+                      value={language}
+                      onChange={(e) => setLanguage(e.target.value as any)}
                       className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl px-4 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm dark:text-white"
                     >
                       <option value="sw">Kiswahili</option>
@@ -828,22 +863,14 @@ export const ShopPage: React.FC = () => {
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">{t('theme')}</label>
                     <button 
-                      onClick={() => {
-                        const newTheme = profileData.theme === 'light' ? 'dark' : 'light';
-                        setProfileData(prev => ({ ...prev, theme: newTheme }));
-                        if (newTheme === 'dark') {
-                          document.documentElement.classList.add('dark');
-                        } else {
-                          document.documentElement.classList.remove('dark');
-                        }
-                      }}
+                      onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
                       className={cn(
                         "w-full flex items-center justify-between px-4 py-4 rounded-2xl border-2 transition-all font-bold text-sm",
-                        profileData.theme === 'dark' ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-100 text-slate-700"
+                        theme === 'dark' ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-100 text-slate-700"
                       )}
                     >
-                      <span>{profileData.theme === 'dark' ? t('dark_mode') : t('light_mode')}</span>
-                      <span>{profileData.theme === 'dark' ? '🌙' : '☀️'}</span>
+                      <span>{theme === 'dark' ? t('dark_mode') : t('light_mode')}</span>
+                      <span>{theme === 'dark' ? '🌙' : '☀️'}</span>
                     </button>
                   </div>
                 </div>

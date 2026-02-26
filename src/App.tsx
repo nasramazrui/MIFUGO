@@ -6,7 +6,7 @@ import { AdminPanel } from './pages/AdminPanel';
 import { Toaster } from 'react-hot-toast';
 
 const AppContent: React.FC = () => {
-  const { user, loading, systemSettings } = useApp();
+  const { user, loading, systemSettings, view } = useApp();
 
   if (loading) {
     return (
@@ -49,7 +49,11 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Simple role-based routing
+  // Simple role-based routing with view override
+  if (view === 'shop') {
+    return <ShopPage />;
+  }
+
   if (user?.role === 'admin') {
     return <AdminPanel />;
   }

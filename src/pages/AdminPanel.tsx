@@ -30,7 +30,11 @@ import {
   Camera,
   Save,
   Star,
-  Trash2
+  Trash2,
+  Moon,
+  Sun,
+  Globe,
+  ArrowLeft
 } from 'lucide-react';
 import { cn } from '../utils';
 import { CATEGORIES } from '../constants';
@@ -60,7 +64,13 @@ export const AdminPanel: React.FC = () => {
     systemSettings,
     updateSystemSettings,
     logout, 
-    addActivity 
+    addActivity,
+    theme,
+    setTheme,
+    language,
+    setLanguage,
+    setView,
+    t
   } = useApp();
   const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'wallet' | 'settings'>('over');
   const [editingItem, setEditingItem] = useState<{ type: string, data: any } | null>(null);
@@ -209,25 +219,76 @@ export const AdminPanel: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col lg:flex-row pb-20 lg:pb-0 transition-colors duration-300">
       {/* Mobile Header */}
-      <header className="lg:hidden bg-amber-950 text-amber-100 px-6 py-4 sticky top-0 z-30 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <BarChart3 size={20} className="text-amber-500" />
-          <h1 className="font-serif italic text-lg font-bold">Admin Panel</h1>
+      <header className="lg:hidden bg-amber-950 text-amber-100 px-6 py-4 sticky top-0 z-30 flex items-center justify-between border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setView('shop')}
+            className="p-2 bg-white/5 rounded-xl text-amber-400"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <h1 className="font-serif italic text-lg font-bold">Admin</h1>
         </div>
-        <button onClick={logout} className="text-amber-400/60 p-2">
-          <LogOut size={20} />
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl">
+            <button 
+              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+              className="p-1.5 text-amber-400"
+            >
+              {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+            </button>
+          </div>
+          <button onClick={logout} className="text-amber-400/60 p-2">
+            <LogOut size={20} />
+          </button>
+        </div>
       </header>
 
       {/* Sidebar (Desktop) */}
       <aside className="hidden lg:flex w-72 bg-amber-950 text-amber-100 flex-col sticky top-0 h-screen z-20">
         <div className="p-8 border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-500 rounded-2xl flex items-center justify-center text-amber-950 shadow-lg shadow-amber-500/20">
-              <BarChart3 size={24} />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-amber-500 rounded-xl flex items-center justify-center text-amber-950 shadow-lg">
+                <BarChart3 size={18} />
+              </div>
+              <h1 className="font-serif italic text-lg font-bold">Admin</h1>
             </div>
-            <h1 className="font-serif italic text-2xl font-bold">Admin Panel</h1>
+            <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl">
+              <button 
+                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-all text-amber-400"
+              >
+                {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
+              </button>
+              <div className="relative group">
+                <button className="p-1.5 hover:bg-white/10 rounded-lg transition-all text-amber-400">
+                  <Globe size={14} />
+                </button>
+                <div className="absolute top-full left-0 mt-2 hidden group-hover:block bg-slate-900 shadow-2xl border border-white/10 rounded-xl p-1 z-50 min-w-[100px]">
+                  {['sw', 'en', 'ar', 'hi'].map(lang => (
+                    <button 
+                      key={lang}
+                      onClick={() => setLanguage(lang as any)}
+                      className={cn(
+                        "w-full text-left px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase",
+                        language === lang ? "bg-amber-500 text-amber-950" : "text-amber-400/60 hover:bg-white/5"
+                      )}
+                    >
+                      {lang}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
+          <button 
+            onClick={() => setView('shop')}
+            className="w-full flex items-center gap-2 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold text-amber-400 transition-all border border-white/5"
+          >
+            <ArrowLeft size={14} />
+            Nenda Sokoni
+          </button>
         </div>
 
         <nav className="flex-1 p-6 space-y-2 overflow-y-auto scrollbar-hide">
