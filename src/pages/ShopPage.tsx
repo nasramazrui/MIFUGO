@@ -52,14 +52,16 @@ export const ShopPage: React.FC = () => {
         language: user.language || 'sw',
         theme: user.theme || 'light'
       });
-      
-      if (user.theme === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
     }
   }, [user]);
+
+  useEffect(() => {
+    if (profileData.theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [profileData.theme]);
 
   const handleUpdateProfile = async () => {
     if (!user) return;
@@ -361,63 +363,63 @@ export const ShopPage: React.FC = () => {
   const isIKConfigured = isImageKitConfigured || (systemSettings?.imagekit_public_key && systemSettings?.imagekit_url_endpoint);
 
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-24 dark:bg-slate-950 transition-colors duration-300">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-amber-100 px-4 py-3">
+      <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-amber-100 dark:border-slate-800 px-4 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-xl shadow-amber-100 border border-amber-50 overflow-hidden">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center shadow-xl shadow-amber-100 dark:shadow-none border border-amber-50 dark:border-slate-700 overflow-hidden">
               {systemSettings?.app_logo ? (
                 <img 
                   src={systemSettings.app_logo} 
-                  alt="FarmConnect Logo" 
+                  alt="Logo" 
                   className="w-full h-full object-contain"
                   referrerPolicy="no-referrer"
                 />
               ) : (
                 <img 
                   src="https://cdn-icons-png.flaticon.com/512/2329/2329113.png" 
-                  alt="FarmConnect Logo" 
+                  alt="Logo" 
                   className="w-8 h-8 object-contain"
                   referrerPolicy="no-referrer"
                 />
               )}
             </div>
             <div className="flex flex-col -gap-1">
-              <h1 className="font-serif italic text-2xl text-amber-900 font-bold tracking-tight">
+              <h1 className="font-serif italic text-xl sm:text-2xl text-amber-900 dark:text-amber-500 font-bold tracking-tight">
                 {systemSettings?.app_name || 'FarmConnect'}
               </h1>
-              <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">Soko la Kilimo</span>
+              <span className="text-[8px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest hidden sm:block">Soko la Kilimo</span>
             </div>
           </div>
-          <div className="flex-1 max-w-md relative hidden sm:block">
+          <div className="flex-1 max-w-md relative hidden md:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text"
               placeholder={t('search')}
-              className="w-full bg-slate-100 border-none rounded-2xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-amber-500 transition-all"
+              className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-2xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-amber-500 transition-all dark:text-white"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button 
               onClick={() => setIsVendorRegModalOpen(true)}
-              className="flex bg-gradient-to-r from-amber-500 to-amber-600 text-white px-4 md:px-6 py-2 md:py-2.5 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 shadow-md shadow-amber-100 animate-pulse hover:animate-none whitespace-nowrap"
+              className="flex bg-gradient-to-r from-amber-500 to-amber-600 text-white px-3 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 shadow-md shadow-amber-100 animate-pulse hover:animate-none whitespace-nowrap"
             >
-              Sajili Duka Lako
+              Sajili Duka
             </button>
             {user ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 bg-amber-600 rounded-full flex items-center justify-center text-white font-black text-sm">
-                    {user.name[0].toUpperCase()}
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-amber-600 rounded-full flex items-center justify-center text-white font-black text-xs sm:text-sm overflow-hidden border-2 border-white dark:border-slate-700">
+                    {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : user.name[0].toUpperCase()}
                   </div>
-                  <span className="text-sm font-bold text-slate-700 hidden md:block">{user.name}</span>
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300 hidden lg:block truncate max-w-[100px]">{user.name}</span>
                 </div>
                 <button 
                   onClick={logout}
-                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
                   title="Toka"
                 >
                   <LogOut size={18} />
@@ -426,9 +428,9 @@ export const ShopPage: React.FC = () => {
             ) : (
               <button 
                 onClick={() => setIsAuthModalOpen(true)}
-                className="bg-amber-600 text-white px-5 py-2 rounded-xl font-bold text-sm shadow-lg shadow-amber-100 active:scale-95 transition-all"
+                className="bg-amber-600 text-white px-4 sm:px-5 py-2 rounded-xl font-bold text-sm shadow-lg shadow-amber-100 active:scale-95 transition-all"
               >
-                Ingia
+                {t('login')}
               </button>
             )}
           </div>
@@ -476,7 +478,7 @@ export const ShopPage: React.FC = () => {
             </div>
 
             {/* Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
               {filteredProducts.map(p => (
                 <ProductCard 
                   key={p.id} 
@@ -494,8 +496,8 @@ export const ShopPage: React.FC = () => {
 
         {activeTab === 'stores' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <h2 className="text-2xl font-black text-slate-900 mb-6">🏪 Maduka Yote</h2>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6">🏪 {t('stores')}</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {vendors.filter(v => v.status === 'approved').map(v => (
                 <div 
                   key={v.id}
@@ -528,24 +530,24 @@ export const ShopPage: React.FC = () => {
 
         {activeTab === 'orders' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-             <h2 className="text-2xl font-black text-slate-900 mb-6">📦 Maagizo Yangu</h2>
+             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6">📦 {t('orders')}</h2>
              {!user ? (
-               <div className="text-center py-20 bg-white rounded-[32px] border border-slate-100">
+               <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800">
                  <div className="text-6xl mb-4">🔒</div>
-                 <p className="text-slate-500 mb-6">Ingia kuona maagizo yako</p>
-                 <button onClick={() => setIsAuthModalOpen(true)} className="btn-primary">Ingia Sasa</button>
+                 <p className="text-slate-500 dark:text-slate-400 mb-6">{t('login')} kuona maagizo yako</p>
+                 <button onClick={() => setIsAuthModalOpen(true)} className="btn-primary">{t('login')} Sasa</button>
                </div>
              ) : (
                <div className="space-y-4">
                  {orders.filter(o => o.userId === user.id).length === 0 ? (
-                   <div className="text-center py-20 bg-white rounded-[32px] border border-slate-100">
+                   <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800">
                      <div className="text-6xl mb-4">📭</div>
-                     <p className="text-slate-500 mb-6">Bado huna maagizo. Anza kununua sasa!</p>
+                     <p className="text-slate-500 dark:text-slate-400 mb-6">Bado huna maagizo. Anza kununua sasa!</p>
                      <button onClick={() => setActiveTab('browse')} className="btn-primary">Nenda Dukani</button>
                    </div>
                  ) : (
                    orders.filter(o => o.userId === user.id).map(order => (
-                     <div key={order.id} className="bg-white rounded-[32px] border border-slate-100 p-6 shadow-sm">
+                     <div key={order.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
                        <div className="flex justify-between items-start mb-4">
                          <div className="flex items-center gap-4">
                            <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-2xl overflow-hidden">
@@ -589,7 +591,7 @@ export const ShopPage: React.FC = () => {
       </main>
 
       {/* Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-6 py-3 z-40">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800 px-6 py-3 z-40">
         <div className="max-w-md mx-auto flex justify-between items-center">
           <button 
             onClick={() => setActiveTab('browse')}
@@ -611,14 +613,14 @@ export const ShopPage: React.FC = () => {
             <button 
               onClick={() => setIsCartModalOpen(true)}
               className={cn(
-                "w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 border-4 border-white",
-                cart.length > 0 ? "bg-amber-600 text-white shadow-amber-200" : "bg-slate-100 text-slate-400"
+                "w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 border-4 border-white dark:border-slate-900",
+                cart.length > 0 ? "bg-amber-600 text-white shadow-amber-200 dark:shadow-none" : "bg-slate-100 dark:bg-slate-800 text-slate-400"
               )}
             >
               <div className="relative">
                 <ShoppingBag size={28} />
                 {cart.length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-bounce">
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white dark:border-slate-900 animate-bounce">
                     {cart.reduce((sum, item) => sum + item.qty, 0)}
                   </span>
                 )}
@@ -667,11 +669,11 @@ export const ShopPage: React.FC = () => {
               {/* Avatar Selection */}
               <div className="flex flex-col items-center gap-4 py-4">
                 <div className="relative group">
-                  <div className="w-24 h-24 bg-amber-50 rounded-[32px] overflow-hidden border-4 border-white shadow-xl flex items-center justify-center text-4xl">
+                  <div className="w-24 h-24 bg-amber-50 dark:bg-slate-800 rounded-[32px] overflow-hidden border-4 border-white dark:border-slate-700 shadow-xl flex items-center justify-center text-4xl">
                     {profileData.avatar?.startsWith('http') ? (
                       <img src={profileData.avatar} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      profileData.avatar || '👤'
+                      <span className="dark:text-white">{profileData.avatar || '👤'}</span>
                     )}
                   </div>
                 </div>
@@ -679,14 +681,14 @@ export const ShopPage: React.FC = () => {
                 <div className="w-full space-y-4">
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2 block">Chagua Emoji</label>
-                    <div className="flex flex-wrap gap-2 justify-center bg-slate-50 p-4 rounded-2xl">
+                    <div className="flex flex-wrap gap-2 justify-center bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl">
                       {['👨‍🌾', '👩‍🌾', '🤠', '😎', '🤩', '🦁', '🐯', '🦊', '🐻', '🐼', '🐮', '🐷', '🐸', '🐔', '🐧'].map(emoji => (
                         <button 
                           key={emoji}
                           onClick={() => setProfileData(prev => ({ ...prev, avatar: emoji }))}
                           className={cn(
                             "w-10 h-10 flex items-center justify-center text-xl rounded-xl transition-all hover:scale-110",
-                            profileData.avatar === emoji ? "bg-amber-600 shadow-lg scale-110" : "bg-white border border-slate-100"
+                            profileData.avatar === emoji ? "bg-amber-600 shadow-lg scale-110" : "bg-white dark:bg-slate-700 border border-slate-100 dark:border-slate-600"
                           )}
                         >
                           {emoji}
@@ -701,7 +703,7 @@ export const ShopPage: React.FC = () => {
                       type="text"
                       value={profileData.avatar?.startsWith('http') ? profileData.avatar : ''}
                       onChange={(e) => setProfileData(prev => ({ ...prev, avatar: e.target.value }))}
-                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm dark:text-white"
                       placeholder="https://picha.com/yangu.jpg"
                     />
                   </div>
@@ -711,22 +713,22 @@ export const ShopPage: React.FC = () => {
               {/* Form Fields */}
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">Jina Lako</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">{t('name')}</label>
                   <input 
                     type="text"
                     value={profileData.name}
                     onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">Namba ya WhatsApp</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">{t('whatsapp')}</label>
                   <input 
                     type="tel"
                     placeholder="255..."
                     value={profileData.contact}
                     onChange={(e) => setProfileData(prev => ({ ...prev, contact: e.target.value }))}
-                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold dark:text-white"
                   />
                 </div>
 
@@ -822,7 +824,7 @@ export const ShopPage: React.FC = () => {
           <div className="bg-green-50 p-4 rounded-2xl border border-green-100 flex items-start gap-3 mb-4">
             <span className="text-2xl">🏪</span>
             <p className="text-xs text-green-800 leading-relaxed">
-              Karibu {systemSettings?.app_name || 'FarmConnect'}! Ili kuanza kuuza, tunahitaji maelezo ya biashara yako. 
+              {t('welcome')} {systemSettings?.app_name || 'FarmConnect'}! Ili kuanza kuuza, tunahitaji maelezo ya biashara yako. 
               Admin atahakiki maelezo haya kabla ya duka lako kuwa hewani.
             </p>
           </div>

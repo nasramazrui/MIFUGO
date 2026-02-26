@@ -31,14 +31,14 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
           className={cn(
-            "relative z-10 w-full max-w-lg bg-white rounded-t-[32px] sm:rounded-[32px] overflow-hidden shadow-2xl max-h-[92vh] flex flex-col",
+            "relative z-10 w-full max-w-lg bg-white dark:bg-slate-900 rounded-t-[32px] sm:rounded-[32px] overflow-hidden shadow-2xl max-h-[92vh] flex flex-col",
             className
           )}
         >
           {title && (
-            <div className={cn("p-6 flex items-center justify-between border-b border-slate-100", headerClassName)}>
-              <h2 className="text-xl font-black text-slate-900">{title}</h2>
-              <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <div className={cn("p-6 flex items-center justify-between border-b border-slate-100 dark:border-slate-800", headerClassName)}>
+              <h2 className="text-xl font-black text-slate-900 dark:text-white">{title}</h2>
+              <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-400">
                 <X size={24} />
               </button>
             </div>

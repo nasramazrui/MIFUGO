@@ -207,7 +207,7 @@ export const AdminPanel: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row pb-20 lg:pb-0">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col lg:flex-row pb-20 lg:pb-0 transition-colors duration-300">
       {/* Mobile Header */}
       <header className="lg:hidden bg-amber-950 text-amber-100 px-6 py-4 sticky top-0 z-30 flex items-center justify-between">
         <div className="flex items-center gap-2">

@@ -87,13 +87,13 @@ export const VendorPortal: React.FC = () => {
 
   if (user.status === 'pending') {
     return (
-      <div className="min-h-screen bg-[#fafaf8] flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-[40px] p-10 shadow-xl border border-amber-100 text-center">
-          <div className="w-20 h-20 bg-amber-50 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-6">
+      <div className="min-h-screen bg-[#fafaf8] dark:bg-slate-950 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-[40px] p-10 shadow-xl border border-amber-100 dark:border-slate-800 text-center">
+          <div className="w-20 h-20 bg-amber-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-6">
             ⏳
           </div>
-          <h2 className="text-2xl font-black text-slate-900 mb-4">Ombi Lako Linahakikiwa</h2>
-          <p className="text-slate-500 leading-relaxed mb-8">
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4">Ombi Lako Linahakikiwa</h2>
+          <p className="text-slate-500 dark:text-slate-400 leading-relaxed mb-8">
             Asante kwa kujiunga na {systemSettings?.app_name || 'FarmConnect'}! Admin anahakiki maelezo yako. 
             Utapewa uwezo wa kuongeza bidhaa pindi tu utakapoidhinishwa.
           </p>
@@ -277,12 +277,12 @@ export const VendorPortal: React.FC = () => {
   const isIKConfigured = isImageKitConfigured || (systemSettings?.imagekit_public_key && systemSettings?.imagekit_url_endpoint);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row pb-20 md:pb-0">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col md:flex-row pb-20 md:pb-0 transition-colors duration-300">
       {/* Mobile Header */}
-      <header className="md:hidden bg-white border-b border-slate-100 px-6 py-4 sticky top-0 z-30 flex items-center justify-between">
+      <header className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-6 py-4 sticky top-0 z-30 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-2xl">🏪</span>
-          <h1 className="font-serif italic text-lg text-emerald-800 font-bold">Vendor Portal</h1>
+          <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor Portal</h1>
         </div>
         <button onClick={logout} className="text-red-400 p-2">
           <LogOut size={20} />
@@ -290,11 +290,11 @@ export const VendorPortal: React.FC = () => {
       </header>
 
       {/* Sidebar (Desktop) */}
-      <aside className="hidden md:flex w-64 bg-white border-r border-slate-100 flex-col sticky top-0 h-screen z-20">
-        <div className="p-6 border-b border-slate-50">
+      <aside className="hidden md:flex w-64 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex-col sticky top-0 h-screen z-20">
+        <div className="p-6 border-b border-slate-50 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <span className="text-2xl">🏪</span>
-            <h1 className="font-serif italic text-xl text-emerald-800 font-bold">Vendor Portal</h1>
+            <h1 className="font-serif italic text-xl text-emerald-800 dark:text-emerald-500 font-bold">Vendor Portal</h1>
           </div>
         </div>
         
@@ -312,8 +312,8 @@ export const VendorPortal: React.FC = () => {
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all",
                 activeTab === item.id 
-                  ? "bg-emerald-50 text-emerald-700 shadow-sm" 
-                  : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+                  ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 shadow-sm" 
+                  : "text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-200"
               )}
             >
               <item.icon size={18} />
@@ -322,10 +322,10 @@ export const VendorPortal: React.FC = () => {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-50">
-          <div className="bg-slate-50 rounded-2xl p-4 mb-4">
+        <div className="p-4 border-t border-slate-50 dark:border-slate-800">
+          <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 mb-4">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center text-white font-black text-xs overflow-hidden">
+              <div className="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center text-white font-black text-xs overflow-hidden border-2 border-white dark:border-slate-700">
                 {user.avatar ? (
                   <img src={user.avatar} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -333,20 +333,20 @@ export const VendorPortal: React.FC = () => {
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-black text-slate-900 truncate">{user.shopName || user.name}</p>
-                <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
+                <p className="text-xs font-black text-slate-900 dark:text-white truncate">{user.shopName || user.name}</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">{user.email}</p>
               </div>
             </div>
             <div className={cn(
               "text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full inline-block",
-              user.status === 'approved' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+              user.status === 'approved' ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
             )}>
               {user.status === 'approved' ? "✓ Approved" : "⏳ Pending"}
             </div>
           </div>
           <button 
             onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-red-400 hover:bg-red-50 transition-all"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
           >
             <LogOut size={18} />
             Toka

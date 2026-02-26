@@ -18,7 +18,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { addActivity, systemSettings } = useApp();
+  const { addActivity, systemSettings, t } = useApp();
   const [view, setView] = useState<'choice' | 'login' | 'register'>('choice');
   const [loading, setLoading] = useState(false);
   const [serverStatus, setServerStatus] = useState<'checking' | 'ok' | 'fail'>('checking');
@@ -98,20 +98,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       {view === 'choice' && (
         <div className="text-center py-4">
           <div className="text-6xl mb-6">🐔</div>
-          <h2 className="text-2xl font-black text-slate-900 mb-2">Karibu {systemSettings?.app_name || 'FarmConnect'}!</h2>
-          <p className="text-slate-500 text-sm mb-8">Unahitaji akaunti ili uweze kununua bidhaa. Je, tayari una akaunti?</p>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">{t('welcome')} {systemSettings?.app_name || 'FarmConnect'}!</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mb-8">Unahitaji akaunti ili uweze kununua bidhaa. Je, tayari una akaunti?</p>
           <div className="space-y-3">
             <button 
               onClick={() => setView('login')}
-              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-4 rounded-2xl transition active:scale-95 shadow-lg shadow-amber-100"
+              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-4 rounded-2xl transition active:scale-95 shadow-lg shadow-amber-100 dark:shadow-none"
             >
-              ✅ Ndiyo — Ingia
+              ✅ Ndiyo — {t('login')}
             </button>
             <button 
               onClick={() => setView('register')}
-              className="w-full bg-white border-2 border-amber-200 hover:border-amber-400 text-amber-800 font-black py-4 rounded-2xl transition active:scale-95"
+              className="w-full bg-white dark:bg-slate-800 border-2 border-amber-200 dark:border-amber-900/50 hover:border-amber-400 text-amber-800 dark:text-amber-500 font-black py-4 rounded-2xl transition active:scale-95"
             >
-              ✨ Hapana — Jisajili Bure
+              ✨ Hapana — {t('register')}
             </button>
           </div>
           {serverStatus === 'fail' && (
@@ -137,12 +137,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       {view === 'login' && (
         <div>
           <div className="mb-6">
-            <h2 className="text-2xl font-black text-slate-900">Ingia</h2>
-            <p className="text-slate-500 text-sm">Karibu tena kwenye soko letu</p>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white">{t('login')}</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">Karibu tena kwenye soko letu</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email au Jina</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t('email')}</label>
               <input 
                 type="text" 
                 required
@@ -153,7 +153,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nywila</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t('password')}</label>
               <input 
                 type="password" 
                 required
@@ -163,13 +163,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 onChange={e => setFormData({...formData, password: e.target.value})}
               />
             </div>
-            <button type="submit" className="w-full btn-primary mt-4">Ingia Sasa →</button>
+            <button type="submit" className="w-full btn-primary mt-4">{t('login')} Sasa →</button>
             <button 
               type="button"
               onClick={() => setView('register')}
-              className="w-full text-sm text-slate-400 font-bold py-2"
+              className="w-full text-sm text-slate-400 dark:text-slate-500 font-bold py-2"
             >
-              Huna akaunti? Jisajili
+              Huna akaunti? {t('register')}
             </button>
           </form>
         </div>
@@ -178,12 +178,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       {view === 'register' && (
         <div>
           <div className="mb-6">
-            <h2 className="text-2xl font-black text-slate-900">Jisajili</h2>
-            <p className="text-slate-500 text-sm">Tengeneza akaunti yako bure</p>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white">{t('register')}</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">Tengeneza akaunti yako bure</p>
           </div>
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jina Kamili</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t('name')}</label>
               <input 
                 type="text" 
                 required
@@ -194,7 +194,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t('email')}</label>
               <input 
                 type="email" 
                 required
@@ -205,7 +205,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Namba ya WhatsApp</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t('whatsapp')}</label>
               <input 
                 type="tel" 
                 required
@@ -217,7 +217,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nywila</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t('password')}</label>
                 <input 
                   type="password" 
                   required
@@ -228,7 +228,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Rudia Nywila</label>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Rudia Nywila</label>
                 <input 
                   type="password" 
                   required
@@ -239,13 +239,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 />
               </div>
             </div>
-            <button type="submit" className="w-full btn-primary mt-4">Jisajili Sasa 🎉</button>
+            <button type="submit" className="w-full btn-primary mt-4">{t('register')} Sasa 🎉</button>
             <button 
               type="button"
               onClick={() => setView('login')}
-              className="w-full text-sm text-slate-400 font-bold py-2"
+              className="w-full text-sm text-slate-400 dark:text-slate-500 font-bold py-2"
             >
-              Tayari una akaunti? Ingia
+              Tayari una akaunti? {t('login')}
             </button>
           </form>
         </div>

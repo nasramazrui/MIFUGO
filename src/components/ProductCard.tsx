@@ -16,9 +16,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
       whileHover={{ y: -8 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className="bg-white rounded-[24px] border border-amber-100 overflow-hidden cursor-pointer shadow-sm hover:shadow-xl hover:shadow-amber-100/50 transition-all duration-300"
+      className="bg-white dark:bg-slate-900 rounded-[24px] border border-amber-100 dark:border-slate-800 overflow-hidden cursor-pointer shadow-sm hover:shadow-xl hover:shadow-amber-100/50 dark:hover:shadow-none transition-all duration-300"
     >
-      <div className="aspect-square bg-gradient-to-br from-amber-50 to-amber-100 flex items-center justify-center text-6xl relative overflow-hidden">
+      <div className="aspect-square bg-gradient-to-br from-amber-50 to-amber-100 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center text-6xl relative overflow-hidden">
         {product.image ? (
           <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
         ) : (
@@ -39,19 +39,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
           </span>
           <div className="flex items-center gap-0.5">
             <Star size={10} className="fill-amber-400 text-amber-400" />
-            <span className="text-[10px] font-bold text-slate-400">4.8</span>
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">4.8</span>
           </div>
         </div>
-        <h3 className="font-bold text-slate-900 text-sm leading-tight mb-1 line-clamp-1">
+        <h3 className="font-bold text-slate-900 dark:text-white text-sm leading-tight mb-1 line-clamp-1">
           {product.name}
         </h3>
-        <p className="text-[10px] text-slate-400 mb-3 flex items-center gap-1">
+        <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1">
           <span>📍</span> {product.location} · {product.vendorName}
         </p>
         <div className="flex items-center justify-between">
-          <p className="text-sm font-black text-amber-700">
+          <p className="text-sm font-black text-amber-700 dark:text-amber-500">
             {formatCurrency(product.price)}
-            <span className="text-[10px] font-normal text-slate-400 ml-1">/ {product.unit}</span>
+            <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500 ml-1">/ {product.unit}</span>
           </p>
           <div className={cn(
             "w-2 h-2 rounded-full",

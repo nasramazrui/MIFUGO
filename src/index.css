@@ -19,25 +19,29 @@
 
 @layer base {
   body {
-    @apply bg-[#fafaf8] text-slate-900 antialiased;
+    @apply bg-[#fafaf8] text-slate-900 antialiased transition-colors duration-300;
+  }
+  
+  .dark body {
+    @apply bg-slate-950 text-slate-100;
   }
 }
 
 @layer components {
   .glass {
-    @apply bg-white/75 backdrop-blur-xl border border-white/60;
+    @apply bg-white/75 backdrop-blur-xl border border-white/60 dark:bg-slate-900/75 dark:border-slate-800/60;
   }
   
   .glass-dark {
-    @apply bg-amber-900/85 backdrop-blur-xl border border-white/10;
+    @apply bg-amber-900/85 backdrop-blur-xl border border-white/10 dark:bg-amber-950/85;
   }
 
   .btn-primary {
-    @apply bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-6 rounded-2xl transition-all active:scale-95 shadow-lg shadow-amber-200;
+    @apply bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-6 rounded-2xl transition-all active:scale-95 shadow-lg shadow-amber-200 dark:shadow-none;
   }
 
   .input-field {
-    @apply w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 outline-none focus:border-amber-500 transition-all;
+    @apply w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 outline-none focus:border-amber-500 transition-all dark:bg-slate-800 dark:border-slate-700 dark:text-white dark:focus:border-amber-500;
   }
 }
 
