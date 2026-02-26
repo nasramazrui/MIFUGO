@@ -83,14 +83,32 @@ export interface Order {
   createdAt: string;
 }
 
+export interface ReviewReply {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  text: string;
+  date: string;
+}
+
+export interface ReviewReaction {
+  userId: string;
+  emoji: string;
+}
+
 export interface Review {
   id: string;
   productId: string;
   userId: string;
   userName: string;
+  userAvatar?: string;
   rating: number;
   text: string;
   date: string;
+  likes?: string[]; // Array of user IDs
+  reactions?: ReviewReaction[];
+  replies?: ReviewReply[];
 }
 
 export type WithdrawalStatus = 'pending' | 'paid' | 'rejected';

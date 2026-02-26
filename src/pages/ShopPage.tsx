@@ -6,7 +6,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion } from 'motion/react';
-import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X } from 'lucide-react';
+import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
@@ -206,6 +206,85 @@ export const ShopPage: React.FC = () => {
       toast.error('Imeshindwa kutuma maoni');
     } finally {
       setIsReviewLoading(false);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!confirm('Una uhakika unataka kufuta maoni haya?')) return;
+    try {
+      await deleteDoc(doc(db, 'kuku_reviews', reviewId));
+      toast.success('Maoni yamefutwa');
+    } catch (error) {
+      toast.error('Imeshindwa kufuta maoni');
+    }
+  };
+
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+
+  const handleReplySubmit = async (reviewId: string) => {
+    if (!user || !replyText.trim()) return;
+    try {
+      const reviewRef = doc(db, 'kuku_reviews', reviewId);
+      const review = reviews.find(r => r.id === reviewId);
+      const newReply = {
+        id: generateId(),
+        userId: user.id,
+        userName: user.name,
+        userAvatar: user.avatar || '',
+        text: replyText,
+        date: new Date().toISOString().split('T')[0]
+      };
+      await updateDoc(reviewRef, {
+        replies: [...(review?.replies || []), newReply]
+      });
+      setReplyText('');
+      setReplyingTo(null);
+      toast.success('Jibu limetumwa');
+    } catch (error) {
+      toast.error('Imeshindwa kutuma jibu');
+    }
+  };
+
+  const handleLikeReview = async (reviewId: string) => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    try {
+      const reviewRef = doc(db, 'kuku_reviews', reviewId);
+      const review = reviews.find(r => r.id === reviewId);
+      const likes = review?.likes || [];
+      const newLikes = likes.includes(user.id) 
+        ? likes.filter(id => id !== user.id)
+        : [...likes, user.id];
+      await updateDoc(reviewRef, { likes: newLikes });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleReactReview = async (reviewId: string, emoji: string) => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    try {
+      const reviewRef = doc(db, 'kuku_reviews', reviewId);
+      const review = reviews.find(r => r.id === reviewId);
+      const reactions = review?.reactions || [];
+      const existingReactionIndex = reactions.findIndex(r => r.userId === user.id && r.emoji === emoji);
+      
+      let newReactions;
+      if (existingReactionIndex > -1) {
+        newReactions = reactions.filter((_, i) => i !== existingReactionIndex);
+      } else {
+        newReactions = [...reactions, { userId: user.id, emoji }];
+      }
+      
+      await updateDoc(reviewRef, { reactions: newReactions });
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -1160,15 +1239,114 @@ export const ShopPage: React.FC = () => {
                   <p className="text-xs text-slate-400 italic">Hakuna maoni bado kwa bidhaa hii.</p>
                 ) : (
                   productReviews.map((rev) => (
-                    <div key={rev.id} className="bg-slate-50 p-4 rounded-2xl">
+                    <div key={rev.id} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
                       <div className="flex justify-between mb-1">
-                        <span className="text-xs font-black text-slate-900">{rev.userName}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-slate-900 dark:text-white">{rev.userName}</span>
+                          {(user?.id === rev.userId || user?.role === 'admin' || user?.id === selectedProduct?.vendorId) && (
+                            <button 
+                              onClick={() => handleDeleteReview(rev.id)}
+                              className="text-red-400 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
                         <div className="flex text-amber-400">
                           {[1,2,3,4,5].map(s => <Star key={s} size={10} fill={s <= rev.rating ? "currentColor" : "none"} />)}
                         </div>
                       </div>
-                      <p className="text-[11px] text-slate-500">{rev.text}</p>
-                      <p className="text-[8px] text-slate-300 mt-1">{rev.date}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">{rev.text}</p>
+                      
+                      {/* Reactions & Actions */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={() => handleLikeReview(rev.id)}
+                            className={cn(
+                              "flex items-center gap-1 text-[10px] font-bold transition-colors",
+                              rev.likes?.includes(user?.id || '') ? "text-amber-600" : "text-slate-400 hover:text-slate-600"
+                            )}
+                          >
+                            <ThumbsUp size={12} />
+                            {rev.likes?.length || 0}
+                          </button>
+                          
+                          <div className="relative group">
+                            <button className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-slate-600">
+                              <Smile size={12} />
+                              {rev.reactions?.length || 0}
+                            </button>
+                            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:flex bg-white dark:bg-slate-900 shadow-xl border border-slate-100 dark:border-slate-800 rounded-full p-1 gap-1 z-50">
+                              {['❤️', '🔥', '👏', '🙌', '😮'].map(emoji => (
+                                <button 
+                                  key={emoji}
+                                  onClick={() => handleReactReview(rev.id, emoji)}
+                                  className="hover:scale-125 transition-transform p-1"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <button 
+                            onClick={() => setReplyingTo(replyingTo === rev.id ? null : rev.id)}
+                            className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-slate-600"
+                          >
+                            <MessageSquare size={12} />
+                            {rev.replies?.length || 0}
+                          </button>
+                        </div>
+                        <span className="text-[8px] text-slate-300 dark:text-slate-600">{rev.date}</span>
+                      </div>
+
+                      {/* Reactions Display */}
+                      {rev.reactions && rev.reactions.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {Array.from(new Set(rev.reactions.map(r => r.emoji))).map(emoji => (
+                            <span key={emoji} className="text-[10px] bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded-full border border-slate-100 dark:border-slate-800">
+                              {emoji} {rev.reactions?.filter(r => r.emoji === emoji).length}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Replies Display */}
+                      {rev.replies && rev.replies.length > 0 && (
+                        <div className="mt-3 space-y-2 pl-4 border-l-2 border-slate-100 dark:border-slate-800">
+                          {rev.replies.map(reply => (
+                            <div key={reply.id} className="text-[10px]">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="font-black text-slate-900 dark:text-white">{reply.userName}</span>
+                                <span className="text-[8px] text-slate-300 dark:text-slate-600">{reply.date}</span>
+                              </div>
+                              <p className="text-slate-500 dark:text-slate-400">{reply.text}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Reply Input */}
+                      {replyingTo === rev.id && (
+                        <div className="mt-3 flex gap-2">
+                          <input 
+                            type="text"
+                            placeholder="Andika jibu..."
+                            className="flex-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-1.5 text-[10px] outline-none"
+                            value={replyText}
+                            onChange={e => setReplyText(e.target.value)}
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => handleReplySubmit(rev.id)}
+                            disabled={!replyText.trim()}
+                            className="bg-amber-600 text-white p-1.5 rounded-lg disabled:opacity-50"
+                          >
+                            <Send size={12} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
