@@ -26,7 +26,7 @@ interface CartItem {
 
 export const ShopPage: React.FC = () => {
   const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView } = useApp();
-  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'cart' | 'status'>('browse');
+  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'cart'>('browse');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [selectedCat, setSelectedCat] = useState('all');
@@ -710,138 +710,137 @@ export const ShopPage: React.FC = () => {
             </div>
           </div>
         )}
-        {activeTab === 'status' && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-3xl font-black text-slate-900 dark:text-white">📱 {t('status')}</h2>
-              {(user?.role === 'vendor' || user?.role === 'admin') && (
-                <button 
-                  onClick={() => setIsStatusModalOpen(true)}
-                  className="bg-amber-600 text-white px-6 py-3 rounded-2xl font-black text-sm shadow-xl shadow-amber-100 dark:shadow-none hover:scale-105 transition-transform active:scale-95"
-                >
-                  {t('post_status')} +
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-8">
-              {statuses.length === 0 ? (
-                <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800">
-                  <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Camera size={32} className="text-slate-300 dark:text-slate-600" />
-                  </div>
-                  <p className="text-slate-500 dark:text-slate-400 font-bold">Hakuna status kwa sasa.</p>
-                </div>
-              ) : (
-                statuses.map(status => (
-                  <div key={status.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500">
-                    <div className="p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-xl overflow-hidden">
-                            {status.vendorAvatar ? (
-                              <img src={status.vendorAvatar} alt={status.vendorName} className="w-full h-full object-cover" />
-                            ) : (
-                              "🏪"
-                            )}
-                          </div>
-                          <div>
-                            <h4 className="font-black text-slate-900 dark:text-white leading-none">{status.vendorName}</h4>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Muuzaji Aliyeidhinishwa</span>
-                          </div>
-                        </div>
-                        {(user?.role === 'admin' || user?.id === status.vendorId) && (
-                          <button 
-                            onClick={() => handleDeleteStatus(status.id)}
-                            className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        )}
-                      </div>
-                      
-                      <p className="text-slate-600 dark:text-slate-300 text-lg leading-relaxed mb-6 whitespace-pre-wrap">{status.text}</p>
-                      
-                      {status.videoUrl && (
-                        <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden mb-6 border border-slate-800">
-                          {getEmbedUrl(status.videoUrl) ? (
-                            <iframe 
-                              src={getEmbedUrl(status.videoUrl)} 
-                              className="w-full h-full" 
-                              allowFullScreen 
-                              title="Status Video"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-500 text-sm p-4 text-center">
-                              <a href={status.videoUrl} target="_blank" rel="noreferrer" className="text-amber-500 underline">Tazama Video Hapa</a>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-6 pt-4 border-t border-slate-50 dark:border-slate-800">
-                        <button 
-                          onClick={() => handleLikeStatus(status.id)}
-                          className={cn(
-                            "flex items-center gap-2 text-sm font-black transition-colors",
-                            status.likes.includes(user?.id || '') ? "text-amber-600" : "text-slate-400 hover:text-slate-600"
-                          )}
-                        >
-                          <ThumbsUp size={20} className={status.likes.includes(user?.id || '') ? "fill-current" : ""} />
-                          {status.likes.length}
-                        </button>
-                        <div className="flex items-center gap-2 text-sm font-black text-slate-400">
-                          <MessageSquare size={20} />
-                          {status.comments.length}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Comments Section */}
-                    <div className="bg-slate-50 dark:bg-slate-800/30 p-6 space-y-4">
-                      {status.comments.map(comment => (
-                        <div key={comment.id} className="flex gap-3">
-                          <div className="w-8 h-8 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center text-xs flex-shrink-0 border border-slate-100 dark:border-slate-700">
-                            👤
-                          </div>
-                          <div className="flex-1">
-                            <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-700 shadow-sm">
-                              <p className="text-[10px] font-black text-slate-900 dark:text-white mb-1">{comment.userName}</p>
-                              <p className="text-xs text-slate-500 dark:text-slate-400">{comment.text}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      {user && (
-                        <div className="flex gap-2 pt-2">
-                          <input 
-                            type="text"
-                            placeholder="Andika maoni..."
-                            className="flex-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-2 text-xs outline-none dark:text-white"
-                            value={commentText[status.id] || ''}
-                            onChange={e => setCommentText(prev => ({ ...prev, [status.id]: e.target.value }))}
-                            onKeyDown={e => e.key === 'Enter' && handleCommentStatus(status.id)}
-                          />
-                          <button 
-                            onClick={() => handleCommentStatus(status.id)}
-                            disabled={!commentText[status.id]?.trim()}
-                            className="bg-amber-600 text-white p-2 rounded-xl disabled:opacity-50 transition-all active:scale-90"
-                          >
-                            <Send size={16} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </motion.div>
-        )}
-
         {activeTab === 'browse' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            {/* Status Feed Section */}
+            <div className="max-w-2xl mx-auto mb-12">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white">📱 {t('status')}</h2>
+                {(user?.role === 'vendor' || user?.role === 'admin') && (
+                  <button 
+                    onClick={() => setIsStatusModalOpen(true)}
+                    className="bg-amber-600 text-white px-4 py-2 rounded-xl font-black text-xs shadow-lg shadow-amber-100 dark:shadow-none hover:scale-105 transition-transform active:scale-95"
+                  >
+                    {t('post_status')} +
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-6">
+                {statuses.length === 0 ? (
+                  <div className="text-center py-12 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800">
+                    <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Camera size={24} className="text-slate-300 dark:text-slate-600" />
+                    </div>
+                    <p className="text-slate-500 dark:text-slate-400 font-bold text-sm">Hakuna status kwa sasa.</p>
+                  </div>
+                ) : (
+                  statuses.slice(0, 5).map(status => (
+                    <div key={status.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-all duration-500">
+                      <div className="p-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-lg overflow-hidden">
+                              {status.vendorAvatar ? (
+                                <img src={status.vendorAvatar} alt={status.vendorName} className="w-full h-full object-cover" />
+                              ) : (
+                                "🏪"
+                              )}
+                            </div>
+                            <div>
+                              <h4 className="font-black text-slate-900 dark:text-white leading-none text-sm">{status.vendorName}</h4>
+                              <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Muuzaji Aliyeidhinishwa</span>
+                            </div>
+                          </div>
+                          {(user?.role === 'admin' || user?.id === status.vendorId) && (
+                            <button 
+                              onClick={() => handleDeleteStatus(status.id)}
+                              className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                        
+                        <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mb-4 whitespace-pre-wrap">{status.text}</p>
+                        
+                        {status.videoUrl && (
+                          <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden mb-4 border border-slate-800">
+                            {getEmbedUrl(status.videoUrl) ? (
+                              <iframe 
+                                src={getEmbedUrl(status.videoUrl)} 
+                                className="w-full h-full" 
+                                allowFullScreen 
+                                title="Status Video"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs p-4 text-center">
+                                <a href={status.videoUrl} target="_blank" rel="noreferrer" className="text-amber-500 underline">Tazama Video Hapa</a>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-6 pt-3 border-t border-slate-50 dark:border-slate-800">
+                          <button 
+                            onClick={() => handleLikeStatus(status.id)}
+                            className={cn(
+                              "flex items-center gap-2 text-xs font-black transition-colors",
+                              status.likes.includes(user?.id || '') ? "text-amber-600" : "text-slate-400 hover:text-slate-600"
+                            )}
+                          >
+                            <ThumbsUp size={18} className={status.likes.includes(user?.id || '') ? "fill-current" : ""} />
+                            {status.likes.length}
+                          </button>
+                          <div className="flex items-center gap-2 text-xs font-black text-slate-400">
+                            <MessageSquare size={18} />
+                            {status.comments.length}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Comments Section */}
+                      <div className="bg-slate-50 dark:bg-slate-800/30 p-5 space-y-3">
+                        {status.comments.slice(0, 2).map(comment => (
+                          <div key={comment.id} className="flex gap-2">
+                            <div className="w-6 h-6 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center text-[10px] flex-shrink-0 border border-slate-100 dark:border-slate-700">
+                              👤
+                            </div>
+                            <div className="flex-1">
+                              <div className="bg-white dark:bg-slate-800 p-2 rounded-xl rounded-tl-none border border-slate-100 dark:border-slate-700 shadow-sm">
+                                <p className="text-[8px] font-black text-slate-900 dark:text-white mb-0.5">{comment.userName}</p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400">{comment.text}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {user && (
+                          <div className="flex gap-2 pt-1">
+                            <input 
+                              type="text"
+                              placeholder="Andika maoni..."
+                              className="flex-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-1.5 text-[10px] outline-none dark:text-white"
+                              value={commentText[status.id] || ''}
+                              onChange={e => setCommentText(prev => ({ ...prev, [status.id]: e.target.value }))}
+                              onKeyDown={e => e.key === 'Enter' && handleCommentStatus(status.id)}
+                            />
+                            <button 
+                              onClick={() => handleCommentStatus(status.id)}
+                              disabled={!commentText[status.id]?.trim()}
+                              className="bg-amber-600 text-white p-1.5 rounded-lg disabled:opacity-50 transition-all active:scale-90"
+                            >
+                              <Send size={12} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
             {/* Categories */}
             <div className="flex gap-3 overflow-x-auto pb-6 scrollbar-hide mb-8 -mx-4 px-4 sm:mx-0 sm:px-0">
               {CATEGORIES.map(cat => (
@@ -990,14 +989,6 @@ export const ShopPage: React.FC = () => {
           >
             <Store size={20} />
             <span className="text-[10px] font-black">{t('stores')}</span>
-          </button>
-
-          <button 
-            onClick={() => setActiveTab('status')}
-            className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'status' ? "text-amber-600 scale-110" : "text-slate-400")}
-          >
-            <Camera size={20} />
-            <span className="text-[10px] font-black">{t('status')}</span>
           </button>
 
           {/* Raised Cart Button */}
