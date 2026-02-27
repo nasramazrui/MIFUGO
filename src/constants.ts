@@ -75,6 +75,9 @@ export const TRANSLATIONS: any = {
     whatsapp: 'Namba ya WhatsApp',
     save: 'Hifadhi',
     cancel: 'Ghairi',
+    tagline: 'Soko la Kilimo Tanzania',
+    register_store: 'Sajili Duka',
+    dashboard: 'Dashboard',
   },
   en: {
     market: 'Market',
@@ -100,6 +103,9 @@ export const TRANSLATIONS: any = {
     whatsapp: 'WhatsApp Number',
     save: 'Save',
     cancel: 'Cancel',
+    tagline: 'Tanzania Agricultural Market',
+    register_store: 'Register Store',
+    dashboard: 'Dashboard',
   },
   ar: {
     market: 'سوق',
@@ -125,6 +131,9 @@ export const TRANSLATIONS: any = {
     whatsapp: 'رقم الواتساب',
     save: 'حفظ',
     cancel: 'إلغاء',
+    tagline: 'سوق تنزانيا الزراعي',
+    register_store: 'سجل متجرك',
+    dashboard: 'لوحة القيادة',
   },
   hi: {
     market: 'बाज़ार',
@@ -150,5 +159,8 @@ export const TRANSLATIONS: any = {
     whatsapp: 'व्हाट्सएप नंबर',
     save: 'सहेजें',
     cancel: 'रद्द करें',
+    tagline: 'तंजानिया कृषि बाजार',
+    register_store: 'दुकान पंजीकृत करें',
+    dashboard: 'डैशबोर्ड',
   }
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { User, Product, Order, Activity, Withdrawal, ProductUnit, WithdrawalStatus } from '../types';
 import { IKContext, IKUpload } from 'imagekitio-react';
@@ -43,6 +43,18 @@ import { toast } from 'react-hot-toast';
 export const VendorPortal: React.FC = () => {
   const { user, products, orders, withdrawals, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t } = useApp();
   const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings'>('dash');
+  const [isLangOpen, setIsLangOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (langRef.current && !langRef.current.contains(event.target as Node)) {
+        setIsLangOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
@@ -294,12 +306,41 @@ export const VendorPortal: React.FC = () => {
           <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-            className="p-2 text-slate-600 dark:text-slate-400"
-          >
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-          </button>
+          <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 p-1 rounded-xl">
+            <button 
+              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+              className="p-2 text-slate-600 dark:text-slate-400"
+            >
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+            <div className="relative" ref={langRef}>
+              <button 
+                onClick={() => setIsLangOpen(!isLangOpen)}
+                className="p-2 text-slate-600 dark:text-slate-400"
+              >
+                <Globe size={18} />
+              </button>
+              {isLangOpen && (
+                <div className="absolute top-full right-0 mt-2 bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 rounded-xl p-1 z-50 min-w-[100px] animate-in fade-in zoom-in duration-200">
+                  {['sw', 'en', 'ar', 'hi'].map(lang => (
+                    <button 
+                      key={lang}
+                      onClick={() => {
+                        setLanguage(lang as any);
+                        setIsLangOpen(false);
+                      }}
+                      className={cn(
+                        "w-full text-left px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase",
+                        language === lang ? "bg-emerald-600 text-white" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      )}
+                    >
+                      {lang}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <button onClick={logout} className="text-red-400 p-2">
             <LogOut size={20} />
           </button>
@@ -321,24 +362,32 @@ export const VendorPortal: React.FC = () => {
               >
                 {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
               </button>
-              <div className="relative group">
-                <button className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all text-slate-600 dark:text-slate-400">
+              <div className="relative" ref={langRef}>
+                <button 
+                  onClick={() => setIsLangOpen(!isLangOpen)}
+                  className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all text-slate-600 dark:text-slate-400"
+                >
                   <Globe size={14} />
                 </button>
-                <div className="absolute top-full left-0 mt-2 hidden group-hover:block bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 rounded-xl p-1 z-50 min-w-[100px]">
-                  {['sw', 'en', 'ar', 'hi'].map(lang => (
-                    <button 
-                      key={lang}
-                      onClick={() => setLanguage(lang as any)}
-                      className={cn(
-                        "w-full text-left px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase",
-                        language === lang ? "bg-emerald-600 text-white" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                      )}
-                    >
-                      {lang}
-                    </button>
-                  ))}
-                </div>
+                {isLangOpen && (
+                  <div className="absolute top-full left-0 mt-2 bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 rounded-xl p-1 z-50 min-w-[100px] animate-in fade-in zoom-in duration-200">
+                    {['sw', 'en', 'ar', 'hi'].map(lang => (
+                      <button 
+                        key={lang}
+                        onClick={() => {
+                          setLanguage(lang as any);
+                          setIsLangOpen(false);
+                        }}
+                        className={cn(
+                          "w-full text-left px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase",
+                          language === lang ? "bg-emerald-600 text-white" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        )}
+                      >
+                        {lang}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -411,11 +460,11 @@ export const VendorPortal: React.FC = () => {
       {/* Main Content */}
       <main className="flex-1 p-6 md:p-10 overflow-y-auto">
         {user.status === 'pending' && (
-          <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 mb-8 flex items-start gap-4">
-            <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0">⏳</div>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-3xl p-6 mb-8 flex items-start gap-4">
+            <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0">⏳</div>
             <div>
-              <h3 className="font-black text-amber-900 mb-1">Akaunti Yako Inasubiri Idhini</h3>
-              <p className="text-sm text-amber-700 leading-relaxed">
+              <h3 className="font-black text-amber-900 dark:text-amber-100 mb-1">Akaunti Yako Inasubiri Idhini</h3>
+              <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed">
                 Admin bado hajahakiki duka lako. Huwezi kuuza bidhaa mpaka upate idhini. 
                 Tafadhali hakikisha umetuma maelezo yako ya KYC kwa WhatsApp ya Admin.
               </p>
@@ -426,10 +475,10 @@ export const VendorPortal: React.FC = () => {
         {activeTab === 'dash' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
             <div className="flex items-center justify-between">
-              <h2 className="text-3xl font-black text-slate-900">Habari, {user.name}! 👋</h2>
+              <h2 className="text-3xl font-black text-slate-900 dark:text-white">Habari, {user.name}! 👋</h2>
               <button 
                 onClick={() => setIsAddModalOpen(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-100 transition-all active:scale-95"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-100 dark:shadow-none transition-all active:scale-95"
               >
                 <Plus size={20} /> Ongeza Bidhaa
               </button>
@@ -442,19 +491,19 @@ export const VendorPortal: React.FC = () => {
                 { label: 'Mapato (TZS)', value: formatCurrency(totalRevenue).replace('TZS ', ''), icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50' },
                 { label: 'Hali', value: user.status === 'approved' ? 'Active' : 'Pending', icon: CheckCircle2, color: 'text-purple-600', bg: 'bg-purple-50' },
               ].map((stat, i) => (
-                <div key={i} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm">
-                  <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-4", stat.bg)}>
+                <div key={i} className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+                  <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-4", stat.bg, stat.bg.includes('blue') && 'dark:bg-blue-900/20', stat.bg.includes('emerald') && 'dark:bg-emerald-900/20', stat.bg.includes('amber') && 'dark:bg-amber-900/20', stat.bg.includes('purple') && 'dark:bg-purple-900/20')}>
                     <stat.icon className={stat.color} size={24} />
                   </div>
                   <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                  <p className="text-2xl font-black text-slate-900">{stat.value}</p>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white">{stat.value}</p>
                 </div>
               ))}
             </div>
 
             <div className="grid lg:grid-cols-2 gap-8">
-              <div className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm">
-                <h3 className="font-black text-slate-900 mb-6 flex items-center gap-2">
+              <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-8 shadow-sm">
+                <h3 className="font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                   <Clock size={20} className="text-amber-500" /> Maagizo ya Hivi Karibuni
                 </h3>
                 <div className="space-y-4">
@@ -462,16 +511,16 @@ export const VendorPortal: React.FC = () => {
                     <p className="text-center py-10 text-slate-400 text-sm">Hakuna maagizo bado.</p>
                   ) : (
                     myOrders.slice(0, 5).map(order => (
-                      <div key={order.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                      <div key={order.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
                         <div className="flex items-center gap-3">
                           <div className="text-2xl">{order.items[0].emoji}</div>
                           <div>
-                            <p className="text-sm font-black text-slate-900">{order.userName}</p>
-                            <p className="text-[10px] text-slate-400">{order.date}</p>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">{order.userName}</p>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500">{order.date}</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-black text-emerald-700">{formatCurrency(order.total)}</p>
+                          <p className="text-sm font-black text-emerald-700 dark:text-emerald-400">{formatCurrency(order.total)}</p>
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{order.status}</span>
                         </div>
                       </div>
@@ -480,8 +529,8 @@ export const VendorPortal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm">
-                <h3 className="font-black text-slate-900 mb-6 flex items-center gap-2">
+              <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-8 shadow-sm">
+                <h3 className="font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                   <AlertCircle size={20} className="text-blue-500" /> Bidhaa Maarufu
                 </h3>
                 <div className="space-y-4">
@@ -489,15 +538,15 @@ export const VendorPortal: React.FC = () => {
                     <p className="text-center py-10 text-slate-400 text-sm">Bado haujaongeza bidhaa.</p>
                   ) : (
                     myProducts.slice(0, 5).map(product => (
-                      <div key={product.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                      <div key={product.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
                         <div className="flex items-center gap-3">
                           <div className="text-2xl">{product.emoji}</div>
                           <div>
-                            <p className="text-sm font-black text-slate-900">{product.name}</p>
-                            <p className="text-[10px] text-slate-400">Stock: {product.stock} pcs</p>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">{product.name}</p>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500">Stock: {product.stock} pcs</p>
                           </div>
                         </div>
-                        <p className="text-sm font-black text-amber-700">{formatCurrency(product.price)}</p>
+                        <p className="text-sm font-black text-amber-700 dark:text-amber-500">{formatCurrency(product.price)}</p>
                       </div>
                     ))
                   )}

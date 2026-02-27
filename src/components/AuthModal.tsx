@@ -10,6 +10,7 @@ import {
   updateProfile
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { AlertCircle } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -98,37 +99,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       {view === 'choice' && (
-        <div className="text-center py-4">
-          <div className="text-6xl mb-6">🐔</div>
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">{t('welcome')} {systemSettings?.app_name || 'FarmConnect'}!</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mb-8">Unahitaji akaunti ili uweze kununua bidhaa. Je, tayari una akaunti?</p>
-          <div className="space-y-3">
+        <div className="text-center py-6">
+          <div className="w-24 h-24 bg-amber-50 dark:bg-amber-900/20 rounded-[32px] flex items-center justify-center text-5xl mx-auto mb-8 shadow-inner">🐔</div>
+          <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-3 tracking-tight leading-tight">
+            {t('welcome')} <span className="text-amber-600">{systemSettings?.app_name || 'FarmConnect'}</span>!
+          </h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mb-10 max-w-[280px] mx-auto leading-relaxed">
+            Unahitaji akaunti ili uweze kununua bidhaa na kufurahia huduma zetu.
+          </p>
+          <div className="space-y-4">
             <button 
               onClick={() => setView('login')}
-              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-4 rounded-2xl transition active:scale-95 shadow-lg shadow-amber-100 dark:shadow-none"
+              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-4 rounded-2xl transition-all active:scale-95 shadow-xl shadow-amber-600/20 dark:shadow-none flex items-center justify-center gap-2"
             >
               ✅ Ndiyo — {t('login')}
             </button>
             <button 
               onClick={() => setView('register')}
-              className="w-full bg-white dark:bg-slate-800 border-2 border-amber-200 dark:border-amber-900/50 hover:border-amber-400 text-amber-800 dark:text-amber-500 font-black py-4 rounded-2xl transition active:scale-95"
+              className="w-full bg-white dark:bg-slate-800 border-2 border-amber-200 dark:border-slate-700 hover:border-amber-400 dark:hover:border-amber-500 text-amber-800 dark:text-amber-400 font-black py-4 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
             >
               ✨ Hapana — {t('register')}
             </button>
           </div>
           {serverStatus === 'fail' && (
-            <div className="mt-4 p-3 bg-red-50 text-red-600 text-[10px] font-bold rounded-xl border border-red-100">
-              ⚠️ Server haijibu. Tafadhali subiri kidogo au wasiliana na msaada.
+            <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-[10px] font-bold rounded-2xl border border-red-100 dark:border-red-900/50 flex items-center gap-2">
+              <AlertCircle size={14} />
+              <span>Server haijibu. Tafadhali subiri kidogo au wasiliana na msaada.</span>
             </div>
           )}
-          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-            <p className="text-xs text-slate-400 mb-3">Unataka kuuza bidhaa zako?</p>
+          <div className="mt-10 pt-8 border-t border-slate-100 dark:border-slate-800 text-center">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-4 font-bold uppercase tracking-widest">Unataka kuuza bidhaa zako?</p>
             <button 
               onClick={() => {
                 onClose();
                 toast('Tafadhali tumia kitufe cha "SAJILI DUKA LAKO" kwenye ukurasa mkuu.', { icon: '🏪' });
               }}
-              className="text-amber-600 text-xs font-black hover:underline"
+              className="bg-slate-50 dark:bg-slate-800/50 text-amber-600 dark:text-amber-500 text-xs font-black px-6 py-3 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all border border-slate-100 dark:border-slate-700"
             >
               SAJILI DUKA LAKO HAPA →
             </button>

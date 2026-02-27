@@ -65,29 +65,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [language, setLanguageState] = useState<'sw' | 'en' | 'ar' | 'hi'>((localStorage.getItem('language') as 'sw' | 'en' | 'ar' | 'hi') || 'sw');
   const [view, setView] = useState<'auto' | 'shop' | 'dashboard'>('auto');
 
-  const setTheme = (newTheme: 'light' | 'dark') => {
-    setThemeState(newTheme);
-    localStorage.setItem('theme', newTheme);
-    if (user) {
-      updateDoc(doc(db, 'kuku_users', user.id), { theme: newTheme });
+  const setTheme = async (newTheme: 'light' | 'dark') => {
+    try {
+      setThemeState(newTheme);
+      localStorage.setItem('theme', newTheme);
+      if (user) {
+        await updateDoc(doc(db, 'kuku_users', user.id), { theme: newTheme });
+      }
+    } catch (e) {
+      console.error("Error updating theme:", e);
     }
   };
 
-  const setLanguage = (newLang: 'sw' | 'en' | 'ar' | 'hi') => {
-    setLanguageState(newLang);
-    localStorage.setItem('language', newLang);
-    if (user) {
-      updateDoc(doc(db, 'kuku_users', user.id), { language: newLang });
+  const setLanguage = async (newLang: 'sw' | 'en' | 'ar' | 'hi') => {
+    try {
+      setLanguageState(newLang);
+      localStorage.setItem('language', newLang);
+      if (user) {
+        await updateDoc(doc(db, 'kuku_users', user.id), { language: newLang });
+      }
+    } catch (e) {
+      console.error("Error updating language:", e);
     }
   };
 
-  // Sync theme and language with user profile
+  // Sync theme and language with user profile ONLY on initial user load or login
+  const [hasSyncedProfile, setHasSyncedProfile] = useState(false);
   useEffect(() => {
-    if (user) {
-      if (user.theme && user.theme !== theme) setThemeState(user.theme);
-      if (user.language && user.language !== language) setLanguageState(user.language);
+    if (user && !hasSyncedProfile) {
+      if (user.theme) {
+        setThemeState(user.theme);
+        localStorage.setItem('theme', user.theme);
+      }
+      if (user.language) {
+        setLanguageState(user.language);
+        localStorage.setItem('language', user.language);
+      }
+      setHasSyncedProfile(true);
+    } else if (!user) {
+      setHasSyncedProfile(false);
     }
-  }, [user]);
+  }, [user, hasSyncedProfile]);
 
   // Apply theme to document
   useEffect(() => {

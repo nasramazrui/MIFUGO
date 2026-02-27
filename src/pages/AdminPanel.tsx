@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { formatCurrency } from '../utils';
 import { Modal } from '../components/Modal';
@@ -73,6 +73,18 @@ export const AdminPanel: React.FC = () => {
     t
   } = useApp();
   const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'wallet' | 'settings'>('over');
+  const [isLangOpen, setIsLangOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (langRef.current && !langRef.current.contains(event.target as Node)) {
+        setIsLangOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   const [editingItem, setEditingItem] = useState<{ type: string, data: any } | null>(null);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [localSettings, setLocalSettings] = useState({
@@ -237,6 +249,33 @@ export const AdminPanel: React.FC = () => {
             >
               {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
             </button>
+            <div className="relative" ref={langRef}>
+              <button 
+                onClick={() => setIsLangOpen(!isLangOpen)}
+                className="p-1.5 text-amber-400"
+              >
+                <Globe size={16} />
+              </button>
+              {isLangOpen && (
+                <div className="absolute top-full right-0 mt-2 bg-slate-900 shadow-2xl border border-white/10 rounded-xl p-1 z-50 min-w-[100px] animate-in fade-in zoom-in duration-200">
+                  {['sw', 'en', 'ar', 'hi'].map(lang => (
+                    <button 
+                      key={lang}
+                      onClick={() => {
+                        setLanguage(lang as any);
+                        setIsLangOpen(false);
+                      }}
+                      className={cn(
+                        "w-full text-left px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase",
+                        language === lang ? "bg-amber-500 text-amber-950" : "text-amber-400/60 hover:bg-white/5"
+                      )}
+                    >
+                      {lang}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <button onClick={logout} className="text-amber-400/60 p-2">
             <LogOut size={20} />
@@ -261,24 +300,32 @@ export const AdminPanel: React.FC = () => {
               >
                 {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
               </button>
-              <div className="relative group">
-                <button className="p-1.5 hover:bg-white/10 rounded-lg transition-all text-amber-400">
+              <div className="relative" ref={langRef}>
+                <button 
+                  onClick={() => setIsLangOpen(!isLangOpen)}
+                  className="p-1.5 hover:bg-white/10 rounded-lg transition-all text-amber-400"
+                >
                   <Globe size={14} />
                 </button>
-                <div className="absolute top-full left-0 mt-2 hidden group-hover:block bg-slate-900 shadow-2xl border border-white/10 rounded-xl p-1 z-50 min-w-[100px]">
-                  {['sw', 'en', 'ar', 'hi'].map(lang => (
-                    <button 
-                      key={lang}
-                      onClick={() => setLanguage(lang as any)}
-                      className={cn(
-                        "w-full text-left px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase",
-                        language === lang ? "bg-amber-500 text-amber-950" : "text-amber-400/60 hover:bg-white/5"
-                      )}
-                    >
-                      {lang}
-                    </button>
-                  ))}
-                </div>
+                {isLangOpen && (
+                  <div className="absolute top-full left-0 mt-2 bg-slate-900 shadow-2xl border border-white/10 rounded-xl p-1 z-50 min-w-[100px] animate-in fade-in zoom-in duration-200">
+                    {['sw', 'en', 'ar', 'hi'].map(lang => (
+                      <button 
+                        key={lang}
+                        onClick={() => {
+                          setLanguage(lang as any);
+                          setIsLangOpen(false);
+                        }}
+                        className={cn(
+                          "w-full text-left px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase",
+                          language === lang ? "bg-amber-500 text-amber-950" : "text-amber-400/60 hover:bg-white/5"
+                        )}
+                      >
+                        {lang}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -358,9 +405,9 @@ export const AdminPanel: React.FC = () => {
                 <h2 className="text-3xl font-black text-slate-900">Muhtasari wa Mfumo</h2>
                 <p className="text-slate-500">Hali ya sasa ya {systemSettings?.app_name || 'FarmConnect'} Tanzania</p>
               </div>
-              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-slate-100 shadow-sm">
+              <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-4 py-2 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
                 <Bell size={18} className="text-amber-500" />
-                <span className="text-xs font-black text-slate-900">{activities.length} Notifications</span>
+                <span className="text-xs font-black text-slate-900 dark:text-white">{activities.length} Notifications</span>
               </div>
             </div>
 
@@ -372,39 +419,39 @@ export const AdminPanel: React.FC = () => {
                 { label: 'Maagizo', value: orders.length, icon: ClipboardList, color: 'text-red-600', bg: 'bg-red-50' },
                 { label: 'Mapato Admin (6%)', value: formatCurrency(totalAdminEarnings), icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
               ].map((stat, i) => (
-                <div key={i} className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
-                  <div className={cn("w-14 h-14 rounded-[20px] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform", stat.bg)}>
+                <div key={i} className="bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all group">
+                  <div className={cn("w-14 h-14 rounded-[20px] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform", stat.bg, stat.bg.includes('blue') && 'dark:bg-blue-900/20', stat.bg.includes('emerald') && 'dark:bg-emerald-900/20', stat.bg.includes('amber') && 'dark:bg-amber-900/20', stat.bg.includes('red') && 'dark:bg-red-900/20', stat.bg.includes('purple') && 'dark:bg-purple-900/20')}>
                     <stat.icon className={stat.color} size={28} />
                   </div>
                   <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                  <p className="text-4xl font-black text-slate-900 mb-1">{stat.value}</p>
-                  {stat.sub && <p className="text-[10px] font-bold text-amber-600">{stat.sub}</p>}
+                  <p className="text-4xl font-black text-slate-900 dark:text-white mb-1">{stat.value}</p>
+                  {stat.sub && <p className="text-[10px] font-bold text-amber-600 dark:text-amber-500">{stat.sub}</p>}
                 </div>
               ))}
             </div>
 
             <div className="grid lg:grid-cols-2 gap-10">
-              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
-                <h3 className="font-black text-slate-900 mb-8 flex items-center gap-3">
+              <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 p-10 shadow-sm">
+                <h3 className="font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
                   <Bell size={24} className="text-amber-500" /> Shughuli za Hivi Karibuni
                 </h3>
                 <div className="space-y-6">
                   {activities.slice(0, 6).map(act => (
                     <div key={act.id} className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-lg flex-shrink-0">
+                      <div className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-lg flex-shrink-0">
                         {act.icon}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-bold text-slate-700 leading-snug">{act.text}</p>
-                        <p className="text-[10px] text-slate-400 mt-1">{act.time}</p>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-300 leading-snug">{act.text}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{act.time}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
-                <h3 className="font-black text-slate-900 mb-8 flex items-center gap-3">
+              <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 p-10 shadow-sm">
+                <h3 className="font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
                   <Store size={24} className="text-emerald-500" /> Wauuzaji Wanasubiri
                 </h3>
                 <div className="space-y-4">
@@ -450,9 +497,9 @@ export const AdminPanel: React.FC = () => {
             <h2 className="text-3xl font-black text-slate-900">Analytics ya Biashara</h2>
             
             <div className="grid lg:grid-cols-2 gap-8">
-              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+              <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 p-10 shadow-sm">
                 <div className="flex items-center justify-between mb-10">
-                  <h3 className="font-black text-slate-900 flex items-center gap-2">
+                  <h3 className="font-black text-slate-900 dark:text-white flex items-center gap-2">
                     <TrendingUp size={20} className="text-amber-500" /> Mauzo ya Siku 7 (TZS)
                   </h3>
                 </div>
@@ -478,9 +525,9 @@ export const AdminPanel: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+              <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 p-10 shadow-sm">
                 <div className="flex items-center justify-between mb-10">
-                  <h3 className="font-black text-slate-900 flex items-center gap-2">
+                  <h3 className="font-black text-slate-900 dark:text-white flex items-center gap-2">
                     <Store size={20} className="text-emerald-500" /> Wauuzaji Bora (Sales)
                   </h3>
                 </div>
@@ -509,8 +556,8 @@ export const AdminPanel: React.FC = () => {
             </div>
 
             <div className="grid lg:grid-cols-2 gap-8">
-              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
-                <h3 className="font-black text-slate-900 mb-8 flex items-center gap-2">
+              <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 p-10 shadow-sm">
+                <h3 className="font-black text-slate-900 dark:text-white mb-8 flex items-center gap-2">
                   <MapPin size={20} className="text-blue-500" /> Mikoa Inayoongoza
                 </h3>
                 <div className="flex flex-col sm:flex-row items-center gap-10">
@@ -545,8 +592,8 @@ export const AdminPanel: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
-                <h3 className="font-black text-slate-900 mb-8 flex items-center gap-2">
+              <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 p-10 shadow-sm">
+                <h3 className="font-black text-slate-900 dark:text-white mb-8 flex items-center gap-2">
                   <ShoppingBag size={20} className="text-emerald-500" /> Bidhaa Maarufu
                 </h3>
                 <div className="space-y-6">
@@ -580,20 +627,20 @@ export const AdminPanel: React.FC = () => {
             <h2 className="text-3xl font-black text-slate-900 mb-8">Wauuzaji Wote</h2>
             <div className="space-y-4">
               {vendors.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100">
-                  <Store size={48} className="mx-auto text-slate-200 mb-4" />
+                <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800">
+                  <Store size={48} className="mx-auto text-slate-200 dark:text-slate-800 mb-4" />
                   <p className="text-slate-400">Hakuna wauzaji bado.</p>
                 </div>
               ) : (
                 vendors.map(v => (
-                  <div key={v.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex items-center justify-between shadow-sm">
+                  <div key={v.id} className="bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 p-6 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-2xl font-black text-amber-800">
+                      <div className="w-14 h-14 bg-amber-50 dark:bg-amber-900/20 rounded-2xl flex items-center justify-center text-2xl font-black text-amber-800 dark:text-amber-500">
                         {(v.shopName || v.name)[0].toUpperCase()}
                       </div>
                       <div>
-                        <h4 className="font-black text-slate-900">{v.shopName || v.name}</h4>
-                        <p className="text-xs text-slate-400">{v.email} · 📍 {v.location}</p>
+                        <h4 className="font-black text-slate-900 dark:text-white">{v.shopName || v.name}</h4>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">{v.email} · 📍 {v.location}</p>
                         <span className={cn(
                           "text-[9px] font-black px-2 py-0.5 rounded-full uppercase mt-1 inline-block",
                           v.status === 'approved' ? "bg-emerald-100 text-emerald-700" : 
