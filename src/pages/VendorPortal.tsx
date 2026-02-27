@@ -25,7 +25,8 @@ import {
   Moon,
   Sun,
   Globe,
-  ArrowLeft
+  ArrowLeft,
+  Camera
 } from 'lucide-react';
 import { cn } from '../utils';
 
@@ -41,8 +42,8 @@ import {
 import { toast } from 'react-hot-toast';
 
 export const VendorPortal: React.FC = () => {
-  const { user, products, orders, withdrawals, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t } = useApp();
-  const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings'>('dash');
+  const { user, products, orders, withdrawals, statuses, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t } = useApp();
+  const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status'>('dash');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -87,6 +88,12 @@ export const VendorPortal: React.FC = () => {
     location: ''
   });
 
+  // Status State
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [statusText, setStatusText] = useState('');
+  const [statusVideoUrl, setStatusVideoUrl] = useState('');
+  const [isStatusLoading, setIsStatusLoading] = useState(false);
+
   React.useEffect(() => {
     if (user) {
       setShopSettings({
@@ -127,6 +134,7 @@ export const VendorPortal: React.FC = () => {
   const myProducts = products.filter(p => p.vendorId === user.id);
   const myOrders = orders.filter(o => o.vendorId === user.id);
   const myWithdrawals = withdrawals.filter(w => w.vendorId === user.id);
+  const myStatuses = statuses.filter(s => s.vendorId === user.id);
   
   const totalRevenue = myOrders
     .filter(o => o.status === 'delivered')
@@ -290,6 +298,44 @@ export const VendorPortal: React.FC = () => {
     }
   };
 
+  const handlePostStatus = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    if (!statusText.trim()) return;
+
+    setIsStatusLoading(true);
+    try {
+      await addDoc(collection(db, 'kuku_statuses'), {
+        vendorId: user.id,
+        vendorName: user.shopName || user.name,
+        vendorAvatar: user.avatar || '',
+        text: statusText,
+        videoUrl: statusVideoUrl,
+        likes: [],
+        comments: [],
+        createdAt: serverTimestamp()
+      });
+      toast.success('Status imewekwa!');
+      setStatusText('');
+      setStatusVideoUrl('');
+      setIsStatusModalOpen(false);
+    } catch (error) {
+      toast.error('Hitilafu wakati wa kuweka status');
+    } finally {
+      setIsStatusLoading(false);
+    }
+  };
+
+  const handleDeleteStatus = async (statusId: string) => {
+    if (!confirm('Je, una uhakika unataka kufuta status hii?')) return;
+    try {
+      await deleteDoc(doc(db, 'kuku_statuses', statusId));
+      toast.success('Status imefutwa');
+    } catch (error) {
+      toast.error('Hitilafu wakati wa kufuta status');
+    }
+  };
+
   const isIKConfigured = isImageKitConfigured || (systemSettings?.imagekit_public_key && systemSettings?.imagekit_url_endpoint);
 
   return (
@@ -406,6 +452,7 @@ export const VendorPortal: React.FC = () => {
             { id: 'products', label: 'Bidhaa Zangu', icon: Package },
             { id: 'orders', label: 'Maagizo', icon: ClipboardList },
             { id: 'wallet', label: 'Wallet', icon: Wallet },
+            { id: 'status', label: t('status'), icon: Camera },
             { id: 'settings', label: 'Mipangilio', icon: Clock },
           ].map(item => (
             <button
@@ -747,6 +794,64 @@ export const VendorPortal: React.FC = () => {
             </div>
           </motion.div>
         )}
+        {activeTab === 'status' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900">{t('status')}</h2>
+                <p className="text-slate-500 font-bold">Manage your store updates and stories</p>
+              </div>
+              <button 
+                onClick={() => setIsStatusModalOpen(true)}
+                className="bg-amber-600 text-white px-6 py-3 rounded-2xl font-black text-sm shadow-xl shadow-amber-100 hover:scale-105 transition-transform active:scale-95"
+              >
+                {t('post_status')} +
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {myStatuses.length === 0 ? (
+                <div className="col-span-full text-center py-20 bg-white rounded-[32px] border border-slate-100">
+                  <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Camera size={32} className="text-slate-300" />
+                  </div>
+                  <p className="text-slate-500 font-bold">Hujaweka status yoyote bado.</p>
+                </div>
+              ) : (
+                myStatuses.map(status => (
+                  <div key={status.id} className="bg-white rounded-[32px] border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl transition-all p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        {status.createdAt?.toDate ? status.createdAt.toDate().toLocaleDateString() : 'Sasa hivi'}
+                      </span>
+                      <button 
+                        onClick={() => handleDeleteStatus(status.id)}
+                        className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                    <p className="text-slate-600 text-sm mb-4 line-clamp-3">{status.text}</p>
+                    {status.videoUrl && (
+                      <div className="aspect-video bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 text-xs p-2 text-center">
+                        Video Link: {status.videoUrl}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-4 mt-4 pt-4 border-t border-slate-50">
+                      <div className="flex items-center gap-1 text-xs font-bold text-slate-400">
+                        <span>❤️ {status.likes.length}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs font-bold text-slate-400">
+                        <span>💬 {status.comments.length}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'settings' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl">
             <h2 className="text-3xl font-black text-slate-900 mb-8">⚙️ Mipangilio ya Duka</h2>
@@ -866,6 +971,43 @@ export const VendorPortal: React.FC = () => {
           </button>
         ))}
       </nav>
+
+      {/* Status Modal */}
+      <Modal 
+        isOpen={isStatusModalOpen} 
+        onClose={() => setIsStatusModalOpen(false)}
+        title={t('post_status')}
+      >
+        <form onSubmit={handlePostStatus} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('status_placeholder')}</label>
+            <textarea 
+              className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm min-h-[120px] outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+              placeholder="Andika hapa..."
+              value={statusText}
+              onChange={e => setStatusText(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('video_link')}</label>
+            <input 
+              type="url"
+              className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+              placeholder="https://youtube.com/..."
+              value={statusVideoUrl}
+              onChange={e => setStatusVideoUrl(e.target.value)}
+            />
+          </div>
+          <button 
+            type="submit"
+            disabled={isStatusLoading || !statusText.trim()}
+            className="w-full bg-amber-600 hover:bg-amber-700 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-amber-100 transition-all active:scale-95 flex items-center justify-center gap-2"
+          >
+            {isStatusLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Send size={18} /> WEKA STATUS</>}
+          </button>
+        </form>
+      </Modal>
 
       {/* Add Product Modal */}
       <Modal 

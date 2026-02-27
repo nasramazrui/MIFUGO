@@ -136,3 +136,23 @@ export interface Activity {
   time: string;
   createdAt: string;
 }
+
+export interface StatusComment {
+  id: string;
+  userId: string;
+  userName: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface Status {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  vendorAvatar?: string;
+  text: string;
+  videoUrl?: string;
+  likes: string[];
+  comments: StatusComment[];
+  createdAt: any;
+}

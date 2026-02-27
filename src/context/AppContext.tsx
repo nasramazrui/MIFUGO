@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Product, Order, Review, Activity, Withdrawal } from '../types';
+import { User, Product, Order, Review, Activity, Withdrawal, Status } from '../types';
 import { generateId } from '../utils';
 import { ADMIN_EMAIL, ADMIN_PASS, TRANSLATIONS } from '../constants';
 import { auth, db } from '../services/firebase';
@@ -35,6 +35,8 @@ interface AppContextType {
   addActivity: (icon: string, text: string) => void;
   withdrawals: Withdrawal[];
   setWithdrawals: React.Dispatch<React.SetStateAction<Withdrawal[]>>;
+  statuses: Status[];
+  setStatuses: React.Dispatch<React.SetStateAction<Status[]>>;
   systemSettings: any;
   updateSystemSettings: (settings: any) => Promise<void>;
   logout: () => void;
@@ -59,6 +61,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [statuses, setStatuses] = useState<Status[]>([]);
   const [systemSettings, setSystemSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [theme, setThemeState] = useState<'light' | 'dark'>((localStorage.getItem('theme') as 'light' | 'dark') || 'light');
@@ -66,6 +69,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [view, setView] = useState<'auto' | 'shop' | 'dashboard'>('auto');
 
   const setTheme = async (newTheme: 'light' | 'dark') => {
+    if (!user) return; // Guests can't change theme
     try {
       setThemeState(newTheme);
       localStorage.setItem('theme', newTheme);
@@ -109,12 +113,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Apply theme to document
   useEffect(() => {
-    if (theme === 'dark') {
+    // Force light mode for guests
+    const activeTheme = user ? theme : 'light';
+    if (activeTheme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [theme]);
+  }, [theme, user]);
 
   // Auth Listener
   useEffect(() => {
@@ -215,6 +221,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
+    // Statuses
+    const qStatuses = query(collection(db, 'kuku_statuses'), orderBy('createdAt', 'desc'));
+    const unsubStatuses = onSnapshot(qStatuses, (snap) => {
+      setStatuses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Status)));
+    });
+
     return () => {
       unsubProducts();
       unsubOrders();
@@ -223,6 +235,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubWithdraws();
       unsubReviews();
       unsubSettings();
+      unsubStatuses();
     };
   }, []);
 
@@ -270,6 +283,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       reviews, setReviews,
       activities, addActivity,
       withdrawals, setWithdrawals,
+      statuses, setStatuses,
       systemSettings, updateSystemSettings,
       logout,
       t,

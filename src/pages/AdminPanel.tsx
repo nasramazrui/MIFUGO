@@ -61,6 +61,7 @@ export const AdminPanel: React.FC = () => {
     orders, 
     activities, 
     withdrawals,
+    statuses,
     systemSettings,
     updateSystemSettings,
     logout, 
@@ -72,7 +73,7 @@ export const AdminPanel: React.FC = () => {
     setView,
     t
   } = useApp();
-  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'wallet' | 'settings'>('over');
+  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'wallet' | 'settings' | 'status'>('over');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -85,6 +86,17 @@ export const AdminPanel: React.FC = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleDeleteStatus = async (statusId: string) => {
+    if (!confirm('Je, una uhakika unataka kufuta status hii?')) return;
+    try {
+      await deleteDoc(doc(db, 'kuku_statuses', statusId));
+      toast.success('Status imefutwa');
+    } catch (error) {
+      toast.error('Hitilafu wakati wa kufuta status');
+    }
+  };
+
   const [editingItem, setEditingItem] = useState<{ type: string, data: any } | null>(null);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [localSettings, setLocalSettings] = useState({
@@ -347,6 +359,7 @@ export const AdminPanel: React.FC = () => {
             { id: 'orders', label: 'Maagizo', icon: ClipboardList },
             { id: 'users', label: 'Watumiaji', icon: Users },
             { id: 'wallet', label: 'Wallet', icon: Wallet },
+            { id: 'status', label: t('status'), icon: Camera },
             { id: 'settings', label: 'Mipangilio', icon: Settings },
           ].map(item => (
             <button
@@ -966,6 +979,66 @@ export const AdminPanel: React.FC = () => {
             </div>
           </motion.div>
         )}
+        {activeTab === 'status' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900">{t('status')}</h2>
+                <p className="text-slate-500 font-bold">Manage all vendor statuses and updates</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-[32px] border border-slate-100 overflow-hidden">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-slate-50">
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Vendor</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Content</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Stats</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {statuses.map(status => (
+                    <tr key={status.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center text-xs overflow-hidden">
+                            {status.vendorAvatar ? <img src={status.vendorAvatar} alt="" className="w-full h-full object-cover" /> : "🏪"}
+                          </div>
+                          <span className="text-sm font-bold text-slate-900">{status.vendorName}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-xs text-slate-500 line-clamp-2 max-w-xs">{status.text}</p>
+                        {status.videoUrl && <span className="text-[10px] text-amber-600 font-bold">Video Included</span>}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400">
+                          <span>❤️ {status.likes.length}</span>
+                          <span>💬 {status.comments.length}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-slate-500">
+                        {status.createdAt?.toDate ? status.createdAt.toDate().toLocaleDateString() : 'Sasa hivi'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <button 
+                          onClick={() => handleDeleteStatus(status.id)}
+                          className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'settings' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl">
             <h2 className="text-3xl font-black text-slate-900 mb-2">Mipangilio ya Mfumo</h2>
