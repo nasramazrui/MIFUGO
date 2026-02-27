@@ -334,7 +334,7 @@ export const AdminPanel: React.FC = () => {
             className="w-full flex items-center gap-2 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold text-amber-400 transition-all border border-white/5"
           >
             <ArrowLeft size={14} />
-            Nenda Sokoni
+            {t('go_to_market')}
           </button>
         </div>
 

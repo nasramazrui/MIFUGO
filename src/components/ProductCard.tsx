@@ -1,8 +1,9 @@
 import React from 'react';
 import { Product } from '../types';
-import { formatCurrency } from '../utils';
+import { formatCurrency, cn } from '../utils';
 import { Star } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useApp } from '../context/AppContext';
 
 interface ProductCardProps {
   product: Product;
@@ -11,6 +12,8 @@ interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOpen = true }) => {
+  const { t } = useApp();
+  
   return (
     <motion.div
       whileHover={{ y: -8 }}
@@ -27,7 +30,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
         {!isOpen && (
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center">
             <span className="bg-red-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
-              🔒 Closed
+              🔒 {t('closed')}
             </span>
           </div>
         )}
@@ -35,7 +38,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
       <div className="p-4">
         <div className="flex items-center justify-between mb-1">
           <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">
-            {product.category}
+            {t(product.category)}
           </span>
           <div className="flex items-center gap-0.5">
             <Star size={10} className="fill-amber-400 text-amber-400" />
@@ -62,5 +65,3 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
     </motion.div>
   );
 };
-
-import { cn } from '../utils';

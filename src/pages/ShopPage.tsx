@@ -444,7 +444,7 @@ export const ShopPage: React.FC = () => {
   const isIKConfigured = isImageKitConfigured || (systemSettings?.imagekit_public_key && systemSettings?.imagekit_url_endpoint);
 
   return (
-    <div className="min-h-screen pb-24 dark:bg-slate-950 transition-colors duration-300">
+    <div className="min-h-screen pb-24 bg-[#fafaf8] dark:bg-slate-950 transition-colors duration-300">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-b border-slate-100/50 dark:border-slate-800/50 px-4 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
@@ -491,9 +491,9 @@ export const ShopPage: React.FC = () => {
               <button 
                 onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
                 className="p-1.5 sm:p-2 hover:bg-white dark:hover:bg-slate-700 rounded-lg sm:rounded-xl transition-all text-slate-600 dark:text-slate-300"
-                title={theme === 'light' ? 'Night Mode' : 'Light Mode'}
+                title={theme === 'light' ? t('dark_mode') : t('light_mode')}
               >
-                {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+                {theme === 'light' ? <Sun size={16} /> : <Moon size={16} />}
               </button>
               <div className="relative" ref={langRef}>
                 <button 
@@ -611,12 +611,12 @@ export const ShopPage: React.FC = () => {
                   className={cn(
                     "flex-shrink-0 px-6 py-4 rounded-[24px] font-black text-xs transition-all flex flex-col items-center gap-2 min-w-[100px] border-2",
                     selectedCat === cat.id 
-                      ? "bg-amber-600 text-white border-amber-600 shadow-xl shadow-amber-100 scale-105" 
-                      : "bg-white text-slate-500 border-slate-100 hover:border-amber-200 hover:bg-amber-50/30"
+                      ? "bg-amber-600 text-white border-amber-600 shadow-xl shadow-amber-100 dark:shadow-none scale-105" 
+                      : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-100 dark:border-slate-800 hover:border-amber-200 dark:hover:border-amber-900 hover:bg-amber-50/30 dark:hover:bg-amber-900/10"
                   )}
                 >
                   <span className="text-2xl">{cat.emoji}</span>
-                  <span className="uppercase tracking-wider">{cat.label}</span>
+                  <span className="uppercase tracking-wider">{t(cat.id)}</span>
                 </button>
               ))}
             </div>
@@ -660,11 +660,11 @@ export const ShopPage: React.FC = () => {
                   <div className="flex items-center justify-between pt-4 border-t border-slate-50">
                     <div className="flex items-center gap-2">
                       <div className={cn("w-2 h-2 rounded-full", isStoreOpen(v.id) ? "bg-emerald-500" : "bg-red-500")} />
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        {isStoreOpen(v.id) ? "Wazi Sasa" : "Limefungwa"}
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        {isStoreOpen(v.id) ? t('open') : t('closed')}
                       </span>
                     </div>
-                    <span className="text-[10px] font-black text-amber-600">ANGALIA BIDHAA →</span>
+                    <span className="text-[10px] font-black text-amber-600 dark:text-amber-500">{t('view_products')} →</span>
                   </div>
                 </div>
               ))}
@@ -1172,7 +1172,7 @@ export const ShopPage: React.FC = () => {
                     "badge px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
                     isStoreOpen(selectedVendor.id) ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
                   )}>
-                    {isStoreOpen(selectedVendor.id) ? "🟢 Wazi Sasa" : "🔴 Imefungwa"}
+                    {isStoreOpen(selectedVendor.id) ? `🟢 ${t('open')}` : `🔴 ${t('closed')}`}
                   </span>
                 </div>
               </div>
@@ -1258,16 +1258,16 @@ export const ShopPage: React.FC = () => {
                   "badge px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
                   isStoreOpen(selectedProduct.vendorId) ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
                 )}>
-                  {isStoreOpen(selectedProduct.vendorId) ? "🟢 Wazi" : "🔴 Imefungwa"}
+                  {isStoreOpen(selectedProduct.vendorId) ? `🟢 ${t('open')}` : `🔴 ${t('closed')}`}
                 </span>
               </div>
             </div>
             
             <div>
               <div className="flex items-start justify-between mb-2">
-                <h2 className="text-2xl font-black text-slate-900 leading-tight">{selectedProduct.name}</h2>
-                <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                  {selectedProduct.category}
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">{selectedProduct.name}</h2>
+                <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
+                  {t(selectedProduct.category)}
                 </span>
               </div>
               <div className="flex items-center gap-2 mb-4">
@@ -1283,20 +1283,20 @@ export const ShopPage: React.FC = () => {
                   {productReviews.length > 0 
                     ? (productReviews.reduce((acc, r) => acc + r.rating, 0) / productReviews.length).toFixed(1) 
                     : "5.0"} 
-                  ({productReviews.length} maoni)
+                  ({productReviews.length} {t('maoni') || 'maoni'})
                 </span>
               </div>
-              <p className="text-slate-500 text-sm leading-relaxed">{selectedProduct.desc}</p>
+              <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">{selectedProduct.desc}</p>
             </div>
 
             {/* Reviews Section */}
-            <div className="border-t border-slate-50 pt-6">
-              <h4 className="font-black text-slate-900 mb-4 flex items-center gap-2">
-                <Star size={18} className="text-amber-500" /> Maoni ya Wateja
+            <div className="border-t border-slate-50 dark:border-slate-800 pt-6">
+              <h4 className="font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <Star size={18} className="text-amber-500" /> {t('customer_reviews')}
               </h4>
               <div className="space-y-4 mb-6 max-h-[200px] overflow-y-auto pr-2 scrollbar-hide">
                 {productReviews.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">Hakuna maoni bado kwa bidhaa hii.</p>
+                  <p className="text-xs text-slate-400 italic">{t('no_reviews')}</p>
                 ) : (
                   productReviews.map((rev) => (
                     <div key={rev.id} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
@@ -1413,20 +1413,20 @@ export const ShopPage: React.FC = () => {
               </div>
               
               {user && (
-                <form onSubmit={handleReviewSubmit} className="bg-slate-50 p-4 rounded-2xl">
-                  <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Acha Maoni Yako</p>
+                <form onSubmit={handleReviewSubmit} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                  <p className="text-[10px] font-black text-slate-400 uppercase mb-2">{t('write_review')}</p>
                   <div className="flex gap-2 mb-3">
                     {[1,2,3,4,5].map(s => (
                       <button type="button" key={s} onClick={() => setReviewRating(s)}>
-                        <Star size={18} className={cn(s <= reviewRating ? "text-amber-500" : "text-slate-300")} fill={s <= reviewRating ? "currentColor" : "none"} />
+                        <Star size={18} className={cn(s <= reviewRating ? "text-amber-500" : "text-slate-300 dark:text-slate-700")} fill={s <= reviewRating ? "currentColor" : "none"} />
                       </button>
                     ))}
                   </div>
                   <div className="flex gap-2">
                     <input 
                       type="text" 
-                      placeholder="Andika maoni..." 
-                      className="flex-1 bg-white border-none rounded-xl px-3 py-2 text-xs outline-none"
+                      placeholder={t('write_review_placeholder')} 
+                      className="flex-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2 text-xs outline-none dark:text-white"
                       value={reviewText}
                       onChange={e => setReviewText(e.target.value)}
                       disabled={isReviewLoading}
@@ -1444,32 +1444,32 @@ export const ShopPage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Bei</p>
-                <p className="text-xl font-black text-amber-700">
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{t('price')}</p>
+                <p className="text-xl font-black text-amber-700 dark:text-amber-500">
                   {formatCurrency(selectedProduct.price)}
                   <span className="text-xs font-normal text-slate-400 ml-1">/ {selectedProduct.unit}</span>
                 </p>
               </div>
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Stock</p>
-                <p className="text-xl font-black text-slate-700">{selectedProduct.stock} {selectedProduct.unit === 'Kg' ? 'Kg' : 'pcs'}</p>
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{t('stock')}</p>
+                <p className="text-xl font-black text-slate-700 dark:text-slate-200">{selectedProduct.stock} {selectedProduct.unit === 'Kg' ? 'Kg' : 'pcs'}</p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between bg-slate-50 rounded-2xl p-4">
-              <span className="font-bold text-slate-700">Idadi:</span>
+            <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
+              <span className="font-bold text-slate-700 dark:text-slate-200">{t('quantity')}:</span>
               <div className="flex items-center gap-4">
                 <button 
                   onClick={() => setQty(Math.max(1, qty - 1))}
-                  className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center hover:bg-red-50 transition-colors"
+                  className="w-10 h-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-slate-600 dark:text-slate-400"
                 >
                   <Minus size={18} />
                 </button>
-                <span className="text-xl font-black w-6 text-center">{qty}</span>
+                <span className="text-xl font-black w-6 text-center dark:text-white">{qty}</span>
                 <button 
                   onClick={() => setQty(Math.min(selectedProduct.stock, qty + 1))}
-                  className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center hover:bg-emerald-50 transition-colors"
+                  className="w-10 h-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors text-slate-600 dark:text-slate-400"
                 >
                   <Plus size={18} />
                 </button>
@@ -1483,11 +1483,11 @@ export const ShopPage: React.FC = () => {
                 className={cn(
                   "py-5 rounded-[24px] font-black text-sm transition-all border-2",
                   isStoreOpen(selectedProduct.vendorId) 
-                    ? "border-amber-600 text-amber-600 hover:bg-amber-50 active:scale-95" 
-                    : "border-slate-200 text-slate-400 cursor-not-allowed"
+                    ? "border-amber-600 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 active:scale-95" 
+                    : "border-slate-200 dark:border-slate-800 text-slate-400 cursor-not-allowed"
                 )}
               >
-                WEKA KIKAPUNI 🛒
+                {t('add_to_cart')} 🛒
               </button>
               <button 
                 disabled={!isStoreOpen(selectedProduct.vendorId)}
@@ -1495,11 +1495,11 @@ export const ShopPage: React.FC = () => {
                 className={cn(
                   "py-5 rounded-[24px] font-black text-sm transition-all shadow-xl",
                   isStoreOpen(selectedProduct.vendorId) 
-                    ? "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-100 active:scale-95" 
-                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    ? "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-100 dark:shadow-none active:scale-95" 
+                    : "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
                 )}
               >
-                NUNUA SASA 🚀
+                {t('buy_now')} 🚀
               </button>
             </div>
           </div>
@@ -1510,28 +1510,28 @@ export const ShopPage: React.FC = () => {
       <Modal 
         isOpen={isCartModalOpen} 
         onClose={() => setIsCartModalOpen(false)}
-        title="Kikapu Chako 🛒"
+        title={`${t('cart_title')} 🛒`}
       >
         <div className="space-y-6">
           {cart.length === 0 ? (
             <div className="text-center py-12">
-              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <ShoppingBag size={32} className="text-slate-300" />
+              <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <ShoppingBag size={32} className="text-slate-300 dark:text-slate-600" />
               </div>
-              <p className="text-slate-500 font-bold">Kikapu chako kiko wazi</p>
+              <p className="text-slate-500 dark:text-slate-400 font-bold">{t('cart_empty')}</p>
               <button 
                 onClick={() => setIsCartModalOpen(false)}
-                className="mt-4 text-amber-600 font-black text-sm uppercase tracking-widest"
+                className="mt-4 text-amber-600 dark:text-amber-500 font-black text-sm uppercase tracking-widest"
               >
-                Anza Kununua
+                {t('start_shopping')}
               </button>
             </div>
           ) : (
             <>
               <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
                 {cart.map(item => (
-                  <div key={item.id} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 group">
-                    <div className="w-16 h-16 bg-white rounded-xl overflow-hidden border border-slate-100 flex-shrink-0">
+                  <div key={item.id} className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 group">
+                    <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 flex-shrink-0">
                       {item.image ? (
                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                       ) : (
@@ -1539,8 +1539,8 @@ export const ShopPage: React.FC = () => {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-black text-slate-900 truncate">{item.name}</h4>
-                      <p className="text-xs font-bold text-amber-600">{formatCurrency(item.price)}</p>
+                      <h4 className="font-black text-slate-900 dark:text-white truncate">{item.name}</h4>
+                      <p className="text-xs font-bold text-amber-600 dark:text-amber-500">{formatCurrency(item.price)}</p>
                       <div className="flex items-center gap-3 mt-2">
                         <button 
                           onClick={() => {
@@ -1550,14 +1550,14 @@ export const ShopPage: React.FC = () => {
                               removeFromCart(item.id);
                             }
                           }}
-                          className="w-6 h-6 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors"
+                          className="w-6 h-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-red-500 transition-colors"
                         >
                           <Minus size={12} />
                         </button>
-                        <span className="text-sm font-black w-4 text-center">{item.qty}</span>
+                        <span className="text-sm font-black w-4 text-center dark:text-white">{item.qty}</span>
                         <button 
                           onClick={() => setCart(cart.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c))}
-                          className="w-6 h-6 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-50 transition-colors"
+                          className="w-6 h-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-emerald-50 transition-colors"
                         >
                           <Plus size={12} />
                         </button>
@@ -1573,10 +1573,10 @@ export const ShopPage: React.FC = () => {
                 ))}
               </div>
 
-              <div className="border-t border-slate-100 pt-6">
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-6">
                 <div className="flex justify-between items-center mb-6">
-                  <span className="text-slate-500 font-bold">Jumla Kuu:</span>
-                  <span className="text-2xl font-black text-slate-900">
+                  <span className="text-slate-500 dark:text-slate-400 font-bold">{t('total')}:</span>
+                  <span className="text-2xl font-black text-slate-900 dark:text-white">
                     {formatCurrency(cart.reduce((sum, item) => sum + (item.price * item.qty), 0))}
                   </span>
                 </div>
@@ -1598,9 +1598,9 @@ export const ShopPage: React.FC = () => {
                       }
                     }
                   }}
-                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-5 rounded-[24px] shadow-xl shadow-amber-100 transition-all active:scale-95 flex items-center justify-center gap-2"
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-5 rounded-[24px] shadow-xl shadow-amber-100 dark:shadow-none transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
-                  ENDELEA NA MALIPO <ShoppingBag size={20} />
+                  {t('checkout')} <ShoppingBag size={20} />
                 </button>
               </div>
             </>

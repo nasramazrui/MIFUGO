@@ -396,7 +396,7 @@ export const VendorPortal: React.FC = () => {
             className="w-full flex items-center gap-2 px-4 py-3 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-2xl text-xs font-bold text-emerald-700 dark:text-emerald-500 transition-all border border-slate-100 dark:border-slate-800"
           >
             <ArrowLeft size={14} />
-            Nenda Sokoni
+            {t('go_to_market')}
           </button>
         </div>
         
