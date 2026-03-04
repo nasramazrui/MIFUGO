@@ -75,6 +75,8 @@ export const VendorPortal: React.FC = () => {
     openDays: user.openDays || [],
     deliveryCity: user.deliveryCity || 3000,
     deliveryOut: user.deliveryOut || 7000,
+    shopIcon: user.shopIcon || '',
+    shopBanner: user.shopBanner || '',
   });
   const [newProduct, setNewProduct] = useState({
     name: '',
@@ -102,6 +104,8 @@ export const VendorPortal: React.FC = () => {
         openDays: user.openDays || [],
         deliveryCity: user.deliveryCity || 3000,
         deliveryOut: user.deliveryOut || 7000,
+        shopIcon: user.shopIcon || '',
+        shopBanner: user.shopBanner || '',
       });
     }
   }, [user]);
@@ -919,6 +923,37 @@ export const VendorPortal: React.FC = () => {
                       value={shopSettings.deliveryOut}
                       onChange={(e) => setShopSettings({ ...shopSettings, deliveryOut: Number(e.target.value) })}
                       className="input-field" 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-slate-50" />
+
+              {/* Shop Branding */}
+              <div>
+                <h3 className="font-black text-slate-900 mb-4 flex items-center gap-2">
+                  <Camera size={20} className="text-purple-500" /> Muonekano wa Duka
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Shop Icon (URL)</label>
+                    <input 
+                      type="text" 
+                      value={shopSettings.shopIcon}
+                      onChange={(e) => setShopSettings({ ...shopSettings, shopIcon: e.target.value })}
+                      className="input-field" 
+                      placeholder="https://link.to/icon.png"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Shop Banner (URL)</label>
+                    <input 
+                      type="text" 
+                      value={shopSettings.shopBanner}
+                      onChange={(e) => setShopSettings({ ...shopSettings, shopBanner: e.target.value })}
+                      className="input-field" 
+                      placeholder="https://link.to/banner.png"
                     />
                   </div>
                 </div>

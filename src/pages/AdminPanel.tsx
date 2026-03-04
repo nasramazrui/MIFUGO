@@ -174,6 +174,7 @@ export const AdminPanel: React.FC = () => {
     banners: [] as { image: string, link: string }[],
     app_logo: '',
     app_name: '',
+    currency: 'TZS',
     loading_icon: '',
     loading_url: ''
   });
@@ -190,6 +191,7 @@ export const AdminPanel: React.FC = () => {
         banners: systemSettings.banners || [],
         app_logo: systemSettings.app_logo || '',
         app_name: systemSettings.app_name || '',
+        currency: systemSettings.currency || 'TZS',
         loading_icon: systemSettings.loading_icon || '',
         loading_url: systemSettings.loading_url || ''
       });
@@ -1182,6 +1184,16 @@ export const AdminPanel: React.FC = () => {
                       onChange={(e) => setLocalSettings(prev => ({ ...prev, app_name: e.target.value }))}
                       className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
                       placeholder="FarmConnect"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Currency (e.g. TZS, $, KES)</label>
+                    <input 
+                      type="text"
+                      value={localSettings.currency}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, currency: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="TZS"
                     />
                   </div>
                   <div className="space-y-2">

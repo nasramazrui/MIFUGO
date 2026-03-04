@@ -27,6 +27,7 @@ interface CartItem {
 
 export const ShopPage: React.FC = () => {
   const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView } = useApp();
+  const currency = systemSettings?.currency || 'TZS';
   const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'cart'>('browse');
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
   const [viewedStatuses, setViewedStatuses] = useState<string[]>(() => {
@@ -366,9 +367,22 @@ export const ShopPage: React.FC = () => {
 
   const filteredProducts = products.filter(p => {
     const matchesCat = selectedCat === 'all' || p.category === selectedCat;
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         p.vendorName.toLowerCase().includes(searchQuery.toLowerCase());
+    const searchLower = searchQuery.toLowerCase().trim();
+    const matchesSearch = !searchLower || 
+                         p.name.toLowerCase().includes(searchLower) || 
+                         p.vendorName.toLowerCase().includes(searchLower) ||
+                         (p.desc && p.desc.toLowerCase().includes(searchLower)) ||
+                         (p.location && p.location.toLowerCase().includes(searchLower));
     return matchesCat && matchesSearch && p.approved;
+  });
+
+  const filteredVendors = vendors.filter(v => {
+    const searchLower = searchQuery.toLowerCase().trim();
+    const matchesSearch = !searchLower || 
+                         (v.shopName && v.shopName.toLowerCase().includes(searchLower)) || 
+                         (v.name && v.name.toLowerCase().includes(searchLower)) ||
+                         (v.location && v.location.toLowerCase().includes(searchLower));
+    return v.status === 'approved' && matchesSearch;
   });
 
   const isStoreOpen = (vendorId: string) => {
@@ -499,14 +513,14 @@ export const ShopPage: React.FC = () => {
       });
 
       const docRef = await addDoc(collection(db, 'kuku_orders'), orderData);
-      addActivity('🛒', `${user.name} amenunua ${p.name} × ${qty} — ${formatCurrency(total)}`);
+      addActivity('🛒', `${user.name} amenunua ${p.name} × ${qty} — ${formatCurrency(total, currency)}`);
       setIsPaymentModalOpen(false);
       setSelectedProduct(null);
       setActiveTab('orders');
       toast.success('Agizo limekamilika!');
       
       // WhatsApp redirect
-      const msg = `*Uthibitisho wa Agizo — ${systemSettings?.app_name || 'FarmConnect'}* 🐔\n\nHabari, agizo langu #${docRef.id.substring(0,8)} limepokewa!\n\nBidhaa: *${p.name}* × ${qty}\nJumla: *${formatCurrency(total)}*\nNjia: *${payMethod}*\n\nAsante!`;
+      const msg = `*Uthibitisho wa Agizo — ${systemSettings?.app_name || 'FarmConnect'}* 🐔\n\nHabari, agizo langu #${docRef.id.substring(0,8)} limepokewa!\n\nBidhaa: *${p.name}* × ${qty}\nJumla: *${formatCurrency(total, currency)}*\nNjia: *${payMethod}*\n\nAsante!`;
       window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
     } catch (error: any) {
       toast.error('Hitilafu wakati wa kutuma agizo');
@@ -978,32 +992,44 @@ export const ShopPage: React.FC = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6">🏪 {t('stores')}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {vendors.filter(v => v.status === 'approved').map(v => (
-                <div 
-                  key={v.id}
-                  className="bg-white rounded-[28px] border border-amber-100 p-6 shadow-sm hover:shadow-xl transition-all cursor-pointer group"
-                  onClick={() => setSelectedVendor(v)}
-                >
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center text-3xl font-black text-amber-800 group-hover:scale-110 transition-transform">
-                      {(v.shopName || v.name)[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <h3 className="font-black text-slate-900">{v.shopName || v.name}</h3>
-                      <p className="text-xs text-slate-400">📍 {v.location}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                    <div className="flex items-center gap-2">
-                      <div className={cn("w-2 h-2 rounded-full", isStoreOpen(v.id) ? "bg-emerald-500" : "bg-red-500")} />
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        {isStoreOpen(v.id) ? t('open') : t('closed')}
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-black text-amber-600 dark:text-amber-500">{t('view_products')} →</span>
-                  </div>
+              {filteredVendors.length === 0 ? (
+                <div className="col-span-full py-20 text-center">
+                  <div className="w-20 h-20 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center text-4xl mx-auto mb-4">🏪</div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Hakuna duka lililopatikana</h3>
+                  <p className="text-slate-500 dark:text-slate-400">Jaribu kutafuta kwa jina lingine au eneo lingine.</p>
                 </div>
-              ))}
+              ) : (
+                filteredVendors.map(v => (
+                  <div 
+                    key={v.id}
+                    className="bg-white dark:bg-slate-900 rounded-[28px] border border-amber-100 dark:border-slate-800 p-6 shadow-sm hover:shadow-xl transition-all cursor-pointer group"
+                    onClick={() => setSelectedVendor(v)}
+                  >
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center text-3xl font-black text-amber-800 dark:text-amber-500 group-hover:scale-110 transition-transform overflow-hidden">
+                        {v.shopIcon ? (
+                          <img src={v.shopIcon} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          (v.shopName || v.name)[0].toUpperCase()
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="font-black text-slate-900 dark:text-white">{v.shopName || v.name}</h3>
+                        <p className="text-xs text-slate-400">📍 {v.location}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-2 h-2 rounded-full", isStoreOpen(v.id) ? "bg-emerald-500" : "bg-red-500")} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          {isStoreOpen(v.id) ? t('open') : t('closed')}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-black text-amber-600 dark:text-amber-500">{t('view_products')} →</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </motion.div>
         )}
@@ -1050,7 +1076,7 @@ export const ShopPage: React.FC = () => {
                          </span>
                        </div>
                        <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                         <p className="font-black text-amber-700">{formatCurrency(order.total)}</p>
+                         <p className="font-black text-amber-700">{formatCurrency(order.total, currency)}</p>
                          <button 
                            onClick={() => {
                              setSelectedOrder(order);
@@ -1472,23 +1498,39 @@ export const ShopPage: React.FC = () => {
       >
         {selectedVendor && (
           <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 bg-amber-100 rounded-3xl flex items-center justify-center text-4xl font-black text-amber-800">
-                {(selectedVendor.shopName || selectedVendor.name)[0].toUpperCase()}
-              </div>
-              <div>
-                <h2 className="text-2xl font-black text-slate-900">{selectedVendor.shopName || selectedVendor.name}</h2>
-                <p className="text-sm text-slate-400 flex items-center gap-1">
-                  <MapPin size={14} /> {selectedVendor.location}
-                </p>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className={cn(
-                    "badge px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                    isStoreOpen(selectedVendor.id) ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
-                  )}>
-                    {isStoreOpen(selectedVendor.id) ? `🟢 ${t('open')}` : `🔴 ${t('closed')}`}
-                  </span>
+            {/* Shop Banner */}
+            <div className="relative h-40 -mx-6 -mt-6 mb-12">
+              {selectedVendor.shopBanner ? (
+                <img src={selectedVendor.shopBanner} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-600" />
+              )}
+              {/* Shop Icon */}
+              <div className="absolute -bottom-10 left-6">
+                <div className="w-24 h-24 bg-white dark:bg-slate-900 rounded-[32px] p-1 shadow-2xl">
+                  <div className="w-full h-full bg-amber-100 dark:bg-amber-900/30 rounded-[28px] flex items-center justify-center text-4xl font-black text-amber-800 dark:text-amber-500 overflow-hidden">
+                    {selectedVendor.shopIcon ? (
+                      <img src={selectedVendor.shopIcon} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      (selectedVendor.shopName || selectedVendor.name)[0].toUpperCase()
+                    )}
+                  </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white">{selectedVendor.shopName || selectedVendor.name}</h2>
+              <p className="text-sm text-slate-400 flex items-center gap-1">
+                <MapPin size={14} /> {selectedVendor.location}
+              </p>
+              <div className="flex items-center gap-2 mt-2">
+                <span className={cn(
+                  "badge px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                  isStoreOpen(selectedVendor.id) ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
+                )}>
+                  {isStoreOpen(selectedVendor.id) ? `🟢 ${t('open')}` : `🔴 ${t('closed')}`}
+                </span>
               </div>
             </div>
 
@@ -1534,7 +1576,7 @@ export const ShopPage: React.FC = () => {
                         {p.emoji}
                       </div>
                       <h4 className="text-[11px] font-black text-slate-900 truncate">{p.name}</h4>
-                      <p className="text-[10px] font-bold text-amber-600">{formatCurrency(p.price)}</p>
+                      <p className="text-[10px] font-bold text-amber-600">{formatCurrency(p.price, currency)}</p>
                     </div>
                   ))
                 )}
@@ -1761,7 +1803,7 @@ export const ShopPage: React.FC = () => {
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{t('price')}</p>
                 <p className="text-xl font-black text-amber-700 dark:text-amber-500">
-                  {formatCurrency(selectedProduct.price)}
+                  {formatCurrency(selectedProduct.price, currency)}
                   <span className="text-xs font-normal text-slate-400 ml-1">/ {selectedProduct.unit}</span>
                 </p>
               </div>
@@ -1891,7 +1933,7 @@ export const ShopPage: React.FC = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-black text-slate-900 dark:text-white truncate">{item.name}</h4>
-                      <p className="text-xs font-bold text-amber-600 dark:text-amber-500">{formatCurrency(item.price)}</p>
+                      <p className="text-xs font-bold text-amber-600 dark:text-amber-500">{formatCurrency(item.price, currency)}</p>
                       <div className="flex items-center gap-3 mt-2">
                         <button 
                           onClick={() => {
@@ -1928,7 +1970,7 @@ export const ShopPage: React.FC = () => {
                 <div className="flex justify-between items-center mb-6">
                   <span className="text-slate-500 dark:text-slate-400 font-bold">{t('total')}:</span>
                   <span className="text-2xl font-black text-slate-900 dark:text-white">
-                    {formatCurrency(cart.reduce((sum, item) => sum + (item.price * item.qty), 0))}
+                    {formatCurrency(cart.reduce((sum, item) => sum + (item.price * item.qty), 0), currency)}
                   </span>
                 </div>
                 <button 
@@ -1973,11 +2015,11 @@ export const ShopPage: React.FC = () => {
             </div>
             <div className="flex justify-between mb-2">
               <span className="text-sm text-slate-500">Bei:</span>
-              <span className="text-sm font-bold">{formatCurrency(selectedProduct?.price * qty)}</span>
+              <span className="text-sm font-bold">{formatCurrency(selectedProduct?.price * qty, currency)}</span>
             </div>
             <div className="flex justify-between pt-2 border-t border-amber-200">
               <span className="font-black text-slate-900">Jumla:</span>
-              <span className="font-black text-amber-700">{formatCurrency(selectedProduct?.price * qty)}</span>
+              <span className="font-black text-amber-700">{formatCurrency(selectedProduct?.price * qty, currency)}</span>
             </div>
           </div>
 

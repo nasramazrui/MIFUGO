@@ -13,7 +13,8 @@ interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOpen = true, rating = 0 }) => {
-  const { t } = useApp();
+  const { t, systemSettings } = useApp();
+  const currency = systemSettings?.currency || 'TZS';
   
   return (
     <motion.div
@@ -52,7 +53,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
         {/* Price Tag Overlay */}
         <div className="absolute bottom-4 right-4 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
           <div className="bg-amber-600 text-white px-4 py-2 rounded-2xl font-black text-xs shadow-xl">
-            {formatCurrency(product.price)}
+            {formatCurrency(product.price, currency)}
           </div>
         </div>
       </div>
@@ -77,7 +78,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
             </p>
           </div>
           <p className="text-xs font-black text-slate-900 dark:text-slate-100">
-            {formatCurrency(product.price)}
+            {formatCurrency(product.price, currency)}
             <span className="text-[10px] font-medium text-slate-400 ml-1">/{product.unit}</span>
           </p>
         </div>

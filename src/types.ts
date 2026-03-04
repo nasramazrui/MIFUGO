@@ -9,6 +9,8 @@ export interface User {
   status?: 'pending' | 'approved' | 'rejected';
   // Vendor specific
   shopName?: string;
+  shopIcon?: string;
+  shopBanner?: string;
   location?: string;
   region?: string;
   tin?: string;
