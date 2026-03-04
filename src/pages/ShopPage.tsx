@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import { Status } from '../types';
 import { ProductCard } from '../components/ProductCard';
 import { CATEGORIES, DAYS, ADMIN_WA } from '../constants';
 import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
@@ -27,6 +28,7 @@ interface CartItem {
 export const ShopPage: React.FC = () => {
   const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView } = useApp();
   const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'cart'>('browse');
+  const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [selectedCat, setSelectedCat] = useState('all');
@@ -712,130 +714,93 @@ export const ShopPage: React.FC = () => {
         )}
         {activeTab === 'browse' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            {/* Status Feed Section */}
-            <div className="max-w-2xl mx-auto mb-12">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-black text-slate-900 dark:text-white">📱 {t('status')}</h2>
+            {/* WhatsApp Style Status Feed */}
+            <div className="mb-12 bg-slate-950/5 dark:bg-slate-900/20 py-6 -mx-4 px-4 sm:mx-0 sm:rounded-[32px] border-y sm:border border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between mb-6 px-2">
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Status</h2>
                 {(user?.role === 'vendor' || user?.role === 'admin') && (
                   <button 
                     onClick={() => setIsStatusModalOpen(true)}
-                    className="bg-amber-600 text-white px-4 py-2 rounded-xl font-black text-xs shadow-lg shadow-amber-100 dark:shadow-none hover:scale-105 transition-transform active:scale-95"
+                    className="bg-amber-600/10 text-amber-600 px-3 py-1 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-amber-600 hover:text-white transition-all"
                   >
-                    {t('post_status')} +
+                    {t('post_status')}
                   </button>
                 )}
               </div>
 
-              <div className="space-y-6">
-                {statuses.length === 0 ? (
-                  <div className="text-center py-12 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800">
-                    <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <Camera size={24} className="text-slate-300 dark:text-slate-600" />
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                {/* Add Status Card */}
+                {(user?.role === 'vendor' || user?.role === 'admin') && (
+                  <button 
+                    onClick={() => setIsStatusModalOpen(true)}
+                    className="flex-shrink-0 w-32 h-52 bg-slate-900 rounded-[24px] flex flex-col items-center justify-center gap-4 group transition-all hover:scale-[1.02] active:scale-95 relative overflow-hidden"
+                  >
+                    <div className="relative z-10">
+                      <div className="w-16 h-16 bg-amber-400 rounded-full flex items-center justify-center text-4xl shadow-lg group-hover:rotate-12 transition-transform">
+                        🤩
+                      </div>
+                      <div className="absolute -bottom-1 -right-1 bg-green-500 text-white rounded-full p-1.5 border-4 border-slate-900">
+                        <Plus size={16} strokeWidth={4} />
+                      </div>
                     </div>
-                    <p className="text-slate-500 dark:text-slate-400 font-bold text-sm">Hakuna status kwa sasa.</p>
+                    <div className="text-center z-10">
+                      <p className="text-xs font-black text-white leading-tight">Add</p>
+                      <p className="text-xs font-black text-white leading-tight">status</p>
+                    </div>
+                    {/* Subtle background pattern */}
+                    <div className="absolute inset-0 opacity-10 pointer-events-none">
+                      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/20 to-transparent" />
+                    </div>
+                  </button>
+                )}
+
+                {statuses.length === 0 && !(user?.role === 'vendor' || user?.role === 'admin') ? (
+                  <div className="flex-shrink-0 w-full py-12 text-center">
+                    <p className="text-slate-400 font-bold text-sm">Hakuna status kwa sasa.</p>
                   </div>
                 ) : (
-                  statuses.slice(0, 5).map(status => (
-                    <div key={status.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-all duration-500">
-                      <div className="p-5">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-lg overflow-hidden">
-                              {status.vendorAvatar ? (
-                                <img src={status.vendorAvatar} alt={status.vendorName} className="w-full h-full object-cover" />
-                              ) : (
-                                "🏪"
-                              )}
-                            </div>
-                            <div>
-                              <h4 className="font-black text-slate-900 dark:text-white leading-none text-sm">{status.vendorName}</h4>
-                              <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Muuzaji Aliyeidhinishwa</span>
-                            </div>
+                  statuses.map(status => (
+                    <button 
+                      key={status.id}
+                      onClick={() => setSelectedStatus(status)}
+                      className="flex-shrink-0 w-32 h-52 rounded-[24px] overflow-hidden relative group shadow-lg transition-all hover:scale-[1.02] active:scale-95"
+                    >
+                      {/* Background Content */}
+                      <div className="absolute inset-0 bg-slate-800">
+                        {status.videoUrl ? (
+                          <div className="w-full h-full bg-slate-900 flex items-center justify-center relative">
+                            <Camera size={24} className="text-white/20" />
+                            {/* If we had thumbnails we'd use them here */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-950" />
                           </div>
-                          {(user?.role === 'admin' || user?.id === status.vendorId) && (
-                            <button 
-                              onClick={() => handleDeleteStatus(status.id)}
-                              className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
-                        
-                        <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mb-4 whitespace-pre-wrap">{status.text}</p>
-                        
-                        {status.videoUrl && (
-                          <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden mb-4 border border-slate-800">
-                            {getEmbedUrl(status.videoUrl) ? (
-                              <iframe 
-                                src={getEmbedUrl(status.videoUrl)} 
-                                className="w-full h-full" 
-                                allowFullScreen 
-                                title="Status Video"
-                              />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-amber-500 to-orange-700 p-4 flex items-center justify-center text-center">
+                            <p className="text-[10px] text-white font-black line-clamp-6 leading-tight uppercase tracking-tighter opacity-90">{status.text}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Overlay Gradient for readability */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/30" />
+
+                      {/* Vendor Avatar with WhatsApp-style Ring */}
+                      <div className="absolute top-3 left-3 z-10">
+                        <div className="w-11 h-11 rounded-full p-[2px] bg-green-500 shadow-lg">
+                          <div className="w-full h-full rounded-full border-2 border-slate-900 overflow-hidden bg-slate-100">
+                            {status.vendorAvatar ? (
+                              <img src={status.vendorAvatar} alt="" className="w-full h-full object-cover" />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs p-4 text-center">
-                                <a href={status.videoUrl} target="_blank" rel="noreferrer" className="text-amber-500 underline">Tazama Video Hapa</a>
-                              </div>
+                              <div className="w-full h-full flex items-center justify-center text-lg">🏪</div>
                             )}
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-6 pt-3 border-t border-slate-50 dark:border-slate-800">
-                          <button 
-                            onClick={() => handleLikeStatus(status.id)}
-                            className={cn(
-                              "flex items-center gap-2 text-xs font-black transition-colors",
-                              status.likes.includes(user?.id || '') ? "text-amber-600" : "text-slate-400 hover:text-slate-600"
-                            )}
-                          >
-                            <ThumbsUp size={18} className={status.likes.includes(user?.id || '') ? "fill-current" : ""} />
-                            {status.likes.length}
-                          </button>
-                          <div className="flex items-center gap-2 text-xs font-black text-slate-400">
-                            <MessageSquare size={18} />
-                            {status.comments.length}
                           </div>
                         </div>
                       </div>
 
-                      {/* Comments Section */}
-                      <div className="bg-slate-50 dark:bg-slate-800/30 p-5 space-y-3">
-                        {status.comments.slice(0, 2).map(comment => (
-                          <div key={comment.id} className="flex gap-2">
-                            <div className="w-6 h-6 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center text-[10px] flex-shrink-0 border border-slate-100 dark:border-slate-700">
-                              👤
-                            </div>
-                            <div className="flex-1">
-                              <div className="bg-white dark:bg-slate-800 p-2 rounded-xl rounded-tl-none border border-slate-100 dark:border-slate-700 shadow-sm">
-                                <p className="text-[8px] font-black text-slate-900 dark:text-white mb-0.5">{comment.userName}</p>
-                                <p className="text-[10px] text-slate-500 dark:text-slate-400">{comment.text}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-
-                        {user && (
-                          <div className="flex gap-2 pt-1">
-                            <input 
-                              type="text"
-                              placeholder="Andika maoni..."
-                              className="flex-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-1.5 text-[10px] outline-none dark:text-white"
-                              value={commentText[status.id] || ''}
-                              onChange={e => setCommentText(prev => ({ ...prev, [status.id]: e.target.value }))}
-                              onKeyDown={e => e.key === 'Enter' && handleCommentStatus(status.id)}
-                            />
-                            <button 
-                              onClick={() => handleCommentStatus(status.id)}
-                              disabled={!commentText[status.id]?.trim()}
-                              className="bg-amber-600 text-white p-1.5 rounded-lg disabled:opacity-50 transition-all active:scale-90"
-                            >
-                              <Send size={12} />
-                            </button>
-                          </div>
-                        )}
+                      {/* Vendor Name at bottom */}
+                      <div className="absolute bottom-4 left-3 right-3 z-10">
+                        <p className="text-[11px] font-black text-white leading-tight line-clamp-2 drop-shadow-md">{status.vendorName}</p>
                       </div>
-                    </div>
+                    </button>
                   ))
                 )}
               </div>
