@@ -352,13 +352,7 @@ export const VendorPortal: React.FC = () => {
           <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor</h1>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 p-1 rounded-xl">
-            <button 
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="p-2 text-slate-600 dark:text-slate-400"
-            >
-              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-            </button>
+          <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-900 p-1 rounded-xl">
             <div className="relative" ref={langRef}>
               <button 
                 onClick={() => setIsLangOpen(!isLangOpen)}
@@ -402,12 +396,6 @@ export const VendorPortal: React.FC = () => {
               <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor</h1>
             </div>
             <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 p-1 rounded-xl">
-              <button 
-                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all text-slate-600 dark:text-slate-400"
-              >
-                {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
-              </button>
               <div className="relative" ref={langRef}>
                 <button 
                   onClick={() => setIsLangOpen(!isLangOpen)}

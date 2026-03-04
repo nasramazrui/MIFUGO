@@ -320,12 +320,6 @@ export const AdminPanel: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl">
-            <button 
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="p-1.5 text-amber-400"
-            >
-              {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-            </button>
             <div className="relative" ref={langRef}>
               <button 
                 onClick={() => setIsLangOpen(!isLangOpen)}
@@ -371,12 +365,6 @@ export const AdminPanel: React.FC = () => {
               <h1 className="font-serif italic text-lg font-bold">Admin</h1>
             </div>
             <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl">
-              <button 
-                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                className="p-1.5 hover:bg-white/10 rounded-lg transition-all text-amber-400"
-              >
-                {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
-              </button>
               <div className="relative" ref={langRef}>
                 <button 
                   onClick={() => setIsLangOpen(!isLangOpen)}

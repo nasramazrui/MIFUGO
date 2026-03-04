@@ -9,57 +9,77 @@ interface ProductCardProps {
   product: Product;
   onClick: () => void;
   isOpen?: boolean;
+  rating?: number;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOpen = true }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOpen = true, rating = 0 }) => {
   const { t } = useApp();
   
   return (
     <motion.div
-      whileHover={{ y: -8 }}
+      whileHover={{ y: -4 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className="bg-white dark:bg-slate-900 rounded-[24px] border border-amber-100 dark:border-slate-800 overflow-hidden cursor-pointer shadow-sm hover:shadow-xl hover:shadow-amber-100/50 dark:hover:shadow-none transition-all duration-300"
+      className="group bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800/50 overflow-hidden cursor-pointer shadow-sm hover:shadow-2xl hover:shadow-amber-900/5 transition-all duration-500"
     >
-      <div className="aspect-square bg-gradient-to-br from-amber-50 to-amber-100 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center text-6xl relative overflow-hidden">
+      <div className="aspect-[4/5] bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center relative overflow-hidden">
         {product.image ? (
-          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+          <img 
+            src={product.image} 
+            alt={product.name} 
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+            referrerPolicy="no-referrer"
+          />
         ) : (
-          product.emoji
+          <span className="text-6xl group-hover:scale-125 transition-transform duration-500">{product.emoji}</span>
         )}
-        {!isOpen && (
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center">
-            <span className="bg-red-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
-              🔒 {t('closed')}
-            </span>
+        
+        {/* Overlay Badges */}
+        <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
+          <div className={cn(
+            "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider backdrop-blur-md shadow-sm",
+            isOpen ? "bg-white/90 text-emerald-600 dark:bg-slate-900/90" : "bg-red-500 text-white"
+          )}>
+            {isOpen ? `● ${t('open')}` : `🔒 ${t('closed')}`}
           </div>
-        )}
-      </div>
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">
-            {t(product.category)}
-          </span>
-          <div className="flex items-center gap-0.5">
-            <Star size={10} className="fill-amber-400 text-amber-400" />
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">4.8</span>
+          
+          <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-2 py-1 rounded-xl flex items-center gap-1 shadow-sm">
+            <Star size={10} className={cn(rating > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300 dark:text-slate-700")} />
+            <span className="text-[10px] font-black text-slate-900 dark:text-white">{rating > 0 ? rating.toFixed(1) : '0'}</span>
           </div>
         </div>
-        <h3 className="font-bold text-slate-900 dark:text-white text-sm leading-tight mb-1 line-clamp-1">
-          {product.name}
-        </h3>
-        <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1">
-          <span>📍</span> {product.location} · {product.vendorName}
-        </p>
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-black text-amber-700 dark:text-amber-500">
+
+        {/* Price Tag Overlay */}
+        <div className="absolute bottom-4 right-4 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+          <div className="bg-amber-600 text-white px-4 py-2 rounded-2xl font-black text-xs shadow-xl">
             {formatCurrency(product.price)}
-            <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500 ml-1">/ {product.unit}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-5">
+        <div className="mb-3">
+          <span className="text-[10px] font-black text-amber-600/60 dark:text-amber-500/60 uppercase tracking-[0.2em] mb-1 block">
+            {t(product.category)}
+          </span>
+          <h3 className="font-black text-slate-900 dark:text-white text-base leading-tight group-hover:text-amber-600 transition-colors duration-300">
+            {product.name}
+          </h3>
+        </div>
+        
+        <div className="flex items-center justify-between mt-auto">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-400">
+              {product.vendorName[0]}
+            </div>
+            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 truncate max-w-[100px]">
+              {product.vendorName}
+            </p>
+          </div>
+          <p className="text-xs font-black text-slate-900 dark:text-slate-100">
+            {formatCurrency(product.price)}
+            <span className="text-[10px] font-medium text-slate-400 ml-1">/{product.unit}</span>
           </p>
-          <div className={cn(
-            "w-2 h-2 rounded-full",
-            isOpen ? "bg-emerald-500 animate-pulse" : "bg-red-500"
-          )} />
         </div>
       </div>
     </motion.div>

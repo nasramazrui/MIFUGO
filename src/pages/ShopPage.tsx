@@ -619,160 +619,195 @@ export const ShopPage: React.FC = () => {
   const isIKConfigured = isImageKitConfigured || (systemSettings?.imagekit_public_key && systemSettings?.imagekit_url_endpoint);
 
   return (
-    <div className="min-h-screen pb-24 bg-[#fafaf8] dark:bg-slate-950 transition-colors duration-300">
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-b border-slate-100/50 dark:border-slate-800/50 px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
-          <div className="flex items-center gap-2 flex-shrink-0 group cursor-pointer" onClick={() => setView('shop')}>
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center shadow-xl shadow-amber-100/50 dark:shadow-none border border-amber-50 dark:border-slate-700 overflow-hidden group-hover:scale-105 transition-transform">
-              {systemSettings?.app_logo ? (
-                <img 
-                  src={systemSettings.app_logo} 
-                  alt="Logo" 
-                  className="w-full h-full object-contain"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <img 
-                  src="https://cdn-icons-png.flaticon.com/512/2329/2329113.png" 
-                  alt="Logo" 
-                  className="w-8 h-8 sm:w-9 sm:h-9 object-contain"
-                  referrerPolicy="no-referrer"
-                />
-              )}
+    <div className="min-h-screen bg-[#fafaf8] dark:bg-slate-950 transition-colors duration-300">
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-72 bg-white dark:bg-slate-950 border-r border-slate-100 dark:border-slate-800/50 flex-col z-50">
+        <div className="p-8">
+          <div className="flex items-center gap-3 mb-10">
+            <div className="w-10 h-10 bg-amber-600 rounded-xl flex items-center justify-center text-white text-xl font-black shadow-lg shadow-amber-600/20">
+              {systemSettings?.app_name?.[0] || 'K'}
             </div>
-            <div className="flex flex-col -gap-1 hidden xs:flex">
-              <h1 className="font-serif italic text-xl sm:text-2xl text-amber-900 dark:text-amber-500 font-bold tracking-tight leading-tight">
-                {systemSettings?.app_name || 'FarmConnect'}
-              </h1>
-              <span className="text-[7px] sm:text-[8px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest hidden sm:block">
-                {t('tagline')}
-              </span>
-            </div>
+            <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+              {systemSettings?.app_name || 'Kuku Market'}
+            </h1>
           </div>
-          <div className="flex-1 max-w-md relative hidden md:block">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text"
-              placeholder={t('search')}
-              className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-2xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-amber-500 transition-all dark:text-white"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Theme & Language Toggles */}
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl sm:rounded-2xl">
-              {user && (
-                <button 
-                  onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                  className="p-1.5 sm:p-2 hover:bg-white dark:hover:bg-slate-700 rounded-lg sm:rounded-xl transition-all text-slate-600 dark:text-slate-300"
-                  title={theme === 'light' ? t('dark_mode') : t('light_mode')}
-                >
-                  {theme === 'light' ? <Sun size={16} /> : <Moon size={16} />}
-                </button>
-              )}
-              <div className="relative" ref={langRef}>
-                <button 
-                  onClick={() => setIsLangOpen(!isLangOpen)}
-                  className="p-1.5 sm:p-2 hover:bg-white dark:hover:bg-slate-700 rounded-lg sm:rounded-xl transition-all text-slate-600 dark:text-slate-300"
-                >
-                  <Globe size={16} />
-                </button>
-                {isLangOpen && (
-                  <div className="absolute top-full right-0 mt-2 bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 rounded-2xl p-2 z-50 min-w-[140px] animate-in fade-in zoom-in duration-200">
-                    {[
-                      { id: 'sw', label: 'Kiswahili' },
-                      { id: 'en', label: 'English' },
-                      { id: 'ar', label: 'العربية' },
-                      { id: 'hi', label: 'हिन्दी' }
-                    ].map(lang => (
-                      <button 
-                        key={lang.id}
-                        onClick={() => {
-                          setLanguage(lang.id as any);
-                          setIsLangOpen(false);
-                        }}
-                        className={cn(
-                          "w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between",
-                          language === lang.id ? "bg-amber-600 text-white" : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                        )}
-                      >
-                        {lang.label}
-                        {language === lang.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </button>
-                    ))}
-                  </div>
+
+          <nav className="space-y-2">
+            {[
+              { id: 'browse', label: t('market'), icon: ShoppingBag },
+              { id: 'stores', label: t('stores'), icon: Store },
+              { id: 'orders', label: t('orders'), icon: Package },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id as any)}
+                className={cn(
+                  "w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-black text-sm transition-all group",
+                  activeTab === item.id 
+                    ? "bg-amber-600 text-white shadow-xl shadow-amber-600/20" 
+                    : "text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-slate-600 dark:hover:text-slate-200"
                 )}
-              </div>
-            </div>
-
-            {user && (user.role === 'admin' || user.role === 'vendor') && (
-              <button 
-                onClick={() => setView('dashboard')}
-                className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-[7px] sm:text-[10px] uppercase tracking-widest hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all active:scale-95 border border-amber-100 dark:border-amber-800/50 shadow-sm"
               >
-                <LayoutDashboard size={12} className="sm:w-3.5 sm:h-3.5" />
-                <span className="hidden xs:inline">{t('dashboard')}</span>
+                <item.icon size={20} className={cn("transition-transform group-hover:scale-110", activeTab === item.id ? "text-white" : "text-slate-300")} />
+                {item.label}
               </button>
-            )}
+            ))}
+          </nav>
 
+          <div className="mt-8">
             <button 
               onClick={() => setIsVendorRegModalOpen(true)}
-              className="flex bg-gradient-to-r from-amber-500 to-amber-600 text-white px-2 sm:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-2xl font-black text-[7px] sm:text-[10px] uppercase tracking-widest hover:shadow-lg hover:shadow-amber-200 transition-all active:scale-95 shadow-md shadow-amber-100 animate-pulse hover:animate-none whitespace-nowrap"
+              className="w-full bg-gradient-to-br from-amber-500 to-amber-600 text-white p-5 rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-600/20 hover:shadow-amber-600/40 transition-all active:scale-95 group flex items-center justify-center gap-3"
             >
+              <Store size={18} className="group-hover:rotate-12 transition-transform" />
               {t('register_store')}
             </button>
-            {user ? (
-              <div className="flex items-center gap-2 sm:gap-4">
-                <div className="flex items-center gap-2 sm:gap-3 group cursor-pointer" onClick={() => setIsProfileModalOpen(true)}>
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-600 rounded-[18px] flex items-center justify-center text-white font-black text-sm sm:text-base overflow-hidden border-2 border-white dark:border-slate-700 shadow-xl group-hover:scale-105 transition-transform ring-4 ring-amber-500/10">
-                    {user.avatar ? (
-                      <img src={user.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      user.name[0].toUpperCase()
-                    )}
-                  </div>
-                  <div className="flex flex-col -gap-1 hidden lg:flex">
-                    <span className="text-sm font-black text-slate-900 dark:text-white truncate max-w-[120px]">{user.name}</span>
-                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-500 uppercase tracking-wider">{user.role}</span>
-                  </div>
-                </div>
-                <button 
-                  onClick={logout}
-                  className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl transition-all active:scale-90"
-                  title="Toka"
-                >
-                  <LogOut size={20} />
-                </button>
-              </div>
-            ) : (
-              <button 
-                onClick={() => setIsAuthModalOpen(true)}
-                className="bg-amber-600 text-white px-4 sm:px-5 py-2 rounded-xl font-bold text-sm shadow-lg shadow-amber-100 active:scale-95 transition-all"
-              >
-                {t('login')}
-              </button>
-            )}
           </div>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-6">
+        <div className="mt-auto p-8 border-t border-slate-50 dark:border-slate-900">
+          {user ? (
+            <button 
+              onClick={() => setIsProfileModalOpen(true)}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-amber-200 transition-all group"
+            >
+              <div className="w-10 h-10 rounded-full bg-amber-100 overflow-hidden border-2 border-white dark:border-slate-800">
+                {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg">👤</div>}
+              </div>
+              <div className="text-left">
+                <p className="text-xs font-black text-slate-900 dark:text-white truncate max-w-[120px]">{user.name}</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{user.role}</p>
+              </div>
+            </button>
+          ) : (
+            <button 
+              onClick={() => setIsAuthModalOpen(true)}
+              className="w-full btn-primary py-4"
+            >
+              {t('login')}
+            </button>
+          )}
+        </div>
+      </aside>
+
+      <div className="lg:pl-72 min-h-screen flex flex-col">
+        {/* Header */}
+        <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800/50">
+          <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between gap-4">
+            <div className="flex-1 max-w-2xl relative group">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-amber-500 transition-colors" size={20} />
+              <input 
+                type="text" 
+                placeholder={t('search_placeholder')}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-900/50 border-2 border-transparent focus:border-amber-500/20 focus:bg-white dark:focus:bg-slate-900 rounded-[20px] pl-14 pr-6 py-3.5 text-sm font-bold outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div className="relative" ref={langRef}>
+                  <button 
+                    onClick={() => setIsLangOpen(!isLangOpen)}
+                    className="flex items-center gap-2 p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-800 text-slate-400 hover:text-amber-600 transition-all font-black text-[10px] uppercase tracking-widest"
+                  >
+                    <Globe size={18} /> {language}
+                  </button>
+                  <AnimatePresence>
+                    {isLangOpen && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 mt-3 w-40 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 p-2 overflow-hidden z-50"
+                      >
+                        {['sw', 'en', 'ar', 'hi'].map(l => (
+                          <button
+                            key={l}
+                            onClick={() => { setLanguage(l as any); setIsLangOpen(false); }}
+                            className={cn(
+                              "w-full text-left px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                              language === l ? "bg-amber-600 text-white" : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            )}
+                          >
+                            {l === 'sw' ? 'Kiswahili' : l === 'en' ? 'English' : l === 'ar' ? 'العربية' : 'हिन्दी'}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setIsVendorRegModalOpen(true)}
+                className="flex bg-amber-600/10 dark:bg-amber-600/20 text-amber-600 dark:text-amber-400 px-3 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest hover:bg-amber-600 hover:text-white transition-all active:scale-95 border border-amber-600/20 whitespace-nowrap"
+              >
+                <Store size={14} className="sm:hidden" />
+                <span className="hidden sm:inline">{t('register_store')}</span>
+                <span className="sm:hidden ml-1">SAJILI</span>
+              </button>
+
+              {user ? (
+                <div className="flex items-center gap-3">
+                  {user.role === 'admin' && (
+                    <button 
+                      onClick={() => setView('admin')}
+                      className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20"
+                    >
+                      <LayoutDashboard size={20} />
+                    </button>
+                  )}
+                  {user.role === 'vendor' && (
+                    <button 
+                      onClick={() => setView('vendor')}
+                      className="p-3 bg-amber-600 text-white rounded-2xl hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20"
+                    >
+                      <Store size={20} />
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setIsProfileModalOpen(true)}
+                    className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm active:scale-95 transition-all"
+                  >
+                    {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xl">👤</div>}
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="bg-amber-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-600/20 active:scale-95 transition-all"
+                >
+                  {t('login')}
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-4 sm:py-8 pb-32">
         {/* Banner Slider */}
         {systemSettings?.banners?.length > 0 && (
-          <div className="mb-10 relative group overflow-hidden rounded-[40px] aspect-[21/9] shadow-2xl">
-            <div className="flex transition-transform duration-700 ease-in-out h-full" style={{ transform: `translateX(-${(Math.floor(Date.now() / 5000) % systemSettings.banners.length) * 100}%)` }}>
+          <div className="mb-4 relative group overflow-hidden rounded-[32px] aspect-[21/9] shadow-2xl shadow-amber-900/10">
+            <div className="flex transition-transform duration-1000 cubic-bezier(0.4, 0, 0.2, 1) h-full" style={{ transform: `translateX(-${(Math.floor(Date.now() / 5000) % systemSettings.banners.length) * 100}%)` }}>
               {systemSettings.banners.map((banner: any, idx: number) => (
-                <a key={idx} href={banner.link || '#'} className="min-w-full h-full block">
-                  <img src={banner.image} alt="" className="w-full h-full object-cover" />
+                <a key={idx} href={banner.link || '#'} className="min-w-full h-full block relative overflow-hidden">
+                  <img src={banner.image} alt="" className="w-full h-full object-cover transition-transform duration-[5000ms] group-hover:scale-110" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                  {banner.title && (
+                    <div className="absolute bottom-10 left-10 right-10">
+                      <h2 className="text-4xl font-black text-white mb-2 tracking-tight">{banner.title}</h2>
+                      {banner.subtitle && <p className="text-white/80 font-bold">{banner.subtitle}</p>}
+                    </div>
+                  )}
                 </a>
               ))}
             </div>
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-3 bg-black/20 backdrop-blur-md px-4 py-2 rounded-full">
               {systemSettings.banners.map((_: any, idx: number) => (
-                <div key={idx} className={cn("w-2 h-2 rounded-full transition-all", (Math.floor(Date.now() / 5000) % systemSettings.banners.length) === idx ? "bg-white w-6" : "bg-white/40")} />
+                <div key={idx} className={cn("h-1.5 rounded-full transition-all duration-500", (Math.floor(Date.now() / 5000) % systemSettings.banners.length) === idx ? "bg-white w-8" : "bg-white/30 w-1.5")} />
               ))}
             </div>
           </div>
@@ -780,8 +815,8 @@ export const ShopPage: React.FC = () => {
         {activeTab === 'browse' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             {/* WhatsApp Style Status Feed */}
-            <div className="mb-12 bg-slate-950/5 dark:bg-slate-900/20 py-6 -mx-4 px-4 sm:mx-0 sm:rounded-[32px] border-y sm:border border-slate-100 dark:border-slate-800">
-              <div className="flex items-center justify-between mb-6 px-2">
+            <div className="mb-2 bg-slate-950/5 dark:bg-slate-900/20 py-3 -mx-4 px-4 sm:mx-0 sm:rounded-[24px] border-y sm:border border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between mb-3 px-2">
                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Status</h2>
                 {(user?.role === 'vendor' || user?.role === 'admin') && (
                   <button 
@@ -872,55 +907,69 @@ export const ShopPage: React.FC = () => {
             </div>
 
             {/* Categories */}
-            <div className="flex gap-3 overflow-x-auto pb-6 scrollbar-hide mb-8 -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="flex gap-2.5 overflow-x-auto pb-3 scrollbar-hide mb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
               <button
                 onClick={() => setSelectedCat('all')}
                 className={cn(
-                  "flex-shrink-0 px-6 py-4 rounded-[24px] font-black text-xs transition-all flex flex-col items-center gap-2 min-w-[100px] border-2",
+                  "flex-shrink-0 px-4 py-2.5 rounded-[20px] font-black text-[7px] transition-all flex flex-col items-center gap-1 min-w-[70px] border-2",
                   selectedCat === 'all' 
-                    ? "bg-amber-600 text-white border-amber-600 shadow-xl shadow-amber-100 dark:shadow-none scale-105" 
-                    : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-100 dark:border-slate-800 hover:border-amber-200 dark:hover:border-amber-900 hover:bg-amber-50/30 dark:hover:bg-amber-900/10"
+                    ? "bg-amber-600 text-white border-amber-600 shadow-lg shadow-amber-600/20 scale-105" 
+                    : "bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-800 hover:border-amber-200 dark:hover:border-amber-900 hover:bg-amber-50/30 dark:hover:bg-amber-900/10"
                 )}
               >
-                <span className="text-2xl">🏪</span>
-                <span className="uppercase tracking-wider">{t('all')}</span>
+                <div className="w-6 h-6 bg-slate-50 dark:bg-slate-800 rounded-lg flex items-center justify-center text-base shadow-inner">🏪</div>
+                <span className="uppercase tracking-[0.1em]">{t('all')}</span>
               </button>
               {categories.map(cat => (
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCat(cat.id)}
                   className={cn(
-                    "flex-shrink-0 px-6 py-4 rounded-[24px] font-black text-xs transition-all flex flex-col items-center gap-2 min-w-[100px] border-2",
+                    "flex-shrink-0 px-4 py-2.5 rounded-[20px] font-black text-[7px] transition-all flex flex-col items-center gap-1 min-w-[70px] border-2",
                     selectedCat === cat.id 
-                      ? "bg-amber-600 text-white border-amber-600 shadow-xl shadow-amber-100 dark:shadow-none scale-105" 
-                      : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-100 dark:border-slate-800 hover:border-amber-200 dark:hover:border-amber-900 hover:bg-amber-50/30 dark:hover:bg-amber-900/10"
+                      ? "bg-amber-600 text-white border-amber-600 shadow-lg shadow-amber-600/20 scale-105" 
+                      : "bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-800 hover:border-amber-200 dark:hover:border-amber-900 hover:bg-amber-50/30 dark:hover:bg-amber-900/10"
                   )}
                 >
-                  <div className="w-8 h-8 flex items-center justify-center overflow-hidden">
+                  <div className="w-6 h-6 bg-slate-50 dark:bg-slate-800 rounded-lg flex items-center justify-center overflow-hidden shadow-inner">
                     {cat.image ? (
-                      <img src={cat.image} alt="" className="w-full h-full object-cover rounded-lg" />
+                      <img src={cat.image} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-2xl">{cat.emoji || '📦'}</span>
+                      <span className="text-base">{cat.emoji || '📦'}</span>
                     )}
                   </div>
-                  <span className="uppercase tracking-wider">{cat.label}</span>
+                  <span className="uppercase tracking-[0.1em]">{cat.label}</span>
                 </button>
               ))}
             </div>
 
             {/* Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
-              {filteredProducts.map(p => (
-                <ProductCard 
-                  key={p.id} 
-                  product={p} 
-                  isOpen={isStoreOpen(p.vendorId)}
-                  onClick={() => {
-                    setSelectedProduct(p);
-                    setQty(1);
-                  }} 
-                />
-              ))}
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-8">
+              {filteredProducts.map((p, idx) => {
+                const productReviews = reviews.filter(r => r.productId === p.id);
+                const avgRating = productReviews.length > 0 
+                  ? productReviews.reduce((acc, r) => acc + r.rating, 0) / productReviews.length 
+                  : 0;
+                
+                return (
+                  <motion.div
+                    key={p.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                  >
+                    <ProductCard 
+                      product={p} 
+                      rating={avgRating}
+                      isOpen={isStoreOpen(p.vendorId)}
+                      onClick={() => {
+                        setSelectedProduct(p);
+                        setQty(1);
+                      }} 
+                    />
+                  </motion.div>
+                );
+              })}
             </div>
           </motion.div>
         )}
@@ -1021,37 +1070,39 @@ export const ShopPage: React.FC = () => {
         )}
       </main>
 
-      {/* Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800 px-6 py-3 z-40">
+      </div> {/* End of lg:pl-72 */}
+
+      {/* Bottom Nav (Mobile Only) */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-950/90 backdrop-blur-2xl border-t border-slate-100 dark:border-slate-800/50 px-6 py-4 z-40">
         <div className="max-w-md mx-auto flex justify-between items-center">
           <button 
             onClick={() => setActiveTab('browse')}
-            className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'browse' ? "text-amber-600 scale-110" : "text-slate-400")}
+            className={cn("flex flex-col items-center gap-1.5 transition-all", activeTab === 'browse' ? "text-amber-600 scale-110" : "text-slate-400")}
           >
-            <ShoppingBag size={20} />
-            <span className="text-[10px] font-black">{t('market')}</span>
+            <ShoppingBag size={22} strokeWidth={activeTab === 'browse' ? 3 : 2} />
+            <span className="text-[9px] font-black uppercase tracking-widest">{t('market')}</span>
           </button>
           <button 
             onClick={() => setActiveTab('stores')}
-            className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'stores' ? "text-amber-600 scale-110" : "text-slate-400")}
+            className={cn("flex flex-col items-center gap-1.5 transition-all", activeTab === 'stores' ? "text-amber-600 scale-110" : "text-slate-400")}
           >
-            <Store size={20} />
-            <span className="text-[10px] font-black">{t('stores')}</span>
+            <Store size={22} strokeWidth={activeTab === 'stores' ? 3 : 2} />
+            <span className="text-[9px] font-black uppercase tracking-widest">{t('stores')}</span>
           </button>
 
           {/* Raised Cart Button */}
-          <div className="relative -top-6">
+          <div className="relative -top-8">
             <button 
               onClick={() => setIsCartModalOpen(true)}
               className={cn(
-                "w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 border-4 border-white dark:border-slate-900",
-                cart.length > 0 ? "bg-amber-600 text-white shadow-amber-200 dark:shadow-none" : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+                "w-16 h-16 rounded-[24px] flex items-center justify-center shadow-2xl transition-all active:scale-90 border-4 border-white dark:border-slate-950",
+                cart.length > 0 ? "bg-amber-600 text-white shadow-amber-600/40" : "bg-slate-100 dark:bg-slate-900 text-slate-400"
               )}
             >
               <div className="relative">
-                <ShoppingBag size={28} />
+                <ShoppingBag size={28} strokeWidth={2.5} />
                 {cart.length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white dark:border-slate-900 animate-bounce">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white dark:border-amber-600 animate-bounce">
                     {cart.reduce((sum, item) => sum + item.qty, 0)}
                   </span>
                 )}
@@ -1061,28 +1112,17 @@ export const ShopPage: React.FC = () => {
 
           <button 
             onClick={() => setActiveTab('orders')}
-            className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'orders' ? "text-amber-600 scale-110" : "text-slate-400")}
+            className={cn("flex flex-col items-center gap-1.5 transition-all", activeTab === 'orders' ? "text-amber-600 scale-110" : "text-slate-400")}
           >
-            <Package size={20} />
-            <span className="text-[10px] font-black">{t('orders')}</span>
+            <Package size={22} strokeWidth={activeTab === 'orders' ? 3 : 2} />
+            <span className="text-[9px] font-black uppercase tracking-widest">{t('orders')}</span>
           </button>
-
           <button 
-            onClick={() => {
-              if (!user) {
-                setIsAuthModalOpen(true);
-              } else {
-                setIsProfileModalOpen(true);
-              }
-            }}
-            className={cn("flex flex-col items-center gap-1 transition-all", isProfileModalOpen ? "text-amber-600 scale-110" : "text-slate-400")}
+            onClick={() => setIsProfileModalOpen(true)}
+            className={cn("flex flex-col items-center gap-1.5 transition-all text-slate-400")}
           >
-            {user?.avatar ? (
-              <img src={user.avatar} alt="" className="w-6 h-6 rounded-lg object-cover border border-amber-200 shadow-sm" referrerPolicy="no-referrer" />
-            ) : (
-              <UserIcon size={22} />
-            )}
-            <span className="text-[10px] font-black">{t('profile')}</span>
+            <UserIcon size={22} />
+            <span className="text-[9px] font-black uppercase tracking-widest">{t('profile')}</span>
           </button>
         </div>
       </nav>
@@ -1179,19 +1219,6 @@ export const ShopPage: React.FC = () => {
                       <option value="ar">العربية (Arabic)</option>
                       <option value="hi">हिन्दी (Hindi)</option>
                     </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">{t('theme')}</label>
-                    <button 
-                      onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                      className={cn(
-                        "w-full flex items-center justify-between px-4 py-4 rounded-2xl border-2 transition-all font-bold text-sm",
-                        theme === 'dark' ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-100 text-slate-700"
-                      )}
-                    >
-                      <span>{theme === 'dark' ? t('dark_mode') : t('light_mode')}</span>
-                      <span>{theme === 'dark' ? '🌙' : '☀️'}</span>
-                    </button>
                   </div>
                 </div>
 
@@ -1562,14 +1589,14 @@ export const ShopPage: React.FC = () => {
                   {[1,2,3,4,5].map(s => {
                     const avgRating = productReviews.length > 0 
                       ? productReviews.reduce((acc, r) => acc + r.rating, 0) / productReviews.length 
-                      : 5;
-                    return <Star key={s} size={14} fill={s <= Math.round(avgRating) ? "currentColor" : "none"} />;
+                      : 0;
+                    return <Star key={s} size={14} className={cn(s <= Math.round(avgRating) ? "text-amber-400 fill-amber-400" : "text-slate-300 dark:text-slate-700 fill-none")} />;
                   })}
                 </div>
                 <span className="text-xs text-slate-400 font-bold">
                   {productReviews.length > 0 
                     ? (productReviews.reduce((acc, r) => acc + r.rating, 0) / productReviews.length).toFixed(1) 
-                    : "5.0"} 
+                    : "0"} 
                   ({productReviews.length} {t('maoni') || 'maoni'})
                 </span>
               </div>
