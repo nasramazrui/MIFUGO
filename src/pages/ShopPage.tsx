@@ -26,9 +26,13 @@ interface CartItem {
 }
 
 export const ShopPage: React.FC = () => {
-  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView } = useApp();
+  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView } = useApp();
   const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'cart'>('browse');
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
+  const [viewedStatuses, setViewedStatuses] = useState<string[]>(() => {
+    const saved = localStorage.getItem('viewed_statuses');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [selectedCat, setSelectedCat] = useState('all');
@@ -98,6 +102,13 @@ export const ShopPage: React.FC = () => {
     if (selectedStatus) {
       setStatusProgress(0);
       setIsPaused(false);
+      
+      // Mark as viewed
+      if (!viewedStatuses.includes(selectedStatus.id)) {
+        const newViewed = [...viewedStatuses, selectedStatus.id];
+        setViewedStatuses(newViewed);
+        localStorage.setItem('viewed_statuses', JSON.stringify(newViewed));
+      }
     }
   }, [selectedStatus]);
 
@@ -839,7 +850,7 @@ export const ShopPage: React.FC = () => {
 
                       {/* Vendor Avatar with WhatsApp-style Ring */}
                       <div className="absolute top-3 left-3 z-10">
-                        <div className="w-11 h-11 rounded-full p-[2px] bg-green-500 shadow-lg">
+                        <div className={cn("w-11 h-11 rounded-full p-[2px] shadow-lg", viewedStatuses.includes(status.id) ? "bg-slate-300 dark:bg-slate-700" : "bg-green-500")}>
                           <div className="w-full h-full rounded-full border-2 border-slate-900 overflow-hidden bg-slate-100">
                             {status.vendorAvatar ? (
                               <img src={status.vendorAvatar} alt="" className="w-full h-full object-cover" />
@@ -862,7 +873,19 @@ export const ShopPage: React.FC = () => {
 
             {/* Categories */}
             <div className="flex gap-3 overflow-x-auto pb-6 scrollbar-hide mb-8 -mx-4 px-4 sm:mx-0 sm:px-0">
-              {CATEGORIES.map(cat => (
+              <button
+                onClick={() => setSelectedCat('all')}
+                className={cn(
+                  "flex-shrink-0 px-6 py-4 rounded-[24px] font-black text-xs transition-all flex flex-col items-center gap-2 min-w-[100px] border-2",
+                  selectedCat === 'all' 
+                    ? "bg-amber-600 text-white border-amber-600 shadow-xl shadow-amber-100 dark:shadow-none scale-105" 
+                    : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-100 dark:border-slate-800 hover:border-amber-200 dark:hover:border-amber-900 hover:bg-amber-50/30 dark:hover:bg-amber-900/10"
+                )}
+              >
+                <span className="text-2xl">🏪</span>
+                <span className="uppercase tracking-wider">{t('all')}</span>
+              </button>
+              {categories.map(cat => (
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCat(cat.id)}
@@ -873,8 +896,14 @@ export const ShopPage: React.FC = () => {
                       : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-100 dark:border-slate-800 hover:border-amber-200 dark:hover:border-amber-900 hover:bg-amber-50/30 dark:hover:bg-amber-900/10"
                   )}
                 >
-                  <span className="text-2xl">{cat.emoji}</span>
-                  <span className="uppercase tracking-wider">{t(cat.id)}</span>
+                  <div className="w-8 h-8 flex items-center justify-center overflow-hidden">
+                    {cat.image ? (
+                      <img src={cat.image} alt="" className="w-full h-full object-cover rounded-lg" />
+                    ) : (
+                      <span className="text-2xl">{cat.emoji || '📦'}</span>
+                    )}
+                  </div>
+                  <span className="uppercase tracking-wider">{cat.label}</span>
                 </button>
               ))}
             </div>
@@ -1571,7 +1600,7 @@ export const ShopPage: React.FC = () => {
                           )}
                         </div>
                         <div className="flex text-amber-400">
-                          {[1,2,3,4,5].map(s => <Star key={s} size={10} fill={s <= rev.rating ? "currentColor" : "none"} />)}
+                          {rev.rating > 0 && [1,2,3,4,5].map(s => <Star key={s} size={10} fill={s <= rev.rating ? "currentColor" : "none"} />)}
                         </div>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">{rev.text}</p>

@@ -137,6 +137,14 @@ export interface Activity {
   createdAt: string;
 }
 
+export interface Category {
+  id: string;
+  label: string;
+  emoji?: string;
+  image?: string;
+  createdAt?: any;
+}
+
 export interface StatusComment {
   id: string;
   userId: string;

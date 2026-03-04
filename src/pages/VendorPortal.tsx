@@ -4,7 +4,7 @@ import { User, Product, Order, Activity, Withdrawal, ProductUnit, WithdrawalStat
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
 import { Modal } from '../components/Modal';
-import { CATEGORIES, DAYS, ADMIN_WA } from '../constants';
+import { DAYS, ADMIN_WA } from '../constants';
 import { formatCurrency, generateId } from '../utils';
 import { motion } from 'motion/react';
 import { 
@@ -42,7 +42,7 @@ import {
 import { toast } from 'react-hot-toast';
 
 export const VendorPortal: React.FC = () => {
-  const { user, products, orders, withdrawals, statuses, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t } = useApp();
+  const { user, products, orders, withdrawals, statuses, categories, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t } = useApp();
   const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status'>('dash');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
@@ -1056,7 +1056,7 @@ export const VendorPortal: React.FC = () => {
                 value={newProduct.category}
                 onChange={e => setNewProduct({...newProduct, category: e.target.value as any})}
               >
-                {CATEGORIES.filter(c => c.id !== 'all').map(c => (
+                {categories.map(c => (
                   <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>
                 ))}
               </select>
@@ -1245,7 +1245,7 @@ export const VendorPortal: React.FC = () => {
                   value={editingProduct.category}
                   onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}
                 >
-                  {CATEGORIES.filter(c => c.id !== 'all').map(c => (
+                  {categories.map(c => (
                     <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>
                   ))}
                 </select>

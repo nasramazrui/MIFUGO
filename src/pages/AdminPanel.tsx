@@ -6,6 +6,7 @@ import { motion } from 'motion/react';
 import { db } from '../services/firebase';
 import { 
   collection, 
+  addDoc,
   updateDoc, 
   doc, 
   deleteDoc, 
@@ -62,6 +63,7 @@ export const AdminPanel: React.FC = () => {
     activities, 
     withdrawals,
     statuses,
+    categories,
     systemSettings,
     updateSystemSettings,
     logout, 
@@ -73,7 +75,7 @@ export const AdminPanel: React.FC = () => {
     setView,
     t
   } = useApp();
-  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'wallet' | 'settings' | 'status'>('over');
+  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'wallet' | 'settings' | 'status' | 'cats'>('over');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -99,6 +101,69 @@ export const AdminPanel: React.FC = () => {
 
   const [editingItem, setEditingItem] = useState<{ type: string, data: any } | null>(null);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isCatModalOpen, setIsCatModalOpen] = useState(false);
+  const [catForm, setCatForm] = useState({
+    id: '',
+    label: '',
+    emoji: '',
+    image: ''
+  });
+  const [isEditingCat, setIsEditingCat] = useState(false);
+
+  const handleSaveCategory = async () => {
+    if (!catForm.label) return;
+    try {
+      if (isEditingCat) {
+        await updateDoc(doc(db, 'kuku_categories', catForm.id), {
+          label: catForm.label,
+          emoji: catForm.emoji,
+          image: catForm.image
+        });
+        toast.success('Category imesasishwa');
+      } else {
+        await addDoc(collection(db, 'kuku_categories'), {
+          label: catForm.label,
+          emoji: catForm.emoji,
+          image: catForm.image,
+          createdAt: serverTimestamp()
+        });
+        toast.success('Category imeongezwa');
+      }
+      setIsCatModalOpen(false);
+      setCatForm({ id: '', label: '', emoji: '', image: '' });
+    } catch (error) {
+      toast.error('Hitilafu imetokea');
+    }
+  };
+
+  const handleImportDefaults = async () => {
+    if (!confirm('Hii itaongeza kategoria zote za msingi. Je, uendelee?')) return;
+    try {
+      for (const cat of CATEGORIES) {
+        if (cat.id === 'all') continue;
+        await addDoc(collection(db, 'kuku_categories'), {
+          label: cat.label,
+          emoji: cat.emoji,
+          image: '',
+          createdAt: serverTimestamp()
+        });
+      }
+      toast.success('Kategoria zimeingizwa!');
+    } catch (error) {
+      toast.error('Hitilafu imetokea');
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    if (!confirm('Futa category hii?')) return;
+    try {
+      await deleteDoc(doc(db, 'kuku_categories', id));
+      toast.success('Category imefutwa');
+    } catch (error) {
+      toast.error('Hitilafu imetokea');
+    }
+  };
+
   const [localSettings, setLocalSettings] = useState({
     imagekit_public_key: '',
     imagekit_private_key: '',
@@ -359,6 +424,7 @@ export const AdminPanel: React.FC = () => {
             { id: 'orders', label: 'Maagizo', icon: ClipboardList },
             { id: 'users', label: 'Watumiaji', icon: Users },
             { id: 'wallet', label: 'Wallet', icon: Wallet },
+            { id: 'cats', label: 'Kategoria', icon: Settings },
             { id: 'status', label: t('status'), icon: Camera },
             { id: 'settings', label: 'Mipangilio', icon: Settings },
           ].map(item => (
@@ -1039,6 +1105,72 @@ export const AdminPanel: React.FC = () => {
           </motion.div>
         )}
 
+        {activeTab === 'cats' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-3xl font-black text-slate-900">Kategoria za Bidhaa</h2>
+              <div className="flex gap-3">
+                {categories.length === 0 && (
+                  <button 
+                    onClick={handleImportDefaults}
+                    className="bg-slate-100 text-slate-600 px-6 py-3 rounded-2xl font-black flex items-center gap-2"
+                  >
+                    Import Defaults
+                  </button>
+                )}
+                <button 
+                  onClick={() => {
+                    setIsEditingCat(false);
+                    setCatForm({ id: '', label: '', emoji: '', image: '' });
+                    setIsCatModalOpen(true);
+                  }}
+                  className="bg-amber-500 text-amber-950 px-6 py-3 rounded-2xl font-black flex items-center gap-2"
+                >
+                  <Package size={20} /> Ongeza Kategoria
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {categories.map(cat => (
+                <div key={cat.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-6 flex items-center justify-between shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-2xl overflow-hidden">
+                      {cat.image ? (
+                        <img src={cat.image} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        cat.emoji || '📦'
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-black text-slate-900 dark:text-white">{cat.label}</h4>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-widest">{cat.id.substring(0,8)}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        setIsEditingCat(true);
+                        setCatForm({ id: cat.id, label: cat.label, emoji: cat.emoji || '', image: cat.image || '' });
+                        setIsCatModalOpen(true);
+                      }}
+                      className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center hover:bg-blue-100 transition-colors"
+                    >
+                      <Settings size={18} />
+                    </button>
+                    <button 
+                      onClick={() => deleteCategory(cat.id)}
+                      className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-100 transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'settings' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl">
             <h2 className="text-3xl font-black text-slate-900 mb-2">Mipangilio ya Mfumo</h2>
@@ -1409,7 +1541,7 @@ export const AdminPanel: React.FC = () => {
                     }}
                     className="input-field"
                   >
-                    {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1471,6 +1603,50 @@ export const AdminPanel: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      {/* Category Modal */}
+      <Modal isOpen={isCatModalOpen} onClose={() => setIsCatModalOpen(false)} title={isEditingCat ? "Hariri Kategoria" : "Ongeza Kategoria"}>
+        <div className="space-y-6">
+          <div>
+            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Jina la Kategoria</label>
+            <input 
+              type="text"
+              className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-amber-500 transition-all"
+              value={catForm.label}
+              onChange={e => setCatForm({...catForm, label: e.target.value})}
+              placeholder="Mf: Mayai ya Kienyeji"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Emoji (Hiari)</label>
+              <input 
+                type="text"
+                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-amber-500 transition-all"
+                value={catForm.emoji}
+                onChange={e => setCatForm({...catForm, emoji: e.target.value})}
+                placeholder="🥚"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Link ya Picha (Hiari)</label>
+              <input 
+                type="text"
+                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-amber-500 transition-all"
+                value={catForm.image}
+                onChange={e => setCatForm({...catForm, image: e.target.value})}
+                placeholder="https://..."
+              />
+            </div>
+          </div>
+          <button 
+            onClick={handleSaveCategory}
+            className="w-full py-4 bg-amber-500 text-amber-950 rounded-2xl font-black shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+          >
+            {isEditingCat ? "HIFADHI MABADILIKO" : "ONGEZA KATEGORIA"}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 };
