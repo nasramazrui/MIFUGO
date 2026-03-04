@@ -46,6 +46,60 @@ export const ShopPage: React.FC = () => {
   const [statusVideoUrl, setStatusVideoUrl] = useState('');
   const [isStatusLoading, setIsStatusLoading] = useState(false);
   const [commentText, setCommentText] = useState<{ [key: string]: string }>({});
+  const [statusProgress, setStatusProgress] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Auto-expiry for Statuses (24 hours)
+  useEffect(() => {
+    const cleanup = async () => {
+      const now = Date.now();
+      const expiryTime = 24 * 60 * 60 * 1000; // 24 hours
+      
+      for (const status of statuses) {
+        if (status.createdAt) {
+          const createdAt = status.createdAt.toMillis ? status.createdAt.toMillis() : new Date(status.createdAt).getTime();
+          if (now - createdAt > expiryTime) {
+            try {
+              await deleteDoc(doc(db, 'kuku_statuses', status.id));
+            } catch (e) {
+              console.error("Error deleting expired status:", e);
+            }
+          }
+        }
+      }
+    };
+    
+    // Run cleanup every hour
+    const interval = setInterval(cleanup, 60 * 60 * 1000);
+    cleanup(); // Run initially
+    
+    return () => clearInterval(interval);
+  }, [statuses]);
+
+  // Progress bar for status viewer
+  useEffect(() => {
+    let interval: any;
+    if (selectedStatus && !isPaused) {
+      interval = setInterval(() => {
+        setStatusProgress(prev => {
+          if (prev >= 100) {
+            setSelectedStatus(null);
+            return 0;
+          }
+          return prev + 0.4; // Slightly slower for better reading
+        });
+      }, 50);
+    }
+    return () => clearInterval(interval);
+  }, [selectedStatus, isPaused]);
+
+  // Reset progress when status changes
+  useEffect(() => {
+    if (selectedStatus) {
+      setStatusProgress(0);
+      setIsPaused(false);
+    }
+  }, [selectedStatus]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1936,6 +1990,155 @@ export const ShopPage: React.FC = () => {
           </button>
         </div>
       </Modal>
+
+      {/* Status Viewer Modal (WhatsApp Style) */}
+      <AnimatePresence>
+        {selectedStatus && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center"
+          >
+            {/* Progress Bar */}
+            <div className="absolute top-4 left-4 right-4 z-20 flex gap-1">
+              <div className="flex-1 h-1 bg-white/20 rounded-full overflow-hidden">
+                <motion.div 
+                  className="h-full bg-white"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${statusProgress}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Header */}
+            <div className="absolute top-8 left-4 right-4 z-20 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full border-2 border-green-500 p-0.5">
+                  <div className="w-full h-full rounded-full overflow-hidden bg-slate-800">
+                    {selectedStatus.vendorAvatar ? (
+                      <img src={selectedStatus.vendorAvatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white font-bold">🏪</div>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-white font-black text-sm">{selectedStatus.vendorName}</p>
+                  <p className="text-white/60 text-[10px] uppercase tracking-widest">Sasa hivi</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {(user?.role === 'admin' || user?.id === selectedStatus.vendorId) && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteStatus(selectedStatus.id);
+                      setSelectedStatus(null);
+                    }}
+                    className="p-2 text-white/60 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                )}
+                <button 
+                  onClick={() => setSelectedStatus(null)}
+                  className="p-2 text-white/60 hover:text-white transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="w-full h-full flex items-center justify-center relative">
+              {selectedStatus.videoUrl ? (
+                <div className="w-full h-full max-w-lg aspect-[9/16] bg-black flex items-center justify-center">
+                  {getEmbedUrl(selectedStatus.videoUrl) ? (
+                    <iframe 
+                      src={`${getEmbedUrl(selectedStatus.videoUrl)}?autoplay=1&mute=0`}
+                      className="w-full h-full"
+                      allow="autoplay; encrypted-media"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <div className="text-white text-center p-8">
+                      <Camera size={48} className="mx-auto mb-4 opacity-20" />
+                      <p className="font-bold">Video haiwezi kuonyeshwa</p>
+                      <p className="text-xs opacity-60">{selectedStatus.videoUrl}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center p-8 text-center bg-gradient-to-br from-amber-500 to-orange-700">
+                  <p className="text-2xl sm:text-4xl text-white font-black leading-tight uppercase tracking-tighter drop-shadow-2xl">
+                    {selectedStatus.text}
+                  </p>
+                </div>
+              )}
+
+              {/* Interaction Overlay */}
+              <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent z-20">
+                <div className="max-w-lg mx-auto">
+                  <div className="flex items-center gap-6 mb-4">
+                    <button 
+                      onClick={() => handleLikeStatus(selectedStatus.id)}
+                      className={cn(
+                        "flex flex-col items-center gap-1 transition-all",
+                        selectedStatus.likes.includes(user?.id || '') ? "text-amber-500 scale-110" : "text-white"
+                      )}
+                    >
+                      <ThumbsUp size={24} fill={selectedStatus.likes.includes(user?.id || '') ? "currentColor" : "none"} />
+                      <span className="text-[10px] font-black">{selectedStatus.likes.length}</span>
+                    </button>
+                    <button className="flex flex-col items-center gap-1 text-white">
+                      <MessageSquare size={24} />
+                      <span className="text-[10px] font-black">{selectedStatus.comments.length}</span>
+                    </button>
+                  </div>
+
+                  {/* Comments Section */}
+                  <div className="max-h-40 overflow-y-auto mb-4 scrollbar-hide space-y-3 px-2">
+                    {selectedStatus.comments.length === 0 ? (
+                      <p className="text-white/40 text-[10px] italic text-center py-2">Hakuna maoni bado. Kuwa wa kwanza!</p>
+                    ) : (
+                      selectedStatus.comments.map(comment => (
+                        <div key={comment.id} className="flex flex-col bg-white/5 p-2 rounded-xl border border-white/10">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-black text-amber-500 text-[10px]">{comment.userName}</span>
+                            <span className="text-[8px] text-white/30">Leo</span>
+                          </div>
+                          <p className="text-white text-[11px] leading-relaxed">{comment.text}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Comment Input */}
+                  <div className="flex gap-2">
+                    <input 
+                      type="text"
+                      placeholder="Andika maoni..."
+                      className="flex-1 bg-white/10 border border-white/20 rounded-full px-4 py-3 text-white text-sm outline-none focus:ring-2 focus:ring-amber-500 placeholder:text-white/30"
+                      value={commentText[selectedStatus.id] || ''}
+                      onChange={e => setCommentText(prev => ({ ...prev, [selectedStatus.id]: e.target.value }))}
+                      onFocus={() => setIsPaused(true)}
+                      onBlur={() => setIsPaused(false)}
+                    />
+                    <button 
+                      onClick={() => handleCommentStatus(selectedStatus.id)}
+                      disabled={!commentText[selectedStatus.id]?.trim()}
+                      className="bg-amber-600 hover:bg-amber-500 text-white p-3 rounded-full disabled:opacity-50 transition-all active:scale-90 shadow-lg"
+                    >
+                      <Send size={20} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AuthModal 
         isOpen={isAuthModalOpen} 
