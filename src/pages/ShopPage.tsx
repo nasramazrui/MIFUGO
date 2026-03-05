@@ -7,7 +7,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard } from 'lucide-react';
+import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
@@ -255,9 +255,15 @@ export const ShopPage: React.FC = () => {
     }
   };
   const [deliveryMethod, setDeliveryMethod] = useState<'city' | 'out' | 'pickup'>('city');
-  const [payMethod, setPayMethod] = useState<'mpesa' | 'bank' | 'cash'>('mpesa');
+  const [payMethod, setPayMethod] = useState<'mpesa' | 'tigo' | 'airtel' | 'halopesa' | 'cash'>('mpesa');
+  const [paymentStep, setPaymentStep] = useState<'method' | 'details' | 'confirm' | 'whatsapp'>('method');
+  const [senderName, setSenderName] = useState('');
+  const [senderPhone, setSenderPhone] = useState('');
+  const [sentAmount, setSentAmount] = useState('');
+  const [transactionId, setTransactionId] = useState('');
   const [payPhone, setPayPhone] = useState('');
   const [paymentProof, setPaymentProof] = useState('');
+  const [lastOrderId, setLastOrderId] = useState('');
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
   const [isReviewLoading, setIsReviewLoading] = useState(false);
@@ -502,9 +508,11 @@ export const ShopPage: React.FC = () => {
     const p = selectedProduct || products.find(x => x.id === selectedProduct?.id);
     if (!p || !user) return;
 
-    if (payMethod !== 'cash' && (!payPhone || !paymentProof)) {
-      toast.error('Tafadhali jaza namba ya simu na uthibitisho wa malipo');
-      return;
+    if (payMethod !== 'cash') {
+      if (!senderName || !senderPhone || !sentAmount || !transactionId) {
+        toast.error('Tafadhali jaza taarifa zote za malipo');
+        return;
+      }
     }
 
     if (p.stock < qty) {
@@ -525,8 +533,11 @@ export const ShopPage: React.FC = () => {
       userId: user.id,
       userName: user.name,
       userContact: user.contact || user.email,
-      userWA: payPhone,
-      payPhone,
+      userWA: senderPhone || user.contact,
+      payPhone: senderPhone,
+      senderName,
+      sentAmount,
+      transactionId,
       items: [{ name: p.name, qty, price: p.price, unit: p.unit, emoji: p.emoji, image: p.image }],
       productId: p.id,
       vendorId: p.vendorId,
@@ -539,7 +550,7 @@ export const ShopPage: React.FC = () => {
       vendorNet,
       total,
       payMethod,
-      paymentProof,
+      paymentProof: `Sender: ${senderName}, Phone: ${senderPhone}, Amount: ${sentAmount}, ID: ${transactionId}`,
       paymentApproved: false,
       status: 'pending' as const,
       date: new Date().toISOString().split('T')[0],
@@ -554,15 +565,18 @@ export const ShopPage: React.FC = () => {
       });
 
       const docRef = await addDoc(collection(db, 'kuku_orders'), orderData);
+      setLastOrderId(docRef.id);
       addActivity('🛒', `${user.name} amenunua ${p.name} × ${qty} — ${formatCurrency(total, currency)}`);
-      setIsPaymentModalOpen(false);
-      setSelectedProduct(null);
-      setActiveTab('orders');
-      toast.success('Agizo limekamilika!');
       
-      // WhatsApp redirect
-      const msg = `*Uthibitisho wa Agizo — ${systemSettings?.app_name || 'FarmConnect'}* 🐔\n\nHabari, agizo langu #${docRef.id.substring(0,8)} limepokewa!\n\nBidhaa: *${p.name}* × ${qty}\nJumla: *${formatCurrency(total, currency)}*\nNjia: *${payMethod}*\n\nAsante!`;
-      window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
+      if (payMethod === 'cash') {
+        setIsPaymentModalOpen(false);
+        setSelectedProduct(null);
+        setActiveTab('orders');
+        toast.success('Agizo limekamilika!');
+      } else {
+        setPaymentStep('whatsapp');
+        toast.success('Malipo yamethibitishwa! Tafadhali tuma WhatsApp.');
+      }
     } catch (error: any) {
       toast.error('Hitilafu wakati wa kutuma agizo');
     } finally {
@@ -2087,88 +2101,207 @@ export const ShopPage: React.FC = () => {
       {/* Payment Modal */}
       <Modal 
         isOpen={isPaymentModalOpen} 
-        onClose={() => setIsPaymentModalOpen(false)}
-        title="Fanya Malipo"
+        onClose={() => {
+          setIsPaymentModalOpen(false);
+          setPaymentStep('method');
+        }}
+        title={paymentStep === 'method' ? "Chagua Njia ya Malipo" : paymentStep === 'details' ? "Maelezo ya Malipo" : paymentStep === 'confirm' ? "Thibitisha Malipo" : "Tuma Uthibitisho"}
       >
         <div className="space-y-6">
-          <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
-            <div className="flex justify-between mb-2">
-              <span className="text-sm text-slate-500">Bidhaa:</span>
-              <span className="text-sm font-bold">{selectedProduct?.name} × {qty}</span>
-            </div>
-            <div className="flex justify-between mb-2">
-              <span className="text-sm text-slate-500">Bei:</span>
-              <span className="text-sm font-bold">{formatCurrency(selectedProduct?.price * qty, currency)}</span>
-            </div>
-            <div className="flex justify-between pt-2 border-t border-amber-200">
-              <span className="font-black text-slate-900">Jumla:</span>
-              <span className="font-black text-amber-700">{formatCurrency(selectedProduct?.price * qty, currency)}</span>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <label className="block text-xs font-black text-slate-500 uppercase tracking-wider">Njia ya Malipo</label>
-            <div className="grid grid-cols-1 gap-2">
-              {['mpesa', 'bank', 'cash'].map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setPayMethod(m as any)}
-                  className={cn(
-                    "flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left",
-                    payMethod === m ? "border-amber-500 bg-amber-50" : "border-slate-100 bg-white"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">{m === 'mpesa' ? '📱' : m === 'bank' ? '🏦' : '💵'}</span>
-                    <div>
-                      <p className="font-bold text-sm capitalize">{m === 'mpesa' ? 'M-Pesa / Tigo / Airtel' : m === 'bank' ? 'Benki' : 'Pesa Taslimu'}</p>
-                      <p className="text-[10px] text-slate-400">{m === 'cash' ? 'Lipa ukipokea mzigo' : 'Lipa sasa kwa usalama'}</p>
-                    </div>
-                  </div>
-                  <div className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center", payMethod === m ? "border-amber-500" : "border-slate-200")}>
-                    {payMethod === m && <div className="w-2.5 h-2.5 bg-amber-500 rounded-full" />}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {payMethod !== 'cash' && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Namba ya Simu ya Malipo</label>
-                <input 
-                  type="tel"
-                  className="input-field"
-                  placeholder="0712 345 678"
-                  value={payPhone}
-                  onChange={e => setPayPhone(e.target.value)}
-                />
+          {/* Order Summary */}
+          {paymentStep !== 'whatsapp' && (
+            <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-slate-500">Bidhaa:</span>
+                <span className="text-sm font-bold">{selectedProduct?.name} × {qty}</span>
               </div>
-              <div>
-                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Uthibitisho wa Malipo (SMS/Screenshot Text)</label>
-                <textarea 
-                  className="input-field resize-none"
-                  rows={2}
-                  placeholder="Nakili ujumbe wa muamala hapa..."
-                  value={paymentProof}
-                  onChange={e => setPaymentProof(e.target.value)}
-                />
+              <div className="flex justify-between pt-2 border-t border-amber-200">
+                <span className="font-black text-slate-900">Jumla:</span>
+                <span className="font-black text-amber-700">{formatCurrency(selectedProduct?.price * qty, currency)}</span>
               </div>
             </div>
           )}
 
-          <button 
-            onClick={confirmOrder}
-            disabled={isOrderLoading}
-            className="w-full btn-primary py-5 text-lg flex items-center justify-center gap-2"
-          >
-            {isOrderLoading ? (
-              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              'THIBITISHA AGIZO ✅'
-            )}
-          </button>
+          {paymentStep === 'method' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  { id: 'tigo', label: 'Mix by Yas (Tigo Pesa)', icon: '📱', color: 'bg-blue-50 text-blue-600' },
+                  { id: 'mpesa', label: 'M-Pesa', icon: '📱', color: 'bg-red-50 text-red-600' },
+                  { id: 'airtel', label: 'Airtel Money', icon: '📱', color: 'bg-red-50 text-red-600' },
+                  { id: 'halopesa', label: 'HaloPesa', icon: '📱', color: 'bg-orange-50 text-orange-600' },
+                  { id: 'cash', label: 'Pesa Taslimu (Cash)', icon: '💵', color: 'bg-emerald-50 text-emerald-600' }
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      setPayMethod(m.id as any);
+                      if (m.id === 'cash') {
+                        confirmOrder();
+                      } else {
+                        setPaymentStep('details');
+                      }
+                    }}
+                    className="flex items-center justify-between p-4 rounded-2xl border-2 border-slate-100 hover:border-amber-500 bg-white transition-all text-left group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-xl", m.color)}>{m.icon}</span>
+                      <div>
+                        <p className="font-bold text-sm">{m.label}</p>
+                        <p className="text-[10px] text-slate-400">{m.id === 'cash' ? 'Lipa ukipokea mzigo' : 'Lipa sasa kwa usalama'}</p>
+                      </div>
+                    </div>
+                    <ChevronRight size={18} className="text-slate-300 group-hover:text-amber-500 transition-colors" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {paymentStep === 'details' && (
+            <div className="space-y-6">
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 text-center space-y-4">
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Namba ya Malipo</p>
+                  <div className="flex items-center justify-center gap-3">
+                    <h3 className="text-2xl font-black text-slate-900">0687225353</h3>
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText('0687225353');
+                        toast.success('Namba imekopiwa!');
+                      }}
+                      className="p-2 bg-white rounded-lg shadow-sm text-amber-600 hover:bg-amber-50"
+                    >
+                      <Copy size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Jina la Akaunti</p>
+                  <h3 className="text-xl font-black text-slate-900">Amour</h3>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <button 
+                  onClick={() => {
+                    // In a real app, this might trigger a USSD push or dialer
+                    toast.success('Tafadhali kamilisha malipo kwenye simu yako');
+                  }}
+                  className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2"
+                >
+                  LIPA SASA 💳
+                </button>
+                <p className="text-[10px] text-center text-slate-400 font-bold uppercase tracking-wider">
+                  Tafadhali tuma pesa kisha bonyeza <span className="text-amber-600">Thibitisha Malipo</span>
+                </p>
+                <button 
+                  onClick={() => setPaymentStep('confirm')}
+                  className="w-full bg-amber-500 text-amber-950 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2"
+                >
+                  THIBITISHA MALIPO ✅
+                </button>
+                <button 
+                  onClick={() => setPaymentStep('method')}
+                  className="w-full text-slate-400 font-black text-xs uppercase tracking-widest"
+                >
+                  Rudi Nyuma
+                </button>
+              </div>
+            </div>
+          )}
+
+          {paymentStep === 'confirm' && (
+            <div className="space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Jina la Mtumaji</label>
+                  <input 
+                    type="text"
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    placeholder="Mf: John Doe"
+                    value={senderName}
+                    onChange={e => setSenderName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Namba ya Simu</label>
+                  <input 
+                    type="tel"
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    placeholder="07XX XXX XXX"
+                    value={senderPhone}
+                    onChange={e => setSenderPhone(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Kiasi ulichotuma</label>
+                  <input 
+                    type="number"
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    placeholder="Mf: 10000"
+                    value={sentAmount}
+                    onChange={e => setSentAmount(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Namba ya Muamala (Transaction ID)</label>
+                  <input 
+                    type="text"
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    placeholder="Mf: 5H67X9..."
+                    value={transactionId}
+                    onChange={e => setTransactionId(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <button 
+                onClick={confirmOrder}
+                disabled={isOrderLoading}
+                className="w-full bg-amber-500 text-amber-950 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+              >
+                {isOrderLoading ? (
+                  <div className="w-6 h-6 border-2 border-amber-950 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  'THIBITISHA MALIPO ✅'
+                )}
+              </button>
+              <button 
+                onClick={() => setPaymentStep('details')}
+                className="w-full text-slate-400 font-black text-xs uppercase tracking-widest"
+              >
+                Rudi Nyuma
+              </button>
+            </div>
+          )}
+
+          {paymentStep === 'whatsapp' && (
+            <div className="text-center space-y-6 py-4">
+              <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-4">✅</div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Agizo Limepokelewa!</h3>
+                <p className="text-slate-500 text-sm mt-2">Tafadhali tuma uthibitisho wa malipo WhatsApp ili agizo lako lishughulikiwe haraka.</p>
+              </div>
+
+              <button 
+                onClick={() => {
+                  const vendor = vendors.find(v => v.id === selectedProduct?.vendorId);
+                  const msg = `Habari,\n\nNimelipia bidhaa kwenye app.\n\n📦 Product: *${selectedProduct?.name}*\n👤 Jina la Mnunuzi: *${user?.name}*\n\n💳 Njia ya Malipo: *${payMethod.toUpperCase()}*\n\n📱 Namba ya Mtumaji: *${senderPhone}*\n💰 Kiasi: *${formatCurrency(Number(sentAmount), currency)}*\n🔑 Transaction ID: *${transactionId}*\n\n🧑💼 Muuzaji wa Product: *${vendor?.shopName || vendor?.name || 'N/A'}*\n📞 Namba ya Muuzaji: *${vendor?.phone || 'N/A'}*\n\nAsante.`;
+                  window.open(`https://wa.me/255764225358?text=${encodeURIComponent(msg)}`);
+                  
+                  // Reset and close
+                  setIsPaymentModalOpen(false);
+                  setPaymentStep('method');
+                  setSelectedProduct(null);
+                  setActiveTab('orders');
+                }}
+                className="w-full bg-emerald-500 text-white py-5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+              >
+                TUMA UTHIBITISHO WHATSAPP 📱
+              </button>
+            </div>
+          )}
         </div>
       </Modal>
 

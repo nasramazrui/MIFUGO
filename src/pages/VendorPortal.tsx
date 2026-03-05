@@ -683,6 +683,30 @@ export const VendorPortal: React.FC = () => {
                     </div>
                   </div>
 
+                  {order.payMethod !== 'cash' && (
+                    <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Uthibitisho wa Malipo</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div>
+                          <p className="text-[10px] text-slate-400">Mtumaji:</p>
+                          <p className="text-xs font-bold">{order.senderName}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400">Simu:</p>
+                          <p className="text-xs font-bold">{order.payPhone}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400">Kiasi:</p>
+                          <p className="text-xs font-bold">{formatCurrency(Number(order.sentAmount || 0), currency)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400">Trans ID:</p>
+                          <p className="text-xs font-bold">{order.transactionId}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex flex-wrap items-center gap-3 pt-6 border-t border-slate-50">
                     <select 
                       value={order.status}

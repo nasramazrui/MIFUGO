@@ -868,9 +868,30 @@ export const AdminPanel: React.FC = () => {
                       <div className="flex-1 min-w-[200px]">
                         <p className="text-xs text-slate-400 mb-1">Muuzaji: <span className="font-bold text-slate-600">{o.vendorName}</span></p>
                         {o.paymentProof && (
-                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Proof of Payment</p>
-                            <p className="text-[10px] text-slate-600 italic break-all">{o.paymentProof}</p>
+                          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
+                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Uthibitisho wa Malipo</p>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <p className="text-[8px] text-slate-400 uppercase">Mtumaji</p>
+                                <p className="text-[10px] font-bold text-slate-900">{o.senderName || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] text-slate-400 uppercase">Simu</p>
+                                <p className="text-[10px] font-bold text-slate-900">{o.payPhone || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] text-slate-400 uppercase">Kiasi</p>
+                                <p className="text-[10px] font-bold text-emerald-700">{formatCurrency(Number(o.sentAmount || 0), currency)}</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] text-slate-400 uppercase">Trans ID</p>
+                                <p className="text-[10px] font-bold text-blue-700">{o.transactionId || 'N/A'}</p>
+                              </div>
+                            </div>
+                            <div className="pt-2 border-t border-slate-200">
+                              <p className="text-[8px] text-slate-400 uppercase mb-1">Raw Proof</p>
+                              <p className="text-[10px] text-slate-600 italic break-all">{o.paymentProof}</p>
+                            </div>
                             {!o.paymentApproved && (
                               <button 
                                 onClick={async (e) => {
@@ -884,9 +905,9 @@ export const AdminPanel: React.FC = () => {
                                     toast.error('Imeshindwa kuthibitisha malipo');
                                   }
                                 }}
-                                className="mt-2 text-[9px] font-black text-blue-600 hover:underline bg-blue-50 px-2 py-1 rounded-lg"
+                                className="w-full mt-2 bg-blue-500 text-white py-2 rounded-xl font-black text-[10px] uppercase tracking-wider shadow-lg shadow-blue-500/20"
                               >
-                                THIBITISHA MALIPO HAPA
+                                THIBITISHA MALIPO HAPA ✅
                               </button>
                             )}
                           </div>

@@ -77,7 +77,10 @@ export interface Order {
   deliveryFee: number;
   deliveryMethod: 'city' | 'out' | 'pickup';
   total: number;
-  payMethod: 'mpesa' | 'bank' | 'cash';
+  payMethod: 'mpesa' | 'tigo' | 'airtel' | 'halopesa' | 'cash';
+  senderName?: string;
+  sentAmount?: string;
+  transactionId?: string;
   status: OrderStatus;
   paymentProof?: string;
   paymentApproved?: boolean;
