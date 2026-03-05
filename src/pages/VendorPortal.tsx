@@ -43,6 +43,7 @@ import { toast } from 'react-hot-toast';
 
 export const VendorPortal: React.FC = () => {
   const { user, products, orders, withdrawals, statuses, categories, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t } = useApp();
+  const currency = systemSettings?.currency || 'TZS';
   const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status'>('dash');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
@@ -273,7 +274,7 @@ export const VendorPortal: React.FC = () => {
         date: new Date().toISOString().split('T')[0],
         createdAt: serverTimestamp()
       });
-      addActivity('💸', `Maombi ya kutoa ${formatCurrency(availableBalance)} kutoka kwa ${user.shopName}`);
+      addActivity('💸', `Maombi ya kutoa ${formatCurrency(availableBalance, currency)} kutoka kwa ${user.shopName}`);
       toast.success('Maombi ya kutoa fedha yametumwa kwa Admin!');
       setIsWithdrawModalOpen(false);
     } catch (error: any) {
@@ -527,7 +528,7 @@ export const VendorPortal: React.FC = () => {
               {[
                 { label: 'Bidhaa', value: myProducts.length, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
                 { label: 'Maagizo', value: myOrders.length, icon: ClipboardList, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                { label: 'Mapato (TZS)', value: formatCurrency(totalRevenue).replace('TZS ', ''), icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50' },
+                { label: `Mapato (${currency})`, value: formatCurrency(totalRevenue, currency).replace(`${currency} `, ''), icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50' },
                 { label: 'Hali', value: user.status === 'approved' ? 'Active' : 'Pending', icon: CheckCircle2, color: 'text-purple-600', bg: 'bg-purple-50' },
               ].map((stat, i) => (
                 <div key={i} className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
@@ -559,7 +560,7 @@ export const VendorPortal: React.FC = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-black text-emerald-700 dark:text-emerald-400">{formatCurrency(order.total)}</p>
+                          <p className="text-sm font-black text-emerald-700 dark:text-emerald-400">{formatCurrency(order.total, currency)}</p>
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{order.status}</span>
                         </div>
                       </div>
@@ -585,7 +586,7 @@ export const VendorPortal: React.FC = () => {
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">Stock: {product.stock} pcs</p>
                           </div>
                         </div>
-                        <p className="text-sm font-black text-amber-700 dark:text-amber-500">{formatCurrency(product.price)}</p>
+                        <p className="text-sm font-black text-amber-700 dark:text-amber-500">{formatCurrency(product.price, currency)}</p>
                       </div>
                     ))
                   )}
@@ -640,7 +641,7 @@ export const VendorPortal: React.FC = () => {
                     <p className="text-xs text-slate-400 mb-4 line-clamp-2">{p.desc}</p>
                     <div className="flex items-center justify-between pt-4 border-t border-slate-50">
                       <p className="font-black text-emerald-700">
-                        {formatCurrency(p.price)}
+                        {formatCurrency(p.price, currency)}
                         <span className="text-[10px] font-normal text-slate-400 ml-1">/ {p.unit}</span>
                       </p>
                       <p className="text-[10px] font-bold text-slate-400">Stock: {p.stock}</p>
@@ -673,7 +674,7 @@ export const VendorPortal: React.FC = () => {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-xl font-black text-emerald-700">{formatCurrency(order.total)}</p>
+                      <p className="text-xl font-black text-emerald-700">{formatCurrency(order.total, currency)}</p>
                       <div className="flex items-center gap-2 justify-end mt-1">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{order.payMethod}</span>
                         <div className="w-1 h-1 bg-slate-300 rounded-full" />
@@ -718,7 +719,7 @@ export const VendorPortal: React.FC = () => {
             <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-[40px] p-10 text-white shadow-2xl shadow-emerald-100 mb-10 relative overflow-hidden">
               <div className="relative z-10">
                 <p className="text-emerald-200 text-xs font-black uppercase tracking-[0.2em] mb-2">Salio la Wallet (Available)</p>
-                <h3 className="text-5xl font-black mb-6">{formatCurrency(availableBalance)}</h3>
+                <h3 className="text-5xl font-black mb-6">{formatCurrency(availableBalance, currency)}</h3>
                 <div className="flex gap-4">
                   <button 
                     onClick={handleWithdrawRequest}
@@ -728,8 +729,8 @@ export const VendorPortal: React.FC = () => {
                   </button>
                 </div>
                 <div className="mt-4 flex gap-6 text-[10px] font-bold text-emerald-100/60 uppercase tracking-widest">
-                  <p>Jumla ya Mapato: {formatCurrency(totalRevenue)}</p>
-                  <p>Zilizotolewa: {formatCurrency(withdrawnAmount)}</p>
+                  <p>Jumla ya Mapato: {formatCurrency(totalRevenue, currency)}</p>
+                  <p>Zilizotolewa: {formatCurrency(withdrawnAmount, currency)}</p>
                 </div>
               </div>
               <div className="absolute right-[-40px] top-[-40px] text-[240px] opacity-10 select-none pointer-events-none">💰</div>
@@ -750,7 +751,7 @@ export const VendorPortal: React.FC = () => {
                           <p className="text-[10px] text-slate-400">{order.date} · {order.items[0].name}</p>
                         </div>
                       </div>
-                      <p className="font-black text-emerald-700">+{formatCurrency(order.vendorNet || (order.total - (order.deliveryFee || 0)) * 0.94)}</p>
+                      <p className="font-black text-emerald-700">+{formatCurrency(order.vendorNet || (order.total - (order.deliveryFee || 0)) * 0.94, currency)}</p>
                     </div>
                   ))}
                 </div>
@@ -767,7 +768,7 @@ export const VendorPortal: React.FC = () => {
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-lg">💸</div>
                           <div>
-                            <p className="text-sm font-black text-slate-900">{formatCurrency(w.amount)}</p>
+                            <p className="text-sm font-black text-slate-900">{formatCurrency(w.amount, currency)}</p>
                             <p className="text-[10px] text-slate-400">{w.date} · {w.method === 'mobile' ? w.network : 'Bank'}</p>
                           </div>
                         </div>
@@ -1405,7 +1406,7 @@ export const VendorPortal: React.FC = () => {
         <div className="space-y-6">
           <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center">
             <p className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-1">Salio Linaloweza Kutolewa</p>
-            <p className="text-3xl font-black text-emerald-800">{formatCurrency(availableBalance)}</p>
+            <p className="text-3xl font-black text-emerald-800">{formatCurrency(availableBalance, currency)}</p>
           </div>
 
           <div>

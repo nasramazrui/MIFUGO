@@ -101,7 +101,8 @@ export interface ReviewReaction {
 
 export interface Review {
   id: string;
-  productId: string;
+  productId?: string;
+  vendorId?: string;
   userId: string;
   userName: string;
   userAvatar?: string;

@@ -190,6 +190,9 @@ export const ShopPage: React.FC = () => {
   const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [selectedVendor, setSelectedVendor] = useState<any>(null);
+  const [vendorRating, setVendorRating] = useState(0);
+  const [vendorReviewText, setVendorReviewText] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [qty, setQty] = useState(1);
   const [vendorFormData, setVendorFormData] = useState({
     shopName: '',
@@ -260,6 +263,44 @@ export const ShopPage: React.FC = () => {
   const [isReviewLoading, setIsReviewLoading] = useState(false);
 
   const productReviews = reviews.filter(r => r.productId === selectedProduct?.id);
+
+  const handleVendorReview = async () => {
+    if (!user) {
+      toast.error('Tafadhali ingia kwanza');
+      return;
+    }
+    if (vendorRating === 0) {
+      toast.error('Tafadhali chagua nyota');
+      return;
+    }
+    setIsSubmittingReview(true);
+    try {
+      await addDoc(collection(db, 'kuku_reviews'), {
+        vendorId: selectedVendor.id,
+        userId: user.id,
+        userName: user.name,
+        userAvatar: user.avatar || '',
+        rating: vendorRating,
+        text: vendorReviewText,
+        date: new Date().toLocaleDateString(),
+        createdAt: serverTimestamp()
+      });
+      toast.success('Asante kwa maoni yako!');
+      setVendorRating(0);
+      setVendorReviewText('');
+    } catch (error) {
+      toast.error('Imeshindwa kutuma maoni');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  const getVendorRating = (vendorId: string) => {
+    const vendorReviews = reviews.filter(r => r.vendorId === vendorId);
+    if (vendorReviews.length === 0) return 0;
+    const sum = vendorReviews.reduce((acc, r) => acc + r.rating, 0);
+    return sum / vendorReviews.length;
+  };
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1016,6 +1057,10 @@ export const ShopPage: React.FC = () => {
                       <div>
                         <h3 className="font-black text-slate-900 dark:text-white">{v.shopName || v.name}</h3>
                         <p className="text-xs text-slate-400">📍 {v.location}</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Star size={10} className="fill-amber-400 text-amber-400" />
+                          <span className="text-[10px] font-black text-amber-600 dark:text-amber-500">{getVendorRating(v.id).toFixed(1)}</span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-slate-800">
@@ -1531,7 +1576,45 @@ export const ShopPage: React.FC = () => {
                 )}>
                   {isStoreOpen(selectedVendor.id) ? `🟢 ${t('open')}` : `🔴 ${t('closed')}`}
                 </span>
+                <div className="flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-full">
+                  <Star size={10} className="fill-amber-400 text-amber-400" />
+                  <span className="text-[10px] font-black text-amber-800">{getVendorRating(selectedVendor.id).toFixed(1)}</span>
+                </div>
               </div>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl space-y-4">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Toa Rating kwa Duka hili</p>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button 
+                    key={star}
+                    onClick={() => setVendorRating(star)}
+                    className="transition-transform active:scale-90"
+                  >
+                    <Star 
+                      size={24} 
+                      className={cn(
+                        star <= vendorRating ? "fill-amber-400 text-amber-400" : "text-slate-300"
+                      )} 
+                    />
+                  </button>
+                ))}
+              </div>
+              <textarea 
+                value={vendorReviewText}
+                onChange={(e) => setVendorReviewText(e.target.value)}
+                placeholder="Andika maoni yako hapa..."
+                className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs outline-none focus:border-amber-500"
+                rows={2}
+              />
+              <button 
+                onClick={handleVendorReview}
+                disabled={isSubmittingReview}
+                className="w-full bg-amber-500 text-amber-950 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider disabled:opacity-50"
+              >
+                {isSubmittingReview ? 'Inatuma...' : 'Tuma Rating'}
+              </button>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-2xl space-y-2">

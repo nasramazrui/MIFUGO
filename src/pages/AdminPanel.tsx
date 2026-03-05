@@ -32,6 +32,7 @@ import {
   Save,
   Star,
   Trash2,
+  ShieldCheck,
   Moon,
   Sun,
   Globe,
@@ -58,6 +59,7 @@ export const AdminPanel: React.FC = () => {
     user,
     users, 
     vendors, 
+    admins,
     products, 
     orders, 
     activities, 
@@ -75,7 +77,8 @@ export const AdminPanel: React.FC = () => {
     setView,
     t
   } = useApp();
-  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'wallet' | 'settings' | 'status' | 'cats'>('over');
+  const currency = systemSettings?.currency || 'TZS';
+  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'admins' | 'wallet' | 'settings' | 'status' | 'cats'>('over');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -413,6 +416,7 @@ export const AdminPanel: React.FC = () => {
             { id: 'prods', label: 'Bidhaa', icon: Package },
             { id: 'orders', label: 'Maagizo', icon: ClipboardList },
             { id: 'users', label: 'Watumiaji', icon: Users },
+            { id: 'admins', label: 'Admins', icon: ShieldCheck },
             { id: 'wallet', label: 'Wallet', icon: Wallet },
             { id: 'cats', label: 'Kategoria', icon: Settings },
             { id: 'status', label: t('status'), icon: Camera },
@@ -486,7 +490,7 @@ export const AdminPanel: React.FC = () => {
                 { label: 'Wauuzaji', value: vendors.length, icon: Store, color: 'text-emerald-600', bg: 'bg-emerald-50', sub: `${pendingVendors.length} wanasubiri` },
                 { label: 'Bidhaa', value: products.length, icon: Package, color: 'text-amber-600', bg: 'bg-amber-50' },
                 { label: 'Maagizo', value: orders.length, icon: ClipboardList, color: 'text-red-600', bg: 'bg-red-50' },
-                { label: 'Mapato Admin (6%)', value: formatCurrency(totalAdminEarnings), icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
+                { label: `Mapato Admin (6% - ${currency})`, value: formatCurrency(totalAdminEarnings, currency), icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
               ].map((stat, i) => (
                 <div key={i} className="bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all group">
                   <div className={cn("w-14 h-14 rounded-[20px] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform", stat.bg, stat.bg.includes('blue') && 'dark:bg-blue-900/20', stat.bg.includes('emerald') && 'dark:bg-emerald-900/20', stat.bg.includes('amber') && 'dark:bg-amber-900/20', stat.bg.includes('red') && 'dark:bg-red-900/20', stat.bg.includes('purple') && 'dark:bg-purple-900/20')}>
@@ -766,7 +770,7 @@ export const AdminPanel: React.FC = () => {
                       </div>
                       <div>
                         <h4 className="font-black text-slate-900">{p.name}</h4>
-                        <p className="text-xs text-slate-400">{p.vendorName} · {formatCurrency(p.price)}</p>
+                        <p className="text-xs text-slate-400">{p.vendorName} · {formatCurrency(p.price, currency)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -841,7 +845,7 @@ export const AdminPanel: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-black text-amber-700">{formatCurrency(o.total)}</p>
+                        <p className="font-black text-amber-700">{formatCurrency(o.total, currency)}</p>
                         <div className="flex flex-col items-end gap-1 mt-1">
                           <span className={cn(
                             "badge px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider",
@@ -941,8 +945,39 @@ export const AdminPanel: React.FC = () => {
                       onClick={() => deleteUser(u.id)}
                       className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all"
                     >
-                      <X size={20} />
+                      <Trash2 size={20} />
                     </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'admins' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <h2 className="text-3xl font-black text-slate-900 mb-8">Admins Wote</h2>
+            <div className="grid gap-4">
+              {admins.map(a => (
+                <div key={a.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex items-center justify-between shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-purple-50 rounded-2xl flex items-center justify-center text-2xl font-black text-purple-800">
+                      {a.name[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="font-black text-slate-900">{a.name}</h4>
+                      <p className="text-xs text-slate-400">{a.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {a.email !== user?.email && (
+                      <button 
+                        onClick={() => deleteUser(a.id)}
+                        className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -967,7 +1002,7 @@ export const AdminPanel: React.FC = () => {
                         <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-2xl">💸</div>
                         <div>
                           <h4 className="font-black text-slate-900 text-lg">{w.vendorName}</h4>
-                          <p className="text-sm font-black text-emerald-700">{formatCurrency(w.amount)}</p>
+                          <p className="text-sm font-black text-emerald-700">{formatCurrency(w.amount, currency)}</p>
                           <p className="text-xs text-slate-400 mt-1">{w.date}</p>
                         </div>
                       </div>
@@ -1395,6 +1430,7 @@ export const AdminPanel: React.FC = () => {
           { id: 'prods', icon: Package, label: 'Bidhaa' },
           { id: 'orders', icon: ClipboardList, label: 'Oda' },
           { id: 'users', icon: Users, label: 'Watu' },
+          { id: 'admins', icon: ShieldCheck, label: 'Admin' },
           { id: 'wallet', icon: Wallet, label: 'Pesa' },
           { id: 'settings', icon: Settings, label: 'Setti' },
         ].map(item => (

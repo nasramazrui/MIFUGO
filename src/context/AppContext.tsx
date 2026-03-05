@@ -27,6 +27,8 @@ interface AppContextType {
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   vendors: User[];
   setVendors: React.Dispatch<React.SetStateAction<User[]>>;
+  admins: User[];
+  setAdmins: React.Dispatch<React.SetStateAction<User[]>>;
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   reviews: Review[];
@@ -59,6 +61,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [vendors, setVendors] = useState<User[]>([]);
+  const [admins, setAdmins] = useState<User[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -192,6 +195,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
       setUsers(all.filter(u => u.role === 'user'));
       setVendors(all.filter(u => u.role === 'vendor'));
+      setAdmins(all.filter(u => u.role === 'admin'));
     }, (err) => {
       console.error("Firestore Users Error:", err);
     });
@@ -285,6 +289,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       products, setProducts,
       orders, setOrders,
       vendors, setVendors,
+      admins, setAdmins,
       users, setUsers,
       reviews, setReviews,
       activities, addActivity,
