@@ -1,6 +1,6 @@
 export const ADMIN_EMAIL = 'amytzee@gmail.com';
 export const ADMIN_PASS = 'TANZANIA';
-export const ADMIN_WA = '+255700000000';
+export const ADMIN_WA = '+255764225358';
 
 export const CATEGORIES = [
   { id: 'all', label: 'Zote', emoji: '🏪' },

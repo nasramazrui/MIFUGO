@@ -521,34 +521,41 @@ export const ShopPage: React.FC = () => {
     }
 
     setIsOrderLoading(true);
-    const deliveryFee = deliveryMethod === 'city' ? p.deliveryCity : 
-                       deliveryMethod === 'out' ? p.deliveryOut : 0;
+    const deliveryFee = deliveryMethod === 'city' ? (p.deliveryCity || 0) : 
+                       deliveryMethod === 'out' ? (p.deliveryOut || 0) : 0;
     
-    const subtotal = p.price * qty;
+    const subtotal = (p.price || 0) * qty;
     const adminCommission = subtotal * 0.06;
     const vendorNet = subtotal - adminCommission;
     const total = subtotal + deliveryFee;
 
     const orderData = {
-      userId: user.id,
-      userName: user.name,
-      userContact: user.contact || user.email,
-      userWA: senderPhone || user.contact,
-      payPhone: senderPhone,
-      senderName,
-      sentAmount,
-      transactionId,
-      items: [{ name: p.name, qty, price: p.price, unit: p.unit, emoji: p.emoji, image: p.image }],
-      productId: p.id,
-      vendorId: p.vendorId,
-      vendorName: p.vendorName,
-      productPrice: p.price,
-      qty,
-      deliveryFee,
+      userId: user.id || '',
+      userName: user.name || '',
+      userContact: user.contact || user.email || '',
+      userWA: senderPhone || user.contact || '',
+      payPhone: senderPhone || '',
+      senderName: senderName || '',
+      sentAmount: sentAmount || '',
+      transactionId: transactionId || '',
+      items: [{ 
+        name: p.name || '', 
+        qty: Number(qty), 
+        price: Number(p.price || 0), 
+        unit: p.unit || '', 
+        emoji: p.emoji || '', 
+        image: p.image || '' 
+      }],
+      productId: p.id || '',
+      vendorId: p.vendorId || '',
+      vendorName: p.vendorName || '',
+      productPrice: Number(p.price || 0),
+      qty: Number(qty),
+      deliveryFee: Number(deliveryFee),
       deliveryMethod,
-      adminCommission,
-      vendorNet,
-      total,
+      adminCommission: Number(adminCommission),
+      vendorNet: Number(vendorNet),
+      total: Number(total),
       payMethod,
       paymentProof: `Sender: ${senderName}, Phone: ${senderPhone}, Amount: ${sentAmount}, ID: ${transactionId}`,
       paymentApproved: false,
@@ -578,7 +585,8 @@ export const ShopPage: React.FC = () => {
         toast.success('Malipo yamethibitishwa! Tafadhali tuma WhatsApp.');
       }
     } catch (error: any) {
-      toast.error('Hitilafu wakati wa kutuma agizo');
+      console.error("Order Error:", error);
+      toast.error('Hitilafu wakati wa kutuma agizo. Jaribu tena.');
     } finally {
       setIsOrderLoading(false);
     }
@@ -2288,7 +2296,7 @@ export const ShopPage: React.FC = () => {
                 onClick={() => {
                   const vendor = vendors.find(v => v.id === selectedProduct?.vendorId);
                   const msg = `Habari,\n\nNimelipia bidhaa kwenye app.\n\n📦 Product: *${selectedProduct?.name}*\n👤 Jina la Mnunuzi: *${user?.name}*\n\n💳 Njia ya Malipo: *${payMethod.toUpperCase()}*\n\n📱 Namba ya Mtumaji: *${senderPhone}*\n💰 Kiasi: *${formatCurrency(Number(sentAmount), currency)}*\n🔑 Transaction ID: *${transactionId}*\n\n🧑💼 Muuzaji wa Product: *${vendor?.shopName || vendor?.name || 'N/A'}*\n📞 Namba ya Muuzaji: *${vendor?.phone || 'N/A'}*\n\nAsante.`;
-                  window.open(`https://wa.me/255764225358?text=${encodeURIComponent(msg)}`);
+                  window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
                   
                   // Reset and close
                   setIsPaymentModalOpen(false);
