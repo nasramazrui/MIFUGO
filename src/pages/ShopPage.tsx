@@ -41,6 +41,13 @@ export const ShopPage: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+  const [isWalletHistoryOpen, setIsWalletHistoryOpen] = useState(false);
+  const [walletAmount, setWalletAmount] = useState('');
+  const [walletStep, setWalletStep] = useState<'method' | 'details' | 'whatsapp'>('method');
+  const [walletPayMethod, setWalletPayMethod] = useState<'mpesa' | 'tigo' | 'airtel' | 'halopesa'>('tigo');
+  const [isWalletLoading, setIsWalletLoading] = useState(false);
+  const [lastWalletTxId, setLastWalletTxId] = useState('');
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
@@ -557,8 +564,8 @@ export const ShopPage: React.FC = () => {
       vendorNet: Number(vendorNet),
       total: Number(total),
       payMethod,
-      paymentProof: `Sender: ${senderName}, Phone: ${senderPhone}, Amount: ${sentAmount}, ID: ${transactionId}`,
-      paymentApproved: false,
+      paymentProof: payMethod === 'wallet' ? 'Paid via Wallet' : `Sender: ${senderName}, Phone: ${senderPhone}, Amount: ${sentAmount}, ID: ${transactionId}`,
+      paymentApproved: payMethod === 'wallet',
       status: 'pending' as const,
       date: new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
@@ -571,11 +578,27 @@ export const ShopPage: React.FC = () => {
         stock: increment(-qty)
       });
 
+      if (payMethod === 'wallet') {
+        await updateDoc(doc(db, 'kuku_users', user.id), {
+          walletBalance: increment(-total)
+        });
+        
+        await addDoc(collection(db, 'kuku_wallet'), {
+          userId: user.id,
+          userName: user.name,
+          amount: total,
+          type: 'purchase',
+          status: 'approved',
+          date: new Date().toISOString().split('T')[0],
+          createdAt: serverTimestamp()
+        });
+      }
+
       const docRef = await addDoc(collection(db, 'kuku_orders'), orderData);
       setLastOrderId(docRef.id);
       addActivity('🛒', `${user.name} amenunua ${p.name} × ${qty} — ${formatCurrency(total, currency)}`);
       
-      if (payMethod === 'cash') {
+      if (payMethod === 'cash' || payMethod === 'wallet') {
         setIsPaymentModalOpen(false);
         setSelectedProduct(null);
         setActiveTab('orders');
@@ -589,6 +612,39 @@ export const ShopPage: React.FC = () => {
       toast.error('Hitilafu wakati wa kutuma agizo. Jaribu tena.');
     } finally {
       setIsOrderLoading(false);
+    }
+  };
+
+  const confirmDeposit = async () => {
+    if (!user || !walletAmount || !senderName || !senderPhone || !transactionId) {
+      toast.error('Tafadhali jaza taarifa zote');
+      return;
+    }
+
+    setIsWalletLoading(true);
+    try {
+      const txData = {
+        userId: user.id,
+        userName: user.name,
+        amount: Number(walletAmount),
+        type: 'deposit',
+        status: 'pending',
+        method: walletPayMethod,
+        senderName,
+        senderPhone,
+        transactionId,
+        date: new Date().toISOString().split('T')[0],
+        createdAt: serverTimestamp()
+      };
+
+      const docRef = await addDoc(collection(db, 'kuku_wallet'), txData);
+      setLastWalletTxId(docRef.id);
+      setWalletStep('whatsapp');
+      toast.success('Ombi la kuongeza pesa limetumwa!');
+    } catch (error) {
+      toast.error('Hitilafu imetokea');
+    } finally {
+      setIsWalletLoading(false);
     }
   };
 
@@ -1318,6 +1374,38 @@ export const ShopPage: React.FC = () => {
                 <div className="p-4 bg-slate-50 rounded-2xl">
                   <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Barua Pepe (Email)</p>
                   <p className="font-bold text-slate-700">{user.email}</p>
+                </div>
+
+                {/* Wallet Section */}
+                <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-[32px] border border-amber-100 dark:border-amber-900/30">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Wallet Balance</p>
+                      <h4 className="text-2xl font-black text-amber-900 dark:text-amber-400">
+                        {formatCurrency(user.walletBalance || 0, currency)}
+                      </h4>
+                    </div>
+                    <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/50 rounded-2xl flex items-center justify-center text-amber-600">
+                      <Wallet size={24} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      onClick={() => {
+                        setWalletStep('method');
+                        setIsWalletModalOpen(true);
+                      }}
+                      className="bg-amber-600 text-white py-3 rounded-2xl font-black text-[10px] uppercase tracking-wider shadow-lg shadow-amber-600/20"
+                    >
+                      + Add Money
+                    </button>
+                    <button 
+                      onClick={() => setIsWalletHistoryOpen(true)}
+                      className="bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-400 py-3 rounded-2xl font-black text-[10px] uppercase tracking-wider border border-amber-200 dark:border-amber-900/50"
+                    >
+                      History
+                    </button>
+                  </div>
                 </div>
               </div>
 

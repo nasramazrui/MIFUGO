@@ -9,6 +9,17 @@ const AppContent: React.FC = () => {
   const { user, loading, systemSettings, view } = useApp();
 
   if (loading) {
+    if (!systemSettings) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-white">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-amber-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest animate-pulse">Inapakia...</p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-8">
@@ -21,11 +32,18 @@ const AppContent: React.FC = () => {
                   className="w-32 h-32 object-contain"
                   referrerPolicy="no-referrer"
                 />
+              ) : systemSettings?.app_logo ? (
+                <img 
+                  src={systemSettings.app_logo} 
+                  alt="Loading..." 
+                  className="w-32 h-32 object-contain"
+                  referrerPolicy="no-referrer"
+                />
               ) : (
                 systemSettings?.loading_icon || '🚜'
               )}
             </div>
-            {!systemSettings?.loading_icon && !systemSettings?.loading_url && (
+            {!systemSettings?.loading_icon && !systemSettings?.loading_url && !systemSettings?.app_logo && (
               <div className="absolute -bottom-2 -right-2 text-4xl animate-bounce">🌱</div>
             )}
           </div>

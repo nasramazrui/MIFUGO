@@ -77,7 +77,7 @@ export interface Order {
   deliveryFee: number;
   deliveryMethod: 'city' | 'out' | 'pickup';
   total: number;
-  payMethod: 'mpesa' | 'tigo' | 'airtel' | 'halopesa' | 'cash';
+  payMethod: 'mpesa' | 'tigo' | 'airtel' | 'halopesa' | 'cash' | 'wallet';
   senderName?: string;
   sentAmount?: string;
   transactionId?: string;
@@ -168,5 +168,20 @@ export interface Status {
   videoUrl?: string;
   likes: string[];
   comments: StatusComment[];
+  createdAt: any;
+}
+
+export interface WalletTransaction {
+  id: string;
+  userId: string;
+  userName: string;
+  amount: number;
+  type: 'deposit' | 'purchase' | 'refund';
+  status: 'pending' | 'approved' | 'rejected';
+  method?: string;
+  senderName?: string;
+  senderPhone?: string;
+  transactionId?: string;
+  date: string;
   createdAt: any;
 }

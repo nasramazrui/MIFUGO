@@ -39,6 +39,8 @@ interface AppContextType {
   setWithdrawals: React.Dispatch<React.SetStateAction<Withdrawal[]>>;
   statuses: Status[];
   setStatuses: React.Dispatch<React.SetStateAction<Status[]>>;
+  walletTransactions: WalletTransaction[];
+  setWalletTransactions: React.Dispatch<React.SetStateAction<WalletTransaction[]>>;
   categories: Category[];
   setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
   systemSettings: any;
@@ -67,6 +69,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activities, setActivities] = useState<Activity[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
+  const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [systemSettings, setSystemSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -135,12 +138,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       try {
         if (fbUser) {
-          const userDoc = await getDoc(doc(db, 'kuku_users', fbUser.uid));
-          if (userDoc.exists()) {
-            setUser({ id: fbUser.uid, ...userDoc.data() } as User);
-          } else {
-            // Fallback for admin if doc doesn't exist yet but email matches
-            if (fbUser.email === ADMIN_EMAIL) {
+          // Use a snapshot for real-time user data (like wallet balance)
+          const unsubUser = onSnapshot(doc(db, 'kuku_users', fbUser.uid), (snap) => {
+            if (snap.exists()) {
+              setUser({ id: fbUser.uid, ...snap.data() } as User);
+            } else if (fbUser.email === ADMIN_EMAIL) {
               const adminData: User = {
                 id: fbUser.uid,
                 name: 'Admin',
@@ -148,19 +150,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 role: 'admin',
                 theme,
                 language,
+                walletBalance: 0,
                 createdAt: new Date().toISOString()
               };
-              await setDoc(doc(db, 'kuku_users', fbUser.uid), adminData);
+              setDoc(doc(db, 'kuku_users', fbUser.uid), adminData);
               setUser(adminData);
             }
-          }
+            setLoading(false);
+            clearTimeout(safetyTimer);
+          });
+          return unsubUser;
         } else {
           setUser(null);
+          setLoading(false);
+          clearTimeout(safetyTimer);
         }
       } catch (error) {
         console.error("Auth listener error:", error);
         setUser(null);
-      } finally {
         setLoading(false);
         clearTimeout(safetyTimer);
       }
@@ -237,6 +244,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as Category)));
     });
 
+    // Wallet Transactions
+    const qWallet = query(collection(db, 'kuku_wallet'), orderBy('createdAt', 'desc'));
+    const unsubWallet = onSnapshot(qWallet, (snap) => {
+      setWalletTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction)));
+    });
+
     return () => {
       unsubProducts();
       unsubOrders();
@@ -246,6 +259,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubReviews();
       unsubSettings();
       unsubStatuses();
+      unsubCats();
+      unsubWallet();
     };
   }, []);
 
@@ -295,6 +310,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       activities, addActivity,
       withdrawals, setWithdrawals,
       statuses, setStatuses,
+      walletTransactions, setWalletTransactions,
       categories, setCategories,
       systemSettings, updateSystemSettings,
       logout,
