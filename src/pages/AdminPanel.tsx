@@ -38,7 +38,9 @@ import {
   Moon,
   Sun,
   Globe,
-  ArrowLeft
+  ArrowLeft,
+  Grid,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '../utils';
 import { CATEGORIES } from '../constants';
@@ -69,6 +71,7 @@ export const AdminPanel: React.FC = () => {
     walletTransactions,
     statuses,
     categories,
+    reviews,
     systemSettings,
     updateSystemSettings,
     logout, 
@@ -81,7 +84,7 @@ export const AdminPanel: React.FC = () => {
     t
   } = useApp();
   const currency = systemSettings?.currency || 'TZS';
-  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'admins' | 'wallet' | 'settings' | 'status' | 'cats'>('over');
+  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'admins' | 'wallet' | 'settings' | 'status' | 'cats' | 'reviews'>('over');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -445,7 +448,8 @@ export const AdminPanel: React.FC = () => {
             { id: 'users', label: 'Watumiaji', icon: Users },
             { id: 'admins', label: 'Admins', icon: ShieldCheck },
             { id: 'wallet', label: 'Wallet', icon: Wallet },
-            { id: 'cats', label: 'Kategoria', icon: Settings },
+            { id: 'reviews', label: 'Maoni (Reviews)', icon: MessageSquare },
+            { id: 'cats', label: 'Kategoria', icon: Grid },
             { id: 'status', label: t('status'), icon: Camera },
             { id: 'settings', label: 'Mipangilio', icon: Settings },
           ].map(item => (
@@ -986,12 +990,14 @@ export const AdminPanel: React.FC = () => {
                     <button 
                       onClick={() => setEditingItem({ type: 'user', data: u })}
                       className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-blue-50 hover:text-blue-500 transition-all"
+                      title="Edit User"
                     >
-                      <TrendingUp size={18} />
+                      <Settings size={18} />
                     </button>
                     <button 
                       onClick={() => deleteUser(u.id)}
                       className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all"
+                      title="Delete User"
                     >
                       <Trash2 size={20} />
                     </button>
@@ -1276,6 +1282,66 @@ export const AdminPanel: React.FC = () => {
           </motion.div>
         )}
 
+        {activeTab === 'reviews' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <h2 className="text-3xl font-black text-slate-900 mb-8">Maoni ya Wateja (System Wide)</h2>
+            <div className="grid gap-6">
+              {reviews.length === 0 ? (
+                <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100">
+                  <MessageSquare size={48} className="mx-auto text-slate-200 mb-4" />
+                  <p className="text-slate-400">Hakuna maoni yoyote kwenye mfumo bado.</p>
+                </div>
+              ) : (
+                reviews.map(review => (
+                  <div key={review.id} className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm">
+                    <div className="flex items-start justify-between mb-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-xl overflow-hidden">
+                          {review.userAvatar ? (
+                            <img src={review.userAvatar} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            '👤'
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-black text-slate-900">{review.userName}</h4>
+                          <p className="text-xs text-slate-400">{review.date}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <Star 
+                            key={star} 
+                            size={16} 
+                            className={cn(star <= review.rating ? "fill-amber-400 text-amber-400" : "text-slate-200")} 
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 mb-4">
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Muuzaji: {review.vendorName || 'N/A'}</p>
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Bidhaa: {review.productName}</p>
+                      <p className="text-slate-700 font-bold leading-relaxed italic">"{review.text || review.comment || 'Hakuna maoni ya maandishi.'}"</p>
+                    </div>
+                    <div className="flex justify-end">
+                      <button 
+                        onClick={() => {
+                          if (confirm('Je, una uhakika unataka kufuta maoni haya?')) {
+                            deleteDoc(doc(db, 'kuku_reviews', review.id));
+                            toast.success('Maoni yamefutwa');
+                          }
+                        }}
+                        className="text-red-500 text-xs font-black hover:underline"
+                      >
+                        FUTA MAONI (DELETE)
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
         {activeTab === 'cats' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <div className="flex items-center justify-between mb-8">
@@ -1610,6 +1676,21 @@ export const AdminPanel: React.FC = () => {
           <div className="space-y-4">
             {editingItem.type === 'user' || editingItem.type === 'vendor' ? (
               <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Role</label>
+                  <select 
+                    defaultValue={editingItem.data.role}
+                    onChange={async (e) => {
+                      await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { role: e.target.value });
+                      toast.success('Role imesasishwa');
+                    }}
+                    className="input-field"
+                  >
+                    <option value="user">User</option>
+                    <option value="vendor">Vendor</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Jina</label>
                   <input 

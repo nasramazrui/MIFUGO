@@ -225,11 +225,33 @@ export const ShopPage: React.FC = () => {
     e.preventDefault();
     setIsVendorLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, vendorFormData.email, vendorFormData.password);
-      const fbUser = userCredential.user;
-      
-      await updateProfile(fbUser, { displayName: vendorFormData.ownerName });
-      
+      if (user) {
+        // Upgrade existing user
+        const vendorData = {
+          shopName: vendorFormData.shopName,
+          role: 'vendor',
+          status: 'pending',
+          location: vendorFormData.location,
+          phone: vendorFormData.phone,
+          tin: vendorFormData.tin,
+          nida: vendorFormData.nida,
+          license: vendorFormData.license,
+          openTime: vendorFormData.openTime,
+          closeTime: vendorFormData.closeTime,
+          openDays: vendorFormData.openDays,
+          updatedAt: serverTimestamp()
+        };
+        
+        await updateDoc(doc(db, 'kuku_users', user.id), vendorData);
+        addActivity('🏪', `Mtumiaji "${user.name}" ameomba kuwa muuzaji ("${vendorFormData.shopName}")`);
+        toast.success('Ombi lako limetumwa! Subiri idhini ya Admin.');
+      } else {
+        // Create new account
+        const userCredential = await createUserWithEmailAndPassword(auth, vendorFormData.email, vendorFormData.password);
+        const fbUser = userCredential.user;
+        
+        await updateProfile(fbUser, { displayName: vendorFormData.ownerName });
+        
         const vendorData = {
           name: vendorFormData.ownerName,
           shopName: vendorFormData.shopName,
@@ -249,13 +271,13 @@ export const ShopPage: React.FC = () => {
           createdAt: new Date().toISOString(),
           serverCreatedAt: serverTimestamp()
         };
+        
+        await setDoc(doc(db, 'kuku_users', fbUser.uid), vendorData);
+        addActivity('🏪', `Muuzaji mpya "${vendorFormData.shopName}" amejisajili`);
+        toast.success('Usajili umekamilika! Subiri idhini ya Admin.');
+      }
       
-      await setDoc(doc(db, 'kuku_users', fbUser.uid), vendorData);
-      
-      addActivity('🏪', `Muuzaji mpya "${vendorFormData.shopName}" amejisajili`);
-      toast.success('Usajili umekamilika! Subiri idhini ya Admin.');
-      
-      const msg = `*Maombi Mapya ya Muuzaji — ${systemSettings?.app_name || 'FarmConnect'}*\n\nJina la Duka: ${vendorFormData.shopName}\nMmiliki: ${vendorFormData.ownerName}\nSimu: ${vendorFormData.phone}\n\nTafadhali nihakikie.`;
+      const msg = `*Maombi ya Muuzaji — ${systemSettings?.app_name || 'FarmConnect'}*\n\nJina la Duka: ${vendorFormData.shopName}\nMmiliki: ${user?.name || vendorFormData.ownerName}\nSimu: ${vendorFormData.phone}\n\nTafadhali nihakikie.`;
       window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
       
       setIsVendorRegModalOpen(false);
@@ -942,7 +964,7 @@ export const ShopPage: React.FC = () => {
                 <div className="flex items-center gap-3">
                   {user.role === 'admin' && (
                     <button 
-                      onClick={() => setView('admin')}
+                      onClick={() => setView('dashboard')}
                       className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20"
                     >
                       <LayoutDashboard size={20} />
@@ -950,7 +972,7 @@ export const ShopPage: React.FC = () => {
                   )}
                   {user.role === 'vendor' && (
                     <button 
-                      onClick={() => setView('vendor')}
+                      onClick={() => setView('dashboard')}
                       className="p-3 bg-amber-600 text-white rounded-2xl hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20"
                     >
                       <Store size={20} />
@@ -1445,10 +1467,55 @@ export const ShopPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="p-4 bg-slate-50 rounded-2xl">
+                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl">
                   <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Barua Pepe (Email)</p>
-                  <p className="font-bold text-slate-700">{user.email}</p>
+                  <p className="font-bold text-slate-700 dark:text-slate-300">{user.email}</p>
                 </div>
+
+                {/* Management Section */}
+                {(user.role === 'admin' || user.role === 'vendor') && (
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-3 block">Usimamizi (Management)</label>
+                    <div className="grid grid-cols-1 gap-3">
+                      {user.role === 'admin' && (
+                        <button 
+                          onClick={() => { setView('dashboard'); setIsProfileModalOpen(false); }}
+                          className="w-full flex items-center justify-between p-4 bg-slate-900 text-white rounded-2xl font-black text-sm hover:bg-slate-800 transition-all"
+                        >
+                          <div className="flex items-center gap-3">
+                            <LayoutDashboard size={18} />
+                            <span>PANELI YA ADMIN</span>
+                          </div>
+                          <ChevronRight size={16} />
+                        </button>
+                      )}
+                      {user.role === 'vendor' && (
+                        <button 
+                          onClick={() => { setView('dashboard'); setIsProfileModalOpen(false); }}
+                          className="w-full flex items-center justify-between p-4 bg-amber-600 text-white rounded-2xl font-black text-sm hover:bg-amber-700 transition-all"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Store size={18} />
+                            <span>PORTAL YA MUUZAJI</span>
+                          </div>
+                          <ChevronRight size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {user.role === 'user' && (
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <button 
+                      onClick={() => { setIsVendorRegModalOpen(true); setIsProfileModalOpen(false); }}
+                      className="w-full flex items-center justify-center gap-2 p-4 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded-2xl font-black text-sm hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all border border-emerald-100 dark:border-emerald-800"
+                    >
+                      <Store size={18} />
+                      KUWA MUUZAJI (BECOME VENDOR)
+                    </button>
+                  </div>
+                )}
 
                 {/* Wallet Section */}
                 <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-[32px] border border-amber-100 dark:border-amber-900/30">
@@ -1536,6 +1603,24 @@ export const ShopPage: React.FC = () => {
               Admin atahakiki maelezo haya kabla ya duka lako kuwa hewani.
             </p>
           </div>
+          {!user && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email ya Biashara *</label>
+                <input 
+                  type="email" required className="input-field" placeholder="duka@email.com" 
+                  value={vendorFormData.email} onChange={e => setVendorFormData({...vendorFormData, email: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nywila *</label>
+                <input 
+                  type="password" required className="input-field" placeholder="••••••••" 
+                  value={vendorFormData.password} onChange={e => setVendorFormData({...vendorFormData, password: e.target.value})}
+                />
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jina la Duka *</label>
@@ -1544,32 +1629,20 @@ export const ShopPage: React.FC = () => {
                 value={vendorFormData.shopName} onChange={e => setVendorFormData({...vendorFormData, shopName: e.target.value})}
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jina la Mmiliki *</label>
-              <input 
-                type="text" required className="input-field" placeholder="Hassan Ali" 
-                value={vendorFormData.ownerName} onChange={e => setVendorFormData({...vendorFormData, ownerName: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Mkoa *</label>
+            {!user && (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jina la Mmiliki *</label>
+                <input 
+                  type="text" required className="input-field" placeholder="Hassan Ali" 
+                  value={vendorFormData.ownerName} onChange={e => setVendorFormData({...vendorFormData, ownerName: e.target.value})}
+                />
+              </div>
+            )}
+            <div className={cn(!user ? "col-span-1" : "col-span-2")}>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Mkoa/Eneo la Duka *</label>
               <input 
                 type="text" required className="input-field" placeholder="Dar es Salaam" 
                 value={vendorFormData.location} onChange={e => setVendorFormData({...vendorFormData, location: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email ya Biashara *</label>
-              <input 
-                type="email" required className="input-field" placeholder="duka@email.com" 
-                value={vendorFormData.email} onChange={e => setVendorFormData({...vendorFormData, email: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nywila *</label>
-              <input 
-                type="password" required className="input-field" placeholder="••••••••" 
-                value={vendorFormData.password} onChange={e => setVendorFormData({...vendorFormData, password: e.target.value})}
               />
             </div>
             <div>

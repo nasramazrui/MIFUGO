@@ -26,7 +26,9 @@ import {
   Sun,
   Globe,
   ArrowLeft,
-  Camera
+  Camera,
+  MessageSquare,
+  Star
 } from 'lucide-react';
 import { cn } from '../utils';
 
@@ -42,9 +44,9 @@ import {
 import { toast } from 'react-hot-toast';
 
 export const VendorPortal: React.FC = () => {
-  const { user, products, orders, withdrawals, statuses, categories, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t } = useApp();
+  const { user, products, orders, withdrawals, statuses, categories, reviews, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t } = useApp();
   const currency = systemSettings?.currency || 'TZS';
-  const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status'>('dash');
+  const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status' | 'reviews'>('dash');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -445,6 +447,7 @@ export const VendorPortal: React.FC = () => {
             { id: 'products', label: 'Bidhaa Zangu', icon: Package },
             { id: 'orders', label: 'Maagizo', icon: ClipboardList },
             { id: 'wallet', label: 'Wallet', icon: Wallet },
+            { id: 'reviews', label: 'Maoni (Reviews)', icon: MessageSquare },
             { id: 'status', label: t('status'), icon: Camera },
             { id: 'settings', label: 'Mipangilio', icon: Clock },
           ].map(item => (
@@ -808,6 +811,52 @@ export const VendorPortal: React.FC = () => {
                   )}
                 </div>
               </div>
+            </div>
+          </motion.div>
+        )}
+        {activeTab === 'reviews' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <h2 className="text-3xl font-black text-slate-900 mb-8">Maoni ya Wateja</h2>
+            <div className="grid gap-6">
+              {reviews.filter(r => r.vendorId === user.id).length === 0 ? (
+                <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100">
+                  <MessageSquare size={48} className="mx-auto text-slate-200 mb-4" />
+                  <p className="text-slate-400">Bado huna maoni kutoka kwa wateja.</p>
+                </div>
+              ) : (
+                reviews.filter(r => r.vendorId === user.id).map(review => (
+                  <div key={review.id} className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm">
+                    <div className="flex items-start justify-between mb-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-xl overflow-hidden">
+                          {review.userAvatar ? (
+                            <img src={review.userAvatar} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            '👤'
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-black text-slate-900">{review.userName}</h4>
+                          <p className="text-xs text-slate-400">{review.date}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <Star 
+                            key={star} 
+                            size={16} 
+                            className={cn(star <= review.rating ? "fill-amber-400 text-amber-400" : "text-slate-200")} 
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Bidhaa: {review.productName}</p>
+                      <p className="text-slate-700 font-bold leading-relaxed italic">"{review.text || review.comment || 'Hakuna maoni ya maandishi.'}"</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </motion.div>
         )}
