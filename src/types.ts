@@ -176,12 +176,37 @@ export interface WalletTransaction {
   userId: string;
   userName: string;
   amount: number;
-  type: 'deposit' | 'purchase' | 'refund';
+  type: 'deposit' | 'purchase' | 'refund' | 'bid_hold' | 'bid_refund';
   status: 'pending' | 'approved' | 'rejected';
   method?: string;
   senderName?: string;
   senderPhone?: string;
   transactionId?: string;
   date: string;
+  createdAt: any;
+}
+
+export interface Bid {
+  id: string;
+  auctionId: string;
+  userId: string;
+  userName: string;
+  amount: number;
+  createdAt: any;
+}
+
+export interface Auction {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  productName: string;
+  description: string;
+  startingPrice: number;
+  currentBid: number;
+  highestBidderId?: string;
+  highestBidderName?: string;
+  endTime: any;
+  status: 'active' | 'ended';
+  image?: string;
   createdAt: any;
 }

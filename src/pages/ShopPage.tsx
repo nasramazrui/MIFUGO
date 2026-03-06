@@ -7,11 +7,12 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check } from 'lucide-react';
+import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, updateProfile, deleteUser } from 'firebase/auth';
+import { AuctionPage } from './AuctionPage';
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
 
@@ -26,9 +27,9 @@ interface CartItem {
 }
 
 export const ShopPage: React.FC = () => {
-  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView } = useApp();
+  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView } = useApp();
   const currency = systemSettings?.currency || 'TZS';
-  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'cart'>('browse');
+  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'cart' | 'auctions'>('browse');
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
   const [viewedStatuses, setViewedStatuses] = useState<string[]>(() => {
     const saved = localStorage.getItem('viewed_statuses');
@@ -846,6 +847,7 @@ export const ShopPage: React.FC = () => {
           <nav className="space-y-2">
             {[
               { id: 'browse', label: t('market'), icon: ShoppingBag },
+              { id: 'auctions', label: t('auctions'), icon: Gavel },
               { id: 'stores', label: t('stores'), icon: Store },
               { id: 'orders', label: t('orders'), icon: Package },
             ].map((item) => (
@@ -1202,6 +1204,8 @@ export const ShopPage: React.FC = () => {
           </motion.div>
         )}
 
+        {activeTab === 'auctions' && <AuctionPage />}
+
         {activeTab === 'stores' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6">🏪 {t('stores')}</h2>
@@ -1326,6 +1330,13 @@ export const ShopPage: React.FC = () => {
           >
             <ShoppingBag size={22} strokeWidth={activeTab === 'browse' ? 3 : 2} />
             <span className="text-[9px] font-black uppercase tracking-widest">{t('market')}</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('auctions')}
+            className={cn("flex flex-col items-center gap-1.5 transition-all", activeTab === 'auctions' ? "text-amber-600 scale-110" : "text-slate-400")}
+          >
+            <Gavel size={22} strokeWidth={activeTab === 'auctions' ? 3 : 2} />
+            <span className="text-[9px] font-black uppercase tracking-widest">{t('auctions')}</span>
           </button>
           <button 
             onClick={() => setActiveTab('stores')}

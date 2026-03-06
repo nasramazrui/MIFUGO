@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Product, Order, Review, Activity, Withdrawal, Status, Category, WalletTransaction } from '../types';
+import { User, Product, Order, Review, Activity, Withdrawal, Status, Category, WalletTransaction, Auction } from '../types';
 import { generateId } from '../utils';
 import { ADMIN_EMAIL, ADMIN_PASS, TRANSLATIONS } from '../constants';
 import { auth, db } from '../services/firebase';
@@ -43,6 +43,8 @@ interface AppContextType {
   setWalletTransactions: React.Dispatch<React.SetStateAction<WalletTransaction[]>>;
   categories: Category[];
   setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
+  auctions: Auction[];
+  setAuctions: React.Dispatch<React.SetStateAction<Auction[]>>;
   systemSettings: any;
   updateSystemSettings: (settings: any) => Promise<void>;
   logout: () => void;
@@ -71,6 +73,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [auctions, setAuctions] = useState<Auction[]>([]);
   const [systemSettings, setSystemSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [theme, setThemeState] = useState<'light' | 'dark'>((localStorage.getItem('theme') as 'light' | 'dark') || 'light');
@@ -250,6 +253,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setWalletTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction)));
     });
 
+    // Auctions
+    const qAuctions = query(collection(db, 'kuku_auctions'), orderBy('endTime', 'asc'));
+    const unsubAuctions = onSnapshot(qAuctions, (snap) => {
+      setAuctions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Auction)));
+    });
+
     return () => {
       unsubProducts();
       unsubOrders();
@@ -261,6 +270,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubStatuses();
       unsubCats();
       unsubWallet();
+      unsubAuctions();
     };
   }, []);
 
@@ -312,6 +322,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       statuses, setStatuses,
       walletTransactions, setWalletTransactions,
       categories, setCategories,
+      auctions, setAuctions,
       systemSettings, updateSystemSettings,
       logout,
       t,
