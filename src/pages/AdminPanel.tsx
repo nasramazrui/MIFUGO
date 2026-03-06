@@ -151,7 +151,7 @@ export const AdminPanel: React.FC = () => {
         await addDoc(collection(db, 'kuku_categories'), {
           label: cat.label,
           emoji: cat.emoji,
-          image: '',
+          image: cat.image || '',
           createdAt: serverTimestamp()
         });
       }

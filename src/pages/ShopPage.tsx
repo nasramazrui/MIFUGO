@@ -7,7 +7,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet } from 'lucide-react';
+import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
@@ -930,33 +930,87 @@ export const ShopPage: React.FC = () => {
         {/* Main Content */}
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-4 sm:py-8 pb-32">
         {/* Banner Slider */}
-        {systemSettings?.banners?.length > 0 && (
-          <div className="mb-4 relative group overflow-hidden rounded-[32px] aspect-[21/9] shadow-2xl shadow-amber-900/10">
-            <div className="flex transition-transform duration-1000 cubic-bezier(0.4, 0, 0.2, 1) h-full" style={{ transform: `translateX(-${(Math.floor(Date.now() / 5000) % systemSettings.banners.length) * 100}%)` }}>
-              {systemSettings.banners.map((banner: any, idx: number) => (
-                <a key={idx} href={banner.link || '#'} className="min-w-full h-full block relative overflow-hidden">
-                  <img src={banner.image} alt="" className="w-full h-full object-cover transition-transform duration-[5000ms] group-hover:scale-110" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                  {banner.title && (
-                    <div className="absolute bottom-10 left-10 right-10">
-                      <h2 className="text-4xl font-black text-white mb-2 tracking-tight">{banner.title}</h2>
-                      {banner.subtitle && <p className="text-white/80 font-bold">{banner.subtitle}</p>}
-                    </div>
-                  )}
-                </a>
-              ))}
+        {(systemSettings?.banners?.length > 0 ? systemSettings.banners : [{ image: 'https://img.freepik.com/free-vector/diwali-sale-banner-with-realistic-diya-lamps_1017-21157.jpg', link: '#' }]).map((banner: any, idx: number, arr: any[]) => (
+          idx === (Math.floor(Date.now() / 5000) % arr.length) && (
+            <div key={idx} className="mb-8 relative group overflow-hidden rounded-[40px] aspect-[21/10] sm:aspect-[21/8] shadow-xl shadow-slate-200 dark:shadow-none">
+              <a href={banner.link || '#'} className="w-full h-full block relative overflow-hidden">
+                <img src={banner.image} alt="" className="w-full h-full object-cover transition-transform duration-[5000ms] group-hover:scale-105" />
+              </a>
+              {arr.length > 1 && (
+                <div className="absolute bottom-6 left-6 flex gap-2">
+                  {arr.map((_: any, i: number) => (
+                    <div key={i} className={cn("h-1.5 rounded-full transition-all duration-500", (Math.floor(Date.now() / 5000) % arr.length) === i ? "bg-white w-8" : "bg-white/30 w-1.5")} />
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-3 bg-black/20 backdrop-blur-md px-4 py-2 rounded-full">
-              {systemSettings.banners.map((_: any, idx: number) => (
-                <div key={idx} className={cn("h-1.5 rounded-full transition-all duration-500", (Math.floor(Date.now() / 5000) % systemSettings.banners.length) === idx ? "bg-white w-8" : "bg-white/30 w-1.5")} />
-              ))}
-            </div>
-          </div>
-        )}
+          )
+        ))}
         {activeTab === 'browse' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            {/* Explore Categories Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Explore Categories</h2>
+                <p className="text-slate-500 dark:text-slate-400 text-sm font-bold">Based on what is popular around you</p>
+              </div>
+              <button className="w-12 h-10 bg-amber-400 rounded-full flex items-center justify-center text-slate-900 shadow-lg shadow-amber-400/20">
+                <ArrowRight size={24} />
+              </button>
+            </div>
+
+            {/* Categories List */}
+            <div className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide mb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
+              <button
+                onClick={() => setSelectedCat('all')}
+                className={cn(
+                  "flex-shrink-0 flex items-center gap-3 px-2 py-2 rounded-full font-black transition-all border-2",
+                  selectedCat === 'all' 
+                    ? "bg-amber-100 border-amber-400 text-amber-900" 
+                    : "bg-white dark:bg-slate-900 text-slate-500 border-slate-100 dark:border-slate-800"
+                )}
+              >
+                <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-xl overflow-hidden">🏪</div>
+                <span className="pr-6 text-sm font-black">{t('all')}</span>
+              </button>
+              {categories.map((cat, idx) => {
+                const colors = [
+                  'bg-emerald-100 border-emerald-200 text-emerald-900',
+                  'bg-orange-100 border-orange-200 text-orange-900',
+                  'bg-blue-100 border-blue-200 text-blue-900',
+                  'bg-purple-100 border-purple-200 text-purple-900',
+                  'bg-rose-100 border-rose-200 text-rose-900'
+                ];
+                const colorClass = colors[idx % colors.length];
+                
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCat(cat.id)}
+                    className={cn(
+                      "flex-shrink-0 flex items-center gap-3 px-2 py-2 rounded-full font-black transition-all border-2",
+                      selectedCat === cat.id 
+                        ? colorClass 
+                        : "bg-white dark:bg-slate-900 text-slate-500 border-slate-100 dark:border-slate-800"
+                    )}
+                  >
+                    <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center overflow-hidden shadow-sm border border-slate-100">
+                      {cat.image ? (
+                        <img src={cat.image} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-slate-50 text-xl">
+                          {cat.emoji || '📦'}
+                        </div>
+                      )}
+                    </div>
+                    <span className="pr-6 text-sm font-black">{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             {/* WhatsApp Style Status Feed */}
-            <div className="mb-2 bg-slate-950/5 dark:bg-slate-900/20 py-3 -mx-4 px-4 sm:mx-0 sm:rounded-[24px] border-y sm:border border-slate-100 dark:border-slate-800">
+            <div className="mb-8 bg-slate-950/5 dark:bg-slate-900/20 py-3 -mx-4 px-4 sm:mx-0 sm:rounded-[24px] border-y sm:border border-slate-100 dark:border-slate-800">
               <div className="flex items-center justify-between mb-3 px-2">
                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Status</h2>
                 {(user?.role === 'vendor' || user?.role === 'admin') && (
@@ -1045,43 +1099,6 @@ export const ShopPage: React.FC = () => {
                   ))
                 )}
               </div>
-            </div>
-
-            {/* Categories */}
-            <div className="flex gap-2.5 overflow-x-auto pb-3 scrollbar-hide mb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
-              <button
-                onClick={() => setSelectedCat('all')}
-                className={cn(
-                  "flex-shrink-0 px-4 py-2.5 rounded-[20px] font-black text-[7px] transition-all flex flex-col items-center gap-1 min-w-[70px] border-2",
-                  selectedCat === 'all' 
-                    ? "bg-amber-600 text-white border-amber-600 shadow-lg shadow-amber-600/20 scale-105" 
-                    : "bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-800 hover:border-amber-200 dark:hover:border-amber-900 hover:bg-amber-50/30 dark:hover:bg-amber-900/10"
-                )}
-              >
-                <div className="w-6 h-6 bg-slate-50 dark:bg-slate-800 rounded-lg flex items-center justify-center text-base shadow-inner">🏪</div>
-                <span className="uppercase tracking-[0.1em]">{t('all')}</span>
-              </button>
-              {categories.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCat(cat.id)}
-                  className={cn(
-                    "flex-shrink-0 px-4 py-2.5 rounded-[20px] font-black text-[7px] transition-all flex flex-col items-center gap-1 min-w-[70px] border-2",
-                    selectedCat === cat.id 
-                      ? "bg-amber-600 text-white border-amber-600 shadow-lg shadow-amber-600/20 scale-105" 
-                      : "bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-800 hover:border-amber-200 dark:hover:border-amber-900 hover:bg-amber-50/30 dark:hover:bg-amber-900/10"
-                  )}
-                >
-                  <div className="w-6 h-6 bg-slate-50 dark:bg-slate-800 rounded-lg flex items-center justify-center overflow-hidden shadow-inner">
-                    {cat.image ? (
-                      <img src={cat.image} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-base">{cat.emoji || '📦'}</span>
-                    )}
-                  </div>
-                  <span className="uppercase tracking-[0.1em]">{cat.label}</span>
-                </button>
-              ))}
             </div>
 
             {/* Grid */}
