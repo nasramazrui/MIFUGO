@@ -7,7 +7,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight } from 'lucide-react';
+import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
@@ -57,6 +57,10 @@ export const ShopPage: React.FC = () => {
   const [statusText, setStatusText] = useState('');
   const [statusVideoUrl, setStatusVideoUrl] = useState('');
   const [isStatusLoading, setIsStatusLoading] = useState(false);
+  const [isOrderReviewModalOpen, setIsOrderReviewModalOpen] = useState(false);
+  const [orderReviewRating, setOrderReviewRating] = useState(0);
+  const [orderReviewComment, setOrderReviewComment] = useState('');
+  const [isOrderReviewLoading, setIsOrderReviewLoading] = useState(false);
   const [commentText, setCommentText] = useState<{ [key: string]: string }>({});
   const [statusProgress, setStatusProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -656,6 +660,50 @@ export const ShopPage: React.FC = () => {
     }
   };
 
+  const confirmReceipt = async () => {
+    if (!selectedOrder) return;
+    
+    try {
+      await updateDoc(doc(db, 'kuku_orders', selectedOrder.id), { 
+        status: 'completed',
+        receivedAt: serverTimestamp()
+      });
+      setIsTrackingModalOpen(false);
+      setIsOrderReviewModalOpen(true);
+      toast.success('Asante kwa kuthibitisha! Tafadhali acha maoni yako.');
+    } catch (error) {
+      toast.error('Hitilafu imetokea wakati wa kuthibitisha.');
+    }
+  };
+
+  const submitReview = async () => {
+    if (!selectedOrder) return;
+    
+    setIsOrderReviewLoading(true);
+    try {
+      await addDoc(collection(db, 'kuku_reviews'), {
+        userId: user?.id,
+        userName: user?.name,
+        productId: selectedOrder.productId,
+        productName: selectedOrder.productName,
+        vendorId: selectedOrder.vendorId,
+        rating: orderReviewRating || 0,
+        comment: orderReviewComment || '',
+        date: new Date().toISOString().split('T')[0],
+        createdAt: serverTimestamp()
+      });
+      
+      setIsOrderReviewModalOpen(false);
+      setOrderReviewRating(0);
+      setOrderReviewComment('');
+      toast.success('Asante kwa maoni yako!');
+    } catch (error) {
+      toast.error('Hitilafu imetokea wakati wa kutuma maoni.');
+    } finally {
+      setIsOrderReviewLoading(false);
+    }
+  };
+
   const handlePostStatus = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || (user.role !== 'vendor' && user.role !== 'admin')) return;
@@ -1218,9 +1266,10 @@ export const ShopPage: React.FC = () => {
                          </div>
                          <span className={cn(
                            "badge px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                           order.status === 'completed' ? "bg-indigo-100 text-indigo-800" :
                            order.status === 'delivered' ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
                          )}>
-                           {order.status}
+                           {order.status === 'completed' ? 'Imekamilika' : order.status}
                          </span>
                        </div>
                        <div className="flex items-center justify-between pt-4 border-t border-slate-50">
@@ -1627,8 +1676,9 @@ export const ShopPage: React.FC = () => {
                 { key: 'waiting', label: 'Inasubiri Msafirishaji', icon: '📦' },
                 { key: 'onway', label: 'Iko Njiani', icon: '🚚' },
                 { key: 'delivered', label: 'Imefika!', icon: '✅' },
+                { key: 'completed', label: 'Imekamilika', icon: '🌟' },
               ].map((s, i) => {
-                const statuses = ['pending', 'processing', 'waiting', 'onway', 'delivered'];
+                const statuses = ['pending', 'processing', 'waiting', 'onway', 'delivered', 'completed'];
                 const currentIdx = statuses.indexOf(selectedOrder.status);
                 const isDone = i < currentIdx;
                 const isActive = i === currentIdx;
@@ -1658,6 +1708,15 @@ export const ShopPage: React.FC = () => {
               })}
             </div>
 
+            {selectedOrder.status === 'delivered' && (
+              <button 
+                onClick={confirmReceipt}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-100"
+              >
+                <Check size={18} /> NIMEPOKEA MZIGO ✅
+              </button>
+            )}
+
             <button 
               onClick={() => {
                 const msg = `Habari, naomba kujua hali ya agizo langu #${selectedOrder.id.substring(0,8)}.`;
@@ -1666,6 +1725,66 @@ export const ShopPage: React.FC = () => {
               className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 transition-all"
             >
               <Send size={18} /> WhatsApp Admin
+            </button>
+          </div>
+        )}
+      </Modal>
+
+      {/* Review Modal */}
+      <Modal
+        isOpen={isOrderReviewModalOpen}
+        onClose={() => setIsOrderReviewModalOpen(false)}
+        title="Acha Maoni Yako"
+      >
+        {selectedOrder && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="w-20 h-20 bg-amber-50 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-4">⭐</div>
+              <h3 className="text-xl font-black text-slate-900">Je, umeridhika na bidhaa?</h3>
+              <p className="text-slate-500 text-sm">Maoni yako yanatusaidia kuboresha huduma zetu.</p>
+            </div>
+
+            <div className="flex justify-center gap-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => setOrderReviewRating(star)}
+                  className="transition-transform active:scale-90"
+                >
+                  <Star 
+                    size={32} 
+                    className={cn(
+                      "transition-colors",
+                      star <= orderReviewRating ? "fill-amber-400 text-amber-400" : "text-slate-200"
+                    )} 
+                  />
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Maoni (Hiyari)</label>
+              <textarea
+                value={orderReviewComment}
+                onChange={(e) => setOrderReviewComment(e.target.value)}
+                placeholder="Andika maoni yako hapa..."
+                className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-amber-500 min-h-[120px]"
+              />
+            </div>
+
+            <button
+              onClick={submitReview}
+              disabled={isOrderReviewLoading}
+              className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm hover:bg-slate-800 transition-all disabled:opacity-50"
+            >
+              {isOrderReviewLoading ? 'INATUMA...' : 'WASILISHA MAONI →'}
+            </button>
+            
+            <button
+              onClick={() => setIsOrderReviewModalOpen(false)}
+              className="w-full text-slate-400 font-black text-xs py-2"
+            >
+              Sio sasa
             </button>
           </div>
         )}

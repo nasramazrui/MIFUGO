@@ -38,6 +38,7 @@ export const ORDER_STATUSES = [
   { key: 'onway', label: 'Iko Njiani', icon: '🚚', color: 'bg-green-100 text-green-800' },
   { key: 'pickup', label: 'Tayari Kuchukua', icon: '🏪', color: 'bg-orange-100 text-orange-800' },
   { key: 'delivered', label: 'Imefika!', icon: '✅', color: 'bg-emerald-100 text-emerald-800' },
+  { key: 'completed', label: 'Imekamilika', icon: '🌟', color: 'bg-indigo-100 text-indigo-800' },
 ];
 
 export const DAYS = [
