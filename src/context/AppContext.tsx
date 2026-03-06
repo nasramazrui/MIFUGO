@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Product, Order, Review, Activity, Withdrawal, Status, Category } from '../types';
+import { User, Product, Order, Review, Activity, Withdrawal, Status, Category, WalletTransaction } from '../types';
 import { generateId } from '../utils';
 import { ADMIN_EMAIL, ADMIN_PASS, TRANSLATIONS } from '../constants';
 import { auth, db } from '../services/firebase';

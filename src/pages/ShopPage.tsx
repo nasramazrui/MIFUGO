@@ -7,7 +7,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy } from 'lucide-react';
+import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
@@ -26,7 +26,7 @@ interface CartItem {
 }
 
 export const ShopPage: React.FC = () => {
-  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView } = useApp();
+  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'cart'>('browse');
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
@@ -262,7 +262,7 @@ export const ShopPage: React.FC = () => {
     }
   };
   const [deliveryMethod, setDeliveryMethod] = useState<'city' | 'out' | 'pickup'>('city');
-  const [payMethod, setPayMethod] = useState<'mpesa' | 'tigo' | 'airtel' | 'halopesa' | 'cash'>('mpesa');
+  const [payMethod, setPayMethod] = useState<'mpesa' | 'tigo' | 'airtel' | 'halopesa' | 'cash' | 'wallet'>('mpesa');
   const [paymentStep, setPaymentStep] = useState<'method' | 'details' | 'confirm' | 'whatsapp'>('method');
   const [senderName, setSenderName] = useState('');
   const [senderPhone, setSenderPhone] = useState('');
@@ -515,7 +515,15 @@ export const ShopPage: React.FC = () => {
     const p = selectedProduct || products.find(x => x.id === selectedProduct?.id);
     if (!p || !user) return;
 
-    if (payMethod !== 'cash') {
+    if (payMethod === 'wallet') {
+      const deliveryFee = deliveryMethod === 'city' ? (p.deliveryCity || 0) : 
+                         deliveryMethod === 'out' ? (p.deliveryOut || 0) : 0;
+      const total = (p.price || 0) * qty + deliveryFee;
+      if ((user.walletBalance || 0) < total) {
+        toast.error('Salio la Wallet halitoshi. Tafadhali ongeza pesa.');
+        return;
+      }
+    } else if (payMethod !== 'cash') {
       if (!senderName || !senderPhone || !sentAmount || !transactionId) {
         toast.error('Tafadhali jaza taarifa zote za malipo');
         return;
@@ -2194,6 +2202,209 @@ export const ShopPage: React.FC = () => {
         </div>
       </Modal>
 
+      {/* Wallet Modal (Add Money) */}
+      <Modal 
+        isOpen={isWalletModalOpen} 
+        onClose={() => {
+          setIsWalletModalOpen(false);
+          setWalletStep('method');
+        }}
+        title={walletStep === 'method' ? "Ongeza Pesa Wallet" : walletStep === 'details' ? "Maelezo ya Malipo" : "Tuma Uthibitisho"}
+      >
+        <div className="space-y-6">
+          {walletStep === 'method' && (
+            <div className="space-y-4">
+              <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 mb-4">
+                <p className="text-xs text-amber-800 font-bold">Weka kiasi unachotaka kuongeza kwenye wallet yako.</p>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Kiasi (TZS)</label>
+                <input 
+                  type="number"
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                  placeholder="Mf: 10000"
+                  value={walletAmount}
+                  onChange={e => setWalletAmount(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  { id: 'tigo', label: 'Tigo Pesa', icon: '📱', color: 'bg-blue-50 text-blue-600' },
+                  { id: 'mpesa', label: 'M-Pesa', icon: '📱', color: 'bg-red-50 text-red-600' },
+                  { id: 'airtel', label: 'Airtel Money', icon: '📱', color: 'bg-red-50 text-red-600' },
+                  { id: 'halopesa', label: 'HaloPesa', icon: '📱', color: 'bg-orange-50 text-orange-600' }
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      if (!walletAmount || Number(walletAmount) <= 0) {
+                        toast.error('Tafadhali ingiza kiasi kwanza');
+                        return;
+                      }
+                      setWalletPayMethod(m.id as any);
+                      setWalletStep('details');
+                    }}
+                    className="flex items-center justify-between p-4 rounded-2xl border-2 border-slate-100 hover:border-amber-500 bg-white transition-all text-left group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-xl", m.color)}>{m.icon}</span>
+                      <p className="font-bold text-sm">{m.label}</p>
+                    </div>
+                    <ChevronRight size={18} className="text-slate-300 group-hover:text-amber-500 transition-colors" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {walletStep === 'details' && (
+            <div className="space-y-6">
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 text-center space-y-4">
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Namba ya Malipo</p>
+                  <div className="flex items-center justify-center gap-3">
+                    <h3 className="text-2xl font-black text-slate-900">0687225353</h3>
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText('0687225353');
+                        toast.success('Namba imekopiwa!');
+                      }}
+                      className="p-2 bg-white rounded-lg shadow-sm text-amber-600 hover:bg-amber-50"
+                    >
+                      <Copy size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Jina la Akaunti</p>
+                  <h3 className="text-xl font-black text-slate-900">Amour</h3>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Jina la Mtumaji</label>
+                  <input 
+                    type="text"
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    placeholder="Mf: John Doe"
+                    value={senderName}
+                    onChange={e => setSenderName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Namba ya Simu</label>
+                  <input 
+                    type="tel"
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    placeholder="07XX XXX XXX"
+                    value={senderPhone}
+                    onChange={e => setSenderPhone(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Namba ya Muamala (Transaction ID)</label>
+                  <input 
+                    type="text"
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    placeholder="Mf: 5H67X9..."
+                    value={transactionId}
+                    onChange={e => setTransactionId(e.target.value)}
+                  />
+                </div>
+                <button 
+                  onClick={confirmDeposit}
+                  disabled={isWalletLoading}
+                  className="w-full bg-amber-500 text-amber-950 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+                >
+                  {isWalletLoading ? <div className="w-5 h-5 border-2 border-amber-950 border-t-transparent rounded-full animate-spin" /> : 'THIBITISHA MALIPO ✅'}
+                </button>
+                <button 
+                  onClick={() => setWalletStep('method')}
+                  className="w-full text-slate-400 font-black text-xs uppercase tracking-widest"
+                >
+                  Rudi Nyuma
+                </button>
+              </div>
+            </div>
+          )}
+
+          {walletStep === 'whatsapp' && (
+            <div className="text-center space-y-6 py-4">
+              <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-4">✅</div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Ombi Limetumwa!</h3>
+                <p className="text-slate-500 text-sm mt-2">Tafadhali tuma uthibitisho WhatsApp ili Admin aweze kuongeza salio lako haraka.</p>
+              </div>
+
+              <button 
+                onClick={() => {
+                  const msg = `Habari Admin,\n\nNaomba kuongeza pesa kwenye Wallet yangu.\n\n👤 Jina: *${user?.name}*\n💰 Kiasi: *${formatCurrency(Number(walletAmount), currency)}*\n💳 Njia: *${walletPayMethod.toUpperCase()}*\n📱 Simu: *${senderPhone}*\n🔑 Trans ID: *${transactionId}*\n\nTafadhali nihakikie.`;
+                  window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
+                  setIsWalletModalOpen(false);
+                  setWalletStep('method');
+                }}
+                className="w-full bg-emerald-500 text-white py-5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+              >
+                TUMA UTHIBITISHO WHATSAPP 📱
+              </button>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Wallet History Modal */}
+      <Modal
+        isOpen={isWalletHistoryOpen}
+        onClose={() => setIsWalletHistoryOpen(false)}
+        title="Wallet History"
+      >
+        <div className="space-y-4">
+          {walletTransactions.filter(tx => tx.userId === user?.id).length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-slate-400 text-sm italic">Hakuna miamala bado.</p>
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
+              {walletTransactions.filter(tx => tx.userId === user?.id).map(tx => (
+                <div key={tx.id} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center text-lg",
+                      tx.type === 'deposit' ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-red-600"
+                    )}>
+                      {tx.type === 'deposit' ? '↓' : '↑'}
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                        {tx.type === 'deposit' ? 'Deposit' : 'Purchase'}
+                      </p>
+                      <p className="text-[10px] text-slate-400">{tx.date}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={cn(
+                      "font-black text-sm",
+                      tx.type === 'deposit' ? "text-emerald-600" : "text-red-600"
+                    )}>
+                      {tx.type === 'deposit' ? '+' : '-'}{formatCurrency(tx.amount, currency)}
+                    </p>
+                    <span className={cn(
+                      "text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase",
+                      tx.status === 'approved' ? "bg-emerald-100 text-emerald-800" : 
+                      tx.status === 'pending' ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"
+                    )}>
+                      {tx.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+
       {/* Payment Modal */}
       <Modal 
         isOpen={isPaymentModalOpen} 
@@ -2222,6 +2433,7 @@ export const ShopPage: React.FC = () => {
             <div className="space-y-3">
               <div className="grid grid-cols-1 gap-2">
                 {[
+                  { id: 'wallet', label: 'Pay with Wallet', icon: '💳', color: 'bg-amber-50 text-amber-600' },
                   { id: 'tigo', label: 'Mix by Yas (Tigo Pesa)', icon: '📱', color: 'bg-blue-50 text-blue-600' },
                   { id: 'mpesa', label: 'M-Pesa', icon: '📱', color: 'bg-red-50 text-red-600' },
                   { id: 'airtel', label: 'Airtel Money', icon: '📱', color: 'bg-red-50 text-red-600' },
@@ -2234,6 +2446,8 @@ export const ShopPage: React.FC = () => {
                       setPayMethod(m.id as any);
                       if (m.id === 'cash') {
                         confirmOrder();
+                      } else if (m.id === 'wallet') {
+                        setPaymentStep('confirm'); // Go straight to summary
                       } else {
                         setPaymentStep('details');
                       }
@@ -2309,48 +2523,67 @@ export const ShopPage: React.FC = () => {
 
           {paymentStep === 'confirm' && (
             <div className="space-y-4">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Jina la Mtumaji</label>
-                  <input 
-                    type="text"
-                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
-                    placeholder="Mf: John Doe"
-                    value={senderName}
-                    onChange={e => setSenderName(e.target.value)}
-                  />
+              {payMethod === 'wallet' ? (
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500">Wallet Balance:</span>
+                    <span className="font-bold">{formatCurrency(user?.walletBalance || 0, currency)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-red-600">
+                    <span className="text-sm">Product Price:</span>
+                    <span className="font-bold">- {formatCurrency(selectedProduct?.price * qty, currency)}</span>
+                  </div>
+                  <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
+                    <span className="text-sm font-black text-slate-900">Balance After:</span>
+                    <span className="font-black text-amber-600">
+                      {formatCurrency((user?.walletBalance || 0) - (selectedProduct?.price * qty + (deliveryMethod === 'city' ? (selectedProduct?.deliveryCity || 0) : deliveryMethod === 'out' ? (selectedProduct?.deliveryOut || 0) : 0)), currency)}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Namba ya Simu</label>
-                  <input 
-                    type="tel"
-                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
-                    placeholder="07XX XXX XXX"
-                    value={senderPhone}
-                    onChange={e => setSenderPhone(e.target.value)}
-                  />
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Jina la Mtumaji</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="Mf: John Doe"
+                      value={senderName}
+                      onChange={e => setSenderName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Namba ya Simu</label>
+                    <input 
+                      type="tel"
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="07XX XXX XXX"
+                      value={senderPhone}
+                      onChange={e => setSenderPhone(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Kiasi ulichotuma</label>
+                    <input 
+                      type="number"
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="Mf: 10000"
+                      value={sentAmount}
+                      onChange={e => setSentAmount(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Namba ya Muamala (Transaction ID)</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="Mf: 5H67X9..."
+                      value={transactionId}
+                      onChange={e => setTransactionId(e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Kiasi ulichotuma</label>
-                  <input 
-                    type="number"
-                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
-                    placeholder="Mf: 10000"
-                    value={sentAmount}
-                    onChange={e => setSentAmount(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1">Namba ya Muamala (Transaction ID)</label>
-                  <input 
-                    type="text"
-                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
-                    placeholder="Mf: 5H67X9..."
-                    value={transactionId}
-                    onChange={e => setTransactionId(e.target.value)}
-                  />
-                </div>
-              </div>
+              )}
 
               <button 
                 onClick={confirmOrder}
@@ -2360,11 +2593,11 @@ export const ShopPage: React.FC = () => {
                 {isOrderLoading ? (
                   <div className="w-6 h-6 border-2 border-amber-950 border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  'THIBITISHA MALIPO ✅'
+                  payMethod === 'wallet' ? 'CONFIRM PAYMENT 💳' : 'THIBITISHA MALIPO ✅'
                 )}
               </button>
               <button 
-                onClick={() => setPaymentStep('details')}
+                onClick={() => setPaymentStep(payMethod === 'wallet' ? 'method' : 'details')}
                 className="w-full text-slate-400 font-black text-xs uppercase tracking-widest"
               >
                 Rudi Nyuma
@@ -2383,7 +2616,9 @@ export const ShopPage: React.FC = () => {
               <button 
                 onClick={() => {
                   const vendor = vendors.find(v => v.id === selectedProduct?.vendorId);
-                  const msg = `Habari,\n\nNimelipia bidhaa kwenye app.\n\n📦 Product: *${selectedProduct?.name}*\n👤 Jina la Mnunuzi: *${user?.name}*\n\n💳 Njia ya Malipo: *${payMethod.toUpperCase()}*\n\n📱 Namba ya Mtumaji: *${senderPhone}*\n💰 Kiasi: *${formatCurrency(Number(sentAmount), currency)}*\n🔑 Transaction ID: *${transactionId}*\n\n🧑💼 Muuzaji wa Product: *${vendor?.shopName || vendor?.name || 'N/A'}*\n📞 Namba ya Muuzaji: *${vendor?.phone || 'N/A'}*\n\nAsante.`;
+                  const msg = payMethod === 'wallet' 
+                    ? `Habari Admin,\n\nKuna order mpya imelipwa kwa Wallet.\n\n📦 Product: *${selectedProduct?.name}*\n👤 Buyer: *${user?.name}*\n💳 Payment Method: Wallet\n💰 Amount: *${formatCurrency(selectedProduct?.price * qty + (deliveryMethod === 'city' ? (selectedProduct?.deliveryCity || 0) : deliveryMethod === 'out' ? (selectedProduct?.deliveryOut || 0) : 0), currency)}*\n🧑💼 Seller: *${vendor?.shopName || vendor?.name || 'N/A'}*\n📞 Seller Phone: *${vendor?.phone || 'N/A'}*`
+                    : `Habari,\n\nNimelipia bidhaa kwenye app.\n\n📦 Product: *${selectedProduct?.name}*\n👤 Jina la Mnunuzi: *${user?.name}*\n\n💳 Njia ya Malipo: *${payMethod.toUpperCase()}*\n\n📱 Namba ya Mtumaji: *${senderPhone}*\n💰 Kiasi: *${formatCurrency(Number(sentAmount), currency)}*\n🔑 Transaction ID: *${transactionId}*\n\n🧑💼 Muuzaji wa Product: *${vendor?.shopName || vendor?.name || 'N/A'}*\n📞 Namba ya Muuzaji: *${vendor?.phone || 'N/A'}*\n\nAsante.`;
                   window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
                   
                   // Reset and close

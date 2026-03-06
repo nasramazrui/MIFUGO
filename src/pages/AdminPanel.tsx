@@ -10,8 +10,10 @@ import {
   updateDoc, 
   doc, 
   deleteDoc, 
-  serverTimestamp 
+  serverTimestamp,
+  increment
 } from 'firebase/firestore';
+import { WalletTransaction } from '../types';
 import { 
   LayoutDashboard,
   BarChart3, 
@@ -64,6 +66,7 @@ export const AdminPanel: React.FC = () => {
     orders, 
     activities, 
     withdrawals,
+    walletTransactions,
     statuses,
     categories,
     systemSettings,
@@ -112,6 +115,7 @@ export const AdminPanel: React.FC = () => {
     image: ''
   });
   const [isEditingCat, setIsEditingCat] = useState(false);
+  const [walletSubTab, setWalletSubTab] = useState<'deposits' | 'withdrawals'>('deposits');
 
   const handleSaveCategory = async () => {
     if (!catForm.label) return;
@@ -277,6 +281,29 @@ export const AdminPanel: React.FC = () => {
       toast.success('Maombi yamekataliwa');
     } catch (error: any) {
       toast.error('Hitilafu wakati wa kukataa');
+    }
+  };
+
+  const approveDeposit = async (tx: WalletTransaction) => {
+    try {
+      await updateDoc(doc(db, 'kuku_wallet', tx.id), { status: 'approved' });
+      await updateDoc(doc(db, 'kuku_users', tx.userId), { 
+        walletBalance: increment(tx.amount) 
+      });
+      toast.success('Deposit imethibitishwa na salio limeongezwa!');
+      addActivity('💰', `Deposit ya ${formatCurrency(tx.amount, currency)} ya ${tx.userName} imethibitishwa`);
+    } catch (err) {
+      console.error(err);
+      toast.error('Imeshindwa kuthibitisha deposit');
+    }
+  };
+
+  const rejectDeposit = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'kuku_wallet', id), { status: 'rejected' });
+      toast.success('Deposit imekataliwa');
+    } catch (err) {
+      toast.error('Imeshindwa kukataa deposit');
     }
   };
 
@@ -1008,89 +1035,187 @@ export const AdminPanel: React.FC = () => {
 
         {activeTab === 'wallet' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <h2 className="text-3xl font-black text-slate-900 mb-8">Maombi ya Malipo (Withdraw)</h2>
-            <div className="space-y-6">
-              {withdrawals.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100">
-                  <Wallet size={48} className="mx-auto text-slate-200 mb-4" />
-                  <p className="text-slate-400">Hakuna maombi ya malipo kwa sasa.</p>
-                </div>
-              ) : (
-                withdrawals.map(w => (
-                  <div key={w.id} className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-6 mb-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-2xl">💸</div>
-                        <div>
-                          <h4 className="font-black text-slate-900 text-lg">{w.vendorName}</h4>
-                          <p className="text-sm font-black text-emerald-700">{formatCurrency(w.amount, currency)}</p>
-                          <p className="text-xs text-slate-400 mt-1">{w.date}</p>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <span className={cn(
-                          "text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider",
-                          w.status === 'paid' ? "bg-emerald-100 text-emerald-800" : 
-                          w.status === 'pending' ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"
-                        )}>
-                          {w.status}
-                        </span>
-                      </div>
-                    </div>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+              <h2 className="text-3xl font-black text-slate-900">Usimamizi wa Wallet</h2>
+              <div className="flex bg-slate-100 p-1 rounded-2xl">
+                <button 
+                  onClick={() => setWalletSubTab('deposits')}
+                  className={cn(
+                    "px-6 py-2 rounded-xl text-xs font-black transition-all",
+                    walletSubTab === 'deposits' ? "bg-white text-amber-600 shadow-sm" : "text-slate-400"
+                  )}
+                >
+                  DEPOSITS ({walletTransactions.filter(t => t.type === 'deposit' && t.status === 'pending').length})
+                </button>
+                <button 
+                  onClick={() => setWalletSubTab('withdrawals')}
+                  className={cn(
+                    "px-6 py-2 rounded-xl text-xs font-black transition-all",
+                    walletSubTab === 'withdrawals' ? "bg-white text-amber-600 shadow-sm" : "text-slate-400"
+                  )}
+                >
+                  WITHDRAWALS ({withdrawals.filter(w => w.status === 'pending').length})
+                </button>
+              </div>
+            </div>
 
-                    <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 mb-6">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Taarifa za Malipo</p>
-                      {w.method === 'mobile' ? (
-                        <div className="grid grid-cols-2 gap-4">
+            {walletSubTab === 'deposits' ? (
+              <div className="space-y-6">
+                {walletTransactions.filter(t => t.type === 'deposit').length === 0 ? (
+                  <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100">
+                    <Wallet size={48} className="mx-auto text-slate-200 mb-4" />
+                    <p className="text-slate-400">Hakuna miamala ya deposit bado.</p>
+                  </div>
+                ) : (
+                  walletTransactions.filter(t => t.type === 'deposit').map(tx => (
+                    <div key={tx.id} className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-6 mb-6">
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-2xl">💰</div>
                           <div>
-                            <p className="text-[10px] text-slate-400 uppercase">Mtandao</p>
-                            <p className="text-sm font-black text-slate-900">{w.network}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-slate-400 uppercase">Namba ya Simu</p>
-                            <p className="text-sm font-black text-slate-900">{w.phoneNumber}</p>
+                            <h4 className="font-black text-slate-900 text-lg">{tx.userName}</h4>
+                            <p className="text-sm font-black text-blue-700">{formatCurrency(tx.amount, currency)}</p>
+                            <p className="text-xs text-slate-400 mt-1">{tx.date}</p>
                           </div>
                         </div>
-                      ) : (
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="flex flex-col items-end gap-2">
+                          <span className={cn(
+                            "text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider",
+                            tx.status === 'approved' ? "bg-emerald-100 text-emerald-800" : 
+                            tx.status === 'pending' ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"
+                          )}>
+                            {tx.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 mb-6">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Taarifa za Malipo</p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div>
-                            <p className="text-[10px] text-slate-400 uppercase">Benki</p>
-                            <p className="text-sm font-black text-slate-900">{w.bankName}</p>
+                            <p className="text-[10px] text-slate-400 uppercase">Njia</p>
+                            <p className="text-sm font-black text-slate-900 uppercase">{tx.method}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] text-slate-400 uppercase">Akaunti</p>
-                            <p className="text-sm font-black text-slate-900">{w.accountNumber}</p>
+                            <p className="text-[10px] text-slate-400 uppercase">Mtumaji</p>
+                            <p className="text-sm font-black text-slate-900">{tx.senderName || 'N/A'}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] text-slate-400 uppercase">Jina</p>
-                            <p className="text-sm font-black text-slate-900">{w.accountName}</p>
+                            <p className="text-[10px] text-slate-400 uppercase">Simu</p>
+                            <p className="text-sm font-black text-slate-900">{tx.senderPhone || 'N/A'}</p>
                           </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 uppercase">Trans ID</p>
+                            <p className="text-sm font-black text-blue-700">{tx.transactionId || 'N/A'}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {tx.status === 'pending' && (
+                        <div className="flex gap-3">
+                          <button 
+                            onClick={() => approveDeposit(tx)}
+                            className="flex-1 bg-blue-600 text-white py-4 rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+                          >
+                            THIBITISHA DEPOSIT ✅
+                          </button>
+                          <button 
+                            onClick={() => rejectDeposit(tx.id)}
+                            className="bg-red-50 text-red-500 px-6 py-4 rounded-xl text-xs font-black hover:bg-red-100 transition-all"
+                          >
+                            KATAA
+                          </button>
                         </div>
                       )}
                     </div>
-
-                    {w.status === 'pending' && (
-                      <div className="flex gap-3">
-                        <button 
-                          onClick={() => approveWithdrawal(w.id)}
-                          className="flex-1 bg-emerald-600 text-white py-4 rounded-xl text-xs font-black hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
-                        >
-                          THIBITISHA MALIPO (PAID)
-                        </button>
-                        <button 
-                          onClick={() => rejectWithdrawal(w.id)}
-                          className="bg-red-50 text-red-500 px-6 py-4 rounded-xl text-xs font-black hover:bg-red-100 transition-all"
-                        >
-                          KATAA
-                        </button>
-                      </div>
-                    )}
+                  ))
+                )}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {withdrawals.length === 0 ? (
+                  <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100">
+                    <Wallet size={48} className="mx-auto text-slate-200 mb-4" />
+                    <p className="text-slate-400">Hakuna maombi ya malipo kwa sasa.</p>
                   </div>
-                ))
-              )}
-            </div>
+                ) : (
+                  withdrawals.map(w => (
+                    <div key={w.id} className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-6 mb-6">
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-2xl">💸</div>
+                          <div>
+                            <h4 className="font-black text-slate-900 text-lg">{w.vendorName}</h4>
+                            <p className="text-sm font-black text-emerald-700">{formatCurrency(w.amount, currency)}</p>
+                            <p className="text-xs text-slate-400 mt-1">{w.date}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <span className={cn(
+                            "text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider",
+                            w.status === 'paid' ? "bg-emerald-100 text-emerald-800" : 
+                            w.status === 'pending' ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"
+                          )}>
+                            {w.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 mb-6">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Taarifa za Malipo</p>
+                        {w.method === 'mobile' ? (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-[10px] text-slate-400 uppercase">Mtandao</p>
+                              <p className="text-sm font-black text-slate-900">{w.network}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-400 uppercase">Namba ya Simu</p>
+                              <p className="text-sm font-black text-slate-900">{w.phoneNumber}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-4">
+                            <div>
+                              <p className="text-[10px] text-slate-400 uppercase">Benki</p>
+                              <p className="text-sm font-black text-slate-900">{w.bankName}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-400 uppercase">Akaunti</p>
+                              <p className="text-sm font-black text-slate-900">{w.accountNumber}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-400 uppercase">Jina</p>
+                              <p className="text-sm font-black text-slate-900">{w.accountName}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {w.status === 'pending' && (
+                        <div className="flex gap-3">
+                          <button 
+                            onClick={() => approveWithdrawal(w.id)}
+                            className="flex-1 bg-emerald-600 text-white py-4 rounded-xl text-xs font-black hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+                          >
+                            THIBITISHA MALIPO (PAID)
+                          </button>
+                          <button 
+                            onClick={() => rejectWithdrawal(w.id)}
+                            className="bg-red-50 text-red-500 px-6 py-4 rounded-xl text-xs font-black hover:bg-red-100 transition-all"
+                          >
+                            KATAA
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </motion.div>
         )}
+
         {activeTab === 'status' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
             <div className="flex items-center justify-between">
