@@ -7,7 +7,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel } from 'lucide-react';
+import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
@@ -846,6 +846,7 @@ export const ShopPage: React.FC = () => {
 
           <nav className="space-y-2">
             {[
+              { id: 'cart', label: t('cart_title'), icon: ShoppingCart },
               { id: 'browse', label: t('market'), icon: ShoppingBag },
               { id: 'auctions', label: t('auctions'), icon: Gavel },
               { id: 'stores', label: t('stores'), icon: Store },
@@ -853,7 +854,13 @@ export const ShopPage: React.FC = () => {
             ].map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id as any)}
+                onClick={() => {
+                  if (item.id === 'cart') {
+                    setIsCartModalOpen(true);
+                  } else {
+                    setActiveTab(item.id as any);
+                  }
+                }}
                 className={cn(
                   "w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-black text-sm transition-all group",
                   activeTab === item.id 
@@ -863,6 +870,11 @@ export const ShopPage: React.FC = () => {
               >
                 <item.icon size={20} className={cn("transition-transform group-hover:scale-110", activeTab === item.id ? "text-white" : "text-slate-300")} />
                 {item.label}
+                {item.id === 'cart' && cart.length > 0 && (
+                  <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse">
+                    {cart.reduce((sum, i) => sum + i.qty, 0)}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -1338,25 +1350,19 @@ export const ShopPage: React.FC = () => {
             <Gavel size={22} strokeWidth={activeTab === 'auctions' ? 3 : 2} />
             <span className="text-[9px] font-black uppercase tracking-widest">{t('auctions')}</span>
           </button>
-          <button 
-            onClick={() => setActiveTab('stores')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all", activeTab === 'stores' ? "text-amber-600 scale-110" : "text-slate-400")}
-          >
-            <Store size={22} strokeWidth={activeTab === 'stores' ? 3 : 2} />
-            <span className="text-[9px] font-black uppercase tracking-widest">{t('stores')}</span>
-          </button>
 
           {/* Raised Cart Button */}
           <div className="relative -top-8">
             <button 
               onClick={() => setIsCartModalOpen(true)}
               className={cn(
-                "w-16 h-16 rounded-[24px] flex items-center justify-center shadow-2xl transition-all active:scale-90 border-4 border-white dark:border-slate-950",
+                "w-16 h-16 rounded-[24px] flex items-center justify-center shadow-2xl transition-all active:scale-90 border-4 border-white dark:border-slate-950 group overflow-hidden",
                 cart.length > 0 ? "bg-amber-600 text-white shadow-amber-600/40" : "bg-slate-100 dark:bg-slate-900 text-slate-400"
               )}
             >
+              <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative">
-                <ShoppingBag size={28} strokeWidth={2.5} />
+                <ShoppingCart size={28} strokeWidth={2.5} />
                 {cart.length > 0 && (
                   <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white dark:border-amber-600 animate-bounce">
                     {cart.reduce((sum, item) => sum + item.qty, 0)}
@@ -1365,6 +1371,14 @@ export const ShopPage: React.FC = () => {
               </div>
             </button>
           </div>
+
+          <button 
+            onClick={() => setActiveTab('stores')}
+            className={cn("flex flex-col items-center gap-1.5 transition-all", activeTab === 'stores' ? "text-amber-600 scale-110" : "text-slate-400")}
+          >
+            <Store size={22} strokeWidth={activeTab === 'stores' ? 3 : 2} />
+            <span className="text-[9px] font-black uppercase tracking-widest">{t('stores')}</span>
+          </button>
 
           <button 
             onClick={() => setActiveTab('orders')}
@@ -2328,71 +2342,124 @@ export const ShopPage: React.FC = () => {
       >
         <div className="space-y-6">
           {cart.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <ShoppingBag size={32} className="text-slate-300 dark:text-slate-600" />
-              </div>
-              <p className="text-slate-500 dark:text-slate-400 font-bold">{t('cart_empty')}</p>
+            <div className="text-center py-20">
+              <motion.div 
+                initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
+                animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                transition={{ type: "spring", damping: 12 }}
+                className="w-32 h-32 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-[40px] flex items-center justify-center mx-auto mb-8 shadow-inner relative"
+              >
+                <ShoppingCart size={48} className="text-slate-200 dark:text-slate-700" />
+                <motion.div 
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                  className="absolute -top-2 -right-2 text-4xl"
+                >
+                  🛒
+                </motion.div>
+              </motion.div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">{t('cart_empty')}</h3>
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.2em] mb-10">Hujachagua bidhaa yoyote bado</p>
               <button 
                 onClick={() => setIsCartModalOpen(false)}
-                className="mt-4 text-amber-600 dark:text-amber-500 font-black text-sm uppercase tracking-widest"
+                className="px-10 py-5 bg-amber-600 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-2xl shadow-amber-600/30 active:scale-95 transition-all hover:bg-amber-700"
               >
                 {t('start_shopping')}
               </button>
             </div>
           ) : (
             <>
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
-                {cart.map(item => (
-                  <div key={item.id} className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 group">
-                    <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 flex-shrink-0">
-                      {item.image ? (
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-black text-slate-900 dark:text-white truncate">{item.name}</h4>
-                      <p className="text-xs font-bold text-amber-600 dark:text-amber-500">{formatCurrency(item.price, currency)}</p>
-                      <div className="flex items-center gap-3 mt-2">
-                        <button 
-                          onClick={() => {
-                            if (item.qty > 1) {
-                              setCart(cart.map(c => c.id === item.id ? { ...c, qty: c.qty - 1 } : c));
-                            } else {
-                              removeFromCart(item.id);
-                            }
-                          }}
-                          className="w-6 h-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-red-500 transition-colors"
-                        >
-                          <Minus size={12} />
-                        </button>
-                        <span className="text-sm font-black w-4 text-center dark:text-white">{item.qty}</span>
-                        <button 
-                          onClick={() => setCart(cart.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c))}
-                          className="w-6 h-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-emerald-50 transition-colors"
-                        >
-                          <Plus size={12} />
-                        </button>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => removeFromCart(item.id)}
-                      className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors"
+              <div className="space-y-4 max-h-[480px] overflow-y-auto pr-2 scrollbar-hide">
+                <AnimatePresence mode="popLayout">
+                  {cart.map(item => (
+                    <motion.div 
+                      key={item.id}
+                      layout
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      className="flex items-center gap-5 bg-white dark:bg-slate-900 p-5 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-amber-100 dark:hover:border-amber-900/30 transition-all group"
                     >
-                      <X size={18} />
-                    </button>
-                  </div>
-                ))}
+                      <div className="w-24 h-24 bg-slate-50 dark:bg-slate-800 rounded-[24px] overflow-hidden border border-slate-100 dark:border-slate-800 flex-shrink-0 relative">
+                        {item.image ? (
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-4xl">📦</div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start gap-2">
+                          <h4 className="font-black text-slate-900 dark:text-white truncate text-base">{item.name}</h4>
+                          <button 
+                            onClick={() => removeFromCart(item.id)}
+                            className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-full transition-all"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                        <p className="text-sm font-black text-amber-600 dark:text-amber-500 mt-1">{formatCurrency(item.price, currency)}</p>
+                        
+                        <div className="flex items-center justify-between mt-4">
+                          <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-2xl p-1 border border-slate-100 dark:border-slate-700">
+                            <button 
+                              onClick={() => {
+                                if (item.qty > 1) {
+                                  setCart(cart.map(c => c.id === item.id ? { ...c, qty: c.qty - 1 } : c));
+                                } else {
+                                  removeFromCart(item.id);
+                                }
+                              }}
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-red-500 transition-all shadow-sm"
+                            >
+                              <Minus size={16} />
+                            </button>
+                            <span className="text-sm font-black w-10 text-center dark:text-white">{item.qty}</span>
+                            <button 
+                              onClick={() => setCart(cart.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c))}
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-emerald-500 transition-all shadow-sm"
+                            >
+                              <Plus size={16} />
+                            </button>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Subtotal</p>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">
+                              {formatCurrency(item.price * item.qty, currency)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
 
-              <div className="border-t border-slate-100 dark:border-slate-800 pt-6">
-                <div className="flex justify-between items-center mb-6">
-                  <span className="text-slate-500 dark:text-slate-400 font-bold">{t('total')}:</span>
-                  <span className="text-2xl font-black text-slate-900 dark:text-white">
-                    {formatCurrency(cart.reduce((sum, item) => sum + (item.price * item.qty), 0), currency)}
-                  </span>
+              <div className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950 p-8 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-inner">
+                <div className="flex justify-between items-end mb-8">
+                  <div>
+                    <span className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] block mb-2">{t('total')}</span>
+                    <motion.span 
+                      key={cart.reduce((sum, item) => sum + (item.price * item.qty), 0)}
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter"
+                    >
+                      {formatCurrency(cart.reduce((sum, item) => sum + (item.price * item.qty), 0), currency)}
+                    </motion.span>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex -space-x-2">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px]">
+                          {i === 1 ? '💳' : i === 2 ? '📱' : '🚚'}
+                        </div>
+                      ))}
+                    </div>
+                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-1.5 rounded-full uppercase tracking-widest">
+                      Malipo Salama
+                    </span>
+                  </div>
                 </div>
                 <button 
                   onClick={() => {
@@ -2400,8 +2467,6 @@ export const ShopPage: React.FC = () => {
                       setIsCartModalOpen(false);
                       setIsAuthModalOpen(true);
                     } else {
-                      // For simplicity, we'll process the first item in cart for checkout
-                      // In a real app, we'd handle multiple items/vendors
                       const firstItem = cart[0];
                       const product = products.find(p => p.id === firstItem.productId);
                       if (product) {
@@ -2412,9 +2477,11 @@ export const ShopPage: React.FC = () => {
                       }
                     }
                   }}
-                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-5 rounded-[24px] shadow-xl shadow-amber-100 dark:shadow-none transition-all active:scale-95 flex items-center justify-center gap-2"
+                  className="w-full bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 bg-[length:200%_auto] hover:bg-right text-white font-black py-6 rounded-[32px] shadow-2xl shadow-amber-600/30 transition-all active:scale-95 flex items-center justify-center gap-4 group overflow-hidden relative"
                 >
-                  {t('checkout')} <ShoppingBag size={20} />
+                  <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
+                  <span className="text-base uppercase tracking-[0.3em] relative z-10">{t('checkout')}</span>
+                  <ArrowRight size={24} className="group-hover:translate-x-2 transition-transform relative z-10" />
                 </button>
               </div>
             </>

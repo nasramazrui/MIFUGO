@@ -63,6 +63,9 @@ export const VendorPortal: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [isAuctionModalOpen, setIsAuctionModalOpen] = useState(false);
+  const [productImageSource, setProductImageSource] = useState<'upload' | 'link'>('upload');
+  const [auctionImageSource, setAuctionImageSource] = useState<'upload' | 'link'>('upload');
+  const [editProductImageSource, setEditProductImageSource] = useState<'upload' | 'link'>('upload');
   const [withdrawStep, setWithdrawStep] = useState<'form' | 'summary' | 'whatsapp'>('form');
   const [lastWithdrawalId, setLastWithdrawalId] = useState<string | null>(null);
   const [walletData, setWalletData] = useState<{ balance: number, transactions: any[] }>({ balance: 0, transactions: [] });
@@ -1353,6 +1356,27 @@ export const VendorPortal: React.FC = () => {
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Picha ya Bidhaa (Hiari)</label>
+            <div className="flex gap-2 mb-4">
+              <button 
+                onClick={() => setProductImageSource('upload')}
+                className={cn(
+                  "flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all",
+                  productImageSource === 'upload' ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"
+                )}
+              >
+                Upload
+              </button>
+              <button 
+                onClick={() => setProductImageSource('link')}
+                className={cn(
+                  "flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all",
+                  productImageSource === 'link' ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"
+                )}
+              >
+                Link
+              </button>
+            </div>
+
             <div className="flex items-center gap-4">
               <div className="w-20 h-20 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden">
                 {newProduct.image ? (
@@ -1361,56 +1385,68 @@ export const VendorPortal: React.FC = () => {
                   <span className="text-2xl opacity-20">📸</span>
                 )}
               </div>
-            <div className="flex-1">
-              {isIKConfigured ? (
-                <IKContext 
-                  publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
-                  urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
-                  authenticator={async () => {
-                    const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
-                    return await res.json();
-                  }}
-                >
-                    <IKUpload
-                      fileName={`product_${Date.now()}.png`}
-                      tags={["product"]}
-                      useUniqueFileName={true}
-                      onSuccess={(res) => {
-                        setNewProduct({...newProduct, image: res.url});
-                        toast.success('Picha imepakiwa!');
-                      }}
-                      onError={(err) => {
-                        console.error('Upload Error:', err);
-                        toast.error('Imeshindwa kupakia picha. Hakikisha ImageKit Keys zipo kwenye Secrets.');
-                      }}
-                      className="hidden"
-                      id="product-image"
-                    />
-                </IKContext>
-              ) : (
-                <input 
-                  type="file" 
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setNewProduct({...newProduct, image: reader.result as string});
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                  className="hidden"
-                  id="product-image"
-                />
-              )}
-              <label 
-                htmlFor="product-image"
-                className="inline-block px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-black cursor-pointer hover:bg-slate-200 transition-all"
-              >
-                {isImageKitConfigured ? 'PAKIA PICHA' : 'CHAGUA PICHA'}
-              </label>
+              <div className="flex-1">
+                {productImageSource === 'upload' ? (
+                  <>
+                    {isIKConfigured ? (
+                      <IKContext 
+                        publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
+                        urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
+                        authenticator={async () => {
+                          const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
+                          return await res.json();
+                        }}
+                      >
+                          <IKUpload
+                            fileName={`product_${Date.now()}.png`}
+                            tags={["product"]}
+                            useUniqueFileName={true}
+                            onSuccess={(res) => {
+                              setNewProduct({...newProduct, image: res.url});
+                              toast.success('Picha imepakiwa!');
+                            }}
+                            onError={(err) => {
+                              console.error('Upload Error:', err);
+                              toast.error('Imeshindwa kupakia picha. Hakikisha ImageKit Keys zipo kwenye Secrets.');
+                            }}
+                            className="hidden"
+                            id="product-image"
+                          />
+                      </IKContext>
+                    ) : (
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setNewProduct({...newProduct, image: reader.result as string});
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="hidden"
+                        id="product-image"
+                      />
+                    )}
+                    <label 
+                      htmlFor="product-image"
+                      className="inline-block px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-black cursor-pointer hover:bg-slate-200 transition-all"
+                    >
+                      {isImageKitConfigured ? 'PAKIA PICHA' : 'CHAGUA PICHA'}
+                    </label>
+                  </>
+                ) : (
+                  <input 
+                    type="text"
+                    className="input-field"
+                    placeholder="Weka link ya picha hapa..."
+                    value={newProduct.image}
+                    onChange={e => setNewProduct({...newProduct, image: e.target.value})}
+                  />
+                )}
                 {newProduct.image && (
                   <button 
                     onClick={() => setNewProduct({...newProduct, image: ''})}
@@ -1532,6 +1568,27 @@ export const VendorPortal: React.FC = () => {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Picha ya Bidhaa (Hiari)</label>
+              <div className="flex gap-2 mb-4">
+                <button 
+                  onClick={() => setEditProductImageSource('upload')}
+                  className={cn(
+                    "flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all",
+                    editProductImageSource === 'upload' ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"
+                  )}
+                >
+                  Upload
+                </button>
+                <button 
+                  onClick={() => setEditProductImageSource('link')}
+                  className={cn(
+                    "flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all",
+                    editProductImageSource === 'link' ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"
+                  )}
+                >
+                  Link
+                </button>
+              </div>
+
               <div className="flex items-center gap-4">
                 <div className="w-20 h-20 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden">
                   {editingProduct.image ? (
@@ -1541,55 +1598,67 @@ export const VendorPortal: React.FC = () => {
                   )}
                 </div>
                 <div className="flex-1">
-                  {isIKConfigured ? (
-                    <IKContext 
-                      publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
-                      urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
-                      authenticator={async () => {
-                        const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
-                        return await res.json();
-                      }}
-                    >
-                      <IKUpload
-                        fileName={`edit_product_${Date.now()}.png`}
-                        tags={["product"]}
-                        useUniqueFileName={true}
-                        onSuccess={(res) => {
-                          setEditingProduct({...editingProduct, image: res.url});
-                          toast.success('Picha imesasishwa!');
-                        }}
-                        onError={(err) => {
-                          console.error('Upload Error:', err);
-                          toast.error('Imeshindwa kupakia picha. Hakikisha ImageKit Keys zipo kwenye Secrets.');
-                        }}
-                        className="hidden"
-                        id="edit-product-image"
-                      />
-                    </IKContext>
+                  {editProductImageSource === 'upload' ? (
+                    <>
+                      {isIKConfigured ? (
+                        <IKContext 
+                          publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
+                          urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
+                          authenticator={async () => {
+                            const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
+                            return await res.json();
+                          }}
+                        >
+                          <IKUpload
+                            fileName={`edit_product_${Date.now()}.png`}
+                            tags={["product"]}
+                            useUniqueFileName={true}
+                            onSuccess={(res) => {
+                              setEditingProduct({...editingProduct, image: res.url});
+                              toast.success('Picha imesasishwa!');
+                            }}
+                            onError={(err) => {
+                              console.error('Upload Error:', err);
+                              toast.error('Imeshindwa kupakia picha. Hakikisha ImageKit Keys zipo kwenye Secrets.');
+                            }}
+                            className="hidden"
+                            id="edit-product-image"
+                          />
+                        </IKContext>
+                      ) : (
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setEditingProduct({...editingProduct, image: reader.result as string});
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                          className="hidden"
+                          id="edit-product-image"
+                        />
+                      )}
+                      <label 
+                        htmlFor="edit-product-image"
+                        className="inline-block px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-black cursor-pointer hover:bg-slate-200 transition-all"
+                      >
+                        {isImageKitConfigured ? 'BADILISHA PICHA' : 'BADILISHA PICHA'}
+                      </label>
+                    </>
                   ) : (
                     <input 
-                      type="file" 
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setEditingProduct({...editingProduct, image: reader.result as string});
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                      className="hidden"
-                      id="edit-product-image"
+                      type="text"
+                      className="input-field"
+                      placeholder="Weka link ya picha hapa..."
+                      value={editingProduct.image}
+                      onChange={e => setEditingProduct({...editingProduct, image: e.target.value})}
                     />
                   )}
-                  <label 
-                    htmlFor="edit-product-image"
-                    className="inline-block px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-black cursor-pointer hover:bg-slate-200 transition-all"
-                  >
-                    {isImageKitConfigured ? 'BADILISHA PICHA' : 'BADILISHA PICHA'}
-                  </label>
                   {editingProduct.image && (
                     <button 
                       onClick={() => setEditingProduct({...editingProduct, image: ''})}
@@ -1909,6 +1978,27 @@ export const VendorPortal: React.FC = () => {
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Picha ya Mfugo</label>
+            <div className="flex gap-2 mb-4">
+              <button 
+                onClick={() => setAuctionImageSource('upload')}
+                className={cn(
+                  "flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all",
+                  auctionImageSource === 'upload' ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-500"
+                )}
+              >
+                Upload
+              </button>
+              <button 
+                onClick={() => setAuctionImageSource('link')}
+                className={cn(
+                  "flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all",
+                  auctionImageSource === 'link' ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-500"
+                )}
+              >
+                Link
+              </button>
+            </div>
+
             <div className="flex items-center gap-4">
               <div className="w-20 h-20 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden">
                 {auctionForm.image ? (
@@ -1918,55 +2008,67 @@ export const VendorPortal: React.FC = () => {
                 )}
               </div>
               <div className="flex-1">
-                {isImageKitConfigured ? (
-                  <IKContext 
-                    publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
-                    urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
-                    authenticator={async () => {
-                      const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
-                      return await res.json();
-                    }}
-                  >
-                      <IKUpload
-                        fileName={`auction_${Date.now()}.png`}
-                        tags={["auction"]}
-                        useUniqueFileName={true}
-                        onSuccess={(res) => {
-                          setAuctionForm({...auctionForm, image: res.url});
-                          toast.success('Picha imepakiwa!');
+                {auctionImageSource === 'upload' ? (
+                  <>
+                    {isImageKitConfigured ? (
+                      <IKContext 
+                        publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
+                        urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
+                        authenticator={async () => {
+                          const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
+                          return await res.json();
                         }}
-                        onError={(err) => {
-                          console.error('Upload Error:', err);
-                          toast.error('Imeshindwa kupakia picha.');
+                      >
+                          <IKUpload
+                            fileName={`auction_${Date.now()}.png`}
+                            tags={["auction"]}
+                            useUniqueFileName={true}
+                            onSuccess={(res) => {
+                              setAuctionForm({...auctionForm, image: res.url});
+                              toast.success('Picha imepakiwa!');
+                            }}
+                            onError={(err) => {
+                              console.error('Upload Error:', err);
+                              toast.error('Imeshindwa kupakia picha.');
+                            }}
+                            className="hidden"
+                            id="auction-image"
+                          />
+                      </IKContext>
+                    ) : (
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setAuctionForm({...auctionForm, image: reader.result as string});
+                            };
+                            reader.readAsDataURL(file);
+                          }
                         }}
                         className="hidden"
                         id="auction-image"
                       />
-                  </IKContext>
+                    )}
+                    <label 
+                      htmlFor="auction-image"
+                      className="inline-block px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-black cursor-pointer hover:bg-slate-200 transition-all"
+                    >
+                      {isImageKitConfigured ? 'PAKIA PICHA' : 'CHAGUA PICHA'}
+                    </label>
+                  </>
                 ) : (
                   <input 
-                    type="file" 
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setAuctionForm({...auctionForm, image: reader.result as string});
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    className="hidden"
-                    id="auction-image"
+                    type="text"
+                    className="input-field"
+                    placeholder="Weka link ya picha hapa..."
+                    value={auctionForm.image}
+                    onChange={e => setAuctionForm({...auctionForm, image: e.target.value})}
                   />
                 )}
-                <label 
-                  htmlFor="auction-image"
-                  className="inline-block px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-black cursor-pointer hover:bg-slate-200 transition-all"
-                >
-                  {isImageKitConfigured ? 'PAKIA PICHA' : 'CHAGUA PICHA'}
-                </label>
               </div>
             </div>
           </div>
