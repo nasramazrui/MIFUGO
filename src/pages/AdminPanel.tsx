@@ -34,6 +34,7 @@ import {
   Save,
   Star,
   Trash2,
+  DollarSign,
   ShieldCheck,
   Moon,
   Sun,
@@ -186,7 +187,12 @@ export const AdminPanel: React.FC = () => {
     app_name: '',
     currency: 'TZS',
     loading_icon: '',
-    loading_url: ''
+    loading_url: '',
+    withdrawalFeeType: 'fixed' as 'fixed' | 'percentage',
+    withdrawalFeeValue: 0,
+    adminWhatsApp: '255764225358',
+    paymentNumber: '0687225353',
+    paymentName: 'Amour'
   });
 
   useEffect(() => {
@@ -203,7 +209,12 @@ export const AdminPanel: React.FC = () => {
         app_name: systemSettings.app_name || '',
         currency: systemSettings.currency || 'TZS',
         loading_icon: systemSettings.loading_icon || '',
-        loading_url: systemSettings.loading_url || ''
+        loading_url: systemSettings.loading_url || '',
+        withdrawalFeeType: systemSettings.withdrawalFeeType || 'fixed',
+        withdrawalFeeValue: systemSettings.withdrawalFeeValue || 0,
+        adminWhatsApp: systemSettings.adminWhatsApp || '255764225358',
+        paymentNumber: systemSettings.paymentNumber || '0687225353',
+        paymentName: systemSettings.paymentName || 'Amour'
       });
     }
   }, [systemSettings]);
@@ -269,21 +280,35 @@ export const AdminPanel: React.FC = () => {
 
   const approveWithdrawal = async (id: string) => {
     try {
-      await updateDoc(doc(db, 'kuku_withdrawals', id), { status: 'paid' });
-      addActivity('💸', `Malipo yameidhinishwa`);
+      const res = await fetch(`/api/admin/withdrawals/${id}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Completed' })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      addActivity('💸', `Malipo yameidhinishwa (Completed)`);
       toast.success('Malipo yameidhinishwa');
     } catch (error: any) {
-      toast.error('Hitilafu wakati wa kuidhinisha');
+      toast.error(error.message || 'Hitilafu wakati wa kuidhinisha');
     }
   };
 
   const rejectWithdrawal = async (id: string) => {
     try {
-      await updateDoc(doc(db, 'kuku_withdrawals', id), { status: 'rejected' });
-      addActivity('✕', `Maombi ya malipo yamekataliwa`);
+      const res = await fetch(`/api/admin/withdrawals/${id}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Rejected' })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      addActivity('✕', `Maombi ya malipo yamekataliwa (Rejected)`);
       toast.success('Maombi yamekataliwa');
     } catch (error: any) {
-      toast.error('Hitilafu wakati wa kukataa');
+      toast.error(error.message || 'Hitilafu wakati wa kukataa');
     }
   };
 
@@ -1159,8 +1184,8 @@ export const AdminPanel: React.FC = () => {
                         <div className="flex flex-col items-end gap-2">
                           <span className={cn(
                             "text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider",
-                            w.status === 'paid' ? "bg-emerald-100 text-emerald-800" : 
-                            w.status === 'pending' ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"
+                            w.status === 'Completed' || w.status === 'paid' ? "bg-emerald-100 text-emerald-800" : 
+                            w.status === 'Pending' || w.status === 'pending' ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"
                           )}>
                             {w.status}
                           </span>
@@ -1198,7 +1223,7 @@ export const AdminPanel: React.FC = () => {
                         )}
                       </div>
 
-                      {w.status === 'pending' && (
+                      { (w.status === 'Pending' || w.status === 'pending') && (
                         <div className="flex gap-3">
                           <button 
                             onClick={() => approveWithdrawal(w.id)}
@@ -1482,6 +1507,71 @@ export const AdminPanel: React.FC = () => {
                         <img src={localSettings.loading_url} alt="Preview" className="w-full h-full object-contain" />
                       </div>
                     )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Financial & Withdrawal Settings */}
+              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                  <div className="w-8 h-8 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
+                    <DollarSign size={18} />
+                  </div>
+                  Financial & Withdrawal Settings
+                </h3>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Withdrawal Fee Type</label>
+                    <select 
+                      value={localSettings.withdrawalFeeType}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, withdrawalFeeType: e.target.value as any }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    >
+                      <option value="fixed">Fixed Amount (Kiasi Maalum)</option>
+                      <option value="percentage">Percentage (Asilimia %)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">
+                      Withdrawal Fee Value ({localSettings.withdrawalFeeType === 'fixed' ? currency : '%'})
+                    </label>
+                    <input 
+                      type="number"
+                      value={localSettings.withdrawalFeeValue}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, withdrawalFeeValue: Number(e.target.value) }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="Mf. 5000 au 5"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Admin WhatsApp (for notifications)</label>
+                    <input 
+                      type="text"
+                      value={localSettings.adminWhatsApp}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, adminWhatsApp: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="255764225358"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Payment Number (for Auction Winners)</label>
+                    <input 
+                      type="text"
+                      value={localSettings.paymentNumber}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, paymentNumber: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="0687225353"
+                    />
+                  </div>
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Payment Name (Account Name)</label>
+                    <input 
+                      type="text"
+                      value={localSettings.paymentName}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, paymentName: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="Amour"
+                    />
                   </div>
                 </div>
               </div>

@@ -117,7 +117,7 @@ export interface Review {
   replies?: ReviewReply[];
 }
 
-export type WithdrawalStatus = 'pending' | 'paid' | 'rejected';
+export type WithdrawalStatus = 'Pending' | 'Completed' | 'Rejected' | 'paid' | 'rejected' | 'pending';
 
 export interface Withdrawal {
   id: string;
@@ -199,14 +199,34 @@ export interface Auction {
   id: string;
   vendorId: string;
   vendorName: string;
+  vendorPhone?: string;
   productName: string;
   description: string;
   startingPrice: number;
+  minIncrement: number;
   currentBid: number;
   highestBidderId?: string;
   highestBidderName?: string;
   endTime: any;
+  location: string;
   status: 'active' | 'ended';
   image?: string;
+  winnerId?: string;
+  winnerName?: string;
+  paymentStatus?: 'pending' | 'paid';
+  paymentMethod?: string;
+  transactionId?: string;
+  senderPhone?: string;
+  senderName?: string;
   createdAt: any;
+}
+
+export interface SystemSettings {
+  id: string;
+  withdrawalFeeType: 'fixed' | 'percentage';
+  withdrawalFeeValue: number;
+  adminWhatsApp: string;
+  paymentNumber: string;
+  paymentName: string;
+  updatedAt: any;
 }

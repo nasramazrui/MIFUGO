@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Auction, Bid } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Gavel, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2, Wallet } from 'lucide-react';
-import { formatCurrency } from '../utils';
+import { Gavel, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2, Wallet, Send, CreditCard, Smartphone } from 'lucide-react';
+import { formatCurrency, cn } from '../utils';
 import { db } from '../services/firebase';
-import { collection, addDoc, updateDoc, doc, serverTimestamp, query, where, orderBy, onSnapshot, increment } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, serverTimestamp, query, where, orderBy, onSnapshot, increment, getDoc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
-import { cn } from '../utils';
 
 export const AuctionPage: React.FC = () => {
   const { user, auctions, systemSettings, t, language } = useApp();
@@ -16,6 +15,14 @@ export const AuctionPage: React.FC = () => {
   const [bidAmount, setBidAmount] = useState<string>('');
   const [isBidding, setIsBidding] = useState(false);
   const [auctionBids, setAuctionBids] = useState<Bid[]>([]);
+  const [isPaying, setIsPaying] = useState(false);
+  const [paymentStep, setPaymentStep] = useState<'options' | 'details' | 'success'>('options');
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'mobile'>('mobile');
+  const [paymentForm, setPaymentForm] = useState({
+    transactionId: '',
+    senderPhone: user?.contact || '',
+    senderName: user?.name || ''
+  });
 
   useEffect(() => {
     if (selectedAuction) {
@@ -30,6 +37,14 @@ export const AuctionPage: React.FC = () => {
       return unsub;
     }
   }, [selectedAuction]);
+
+  const finalizeAuction = async (auctionId: string) => {
+    try {
+      await fetch(`/api/auctions/${auctionId}/finalize`, { method: 'POST' });
+    } catch (err) {
+      console.error('Finalize error:', err);
+    }
+  };
 
   const handlePlaceBid = async () => {
     if (!user) {
@@ -99,12 +114,58 @@ export const AuctionPage: React.FC = () => {
     const interval = setInterval(() => {
       const newTimers: Record<string, string> = {};
       auctions.forEach(a => {
-        newTimers[a.id] = getTimeRemaining(a.endTime);
+        const time = getTimeRemaining(a.endTime);
+        newTimers[a.id] = time;
+        if (time === 'Ended' && a.status === 'active') {
+          finalizeAuction(a.id);
+        }
       });
       setTimers(newTimers);
     }, 1000);
     return () => clearInterval(interval);
   }, [auctions]);
+
+  const handleAuctionPayment = async () => {
+    if (!selectedAuction || !user) return;
+    setIsPaying(true);
+    try {
+      if (paymentMethod === 'wallet') {
+        if ((user.walletBalance || 0) < selectedAuction.currentBid) {
+          toast.error('Salio la wallet halitoshi.');
+          return;
+        }
+        // Logic for wallet payment would go here (API call)
+        // For now, we'll use the confirm payment API
+      }
+
+      const res = await fetch(`/api/auctions/${selectedAuction.id}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentMethod,
+          transactionId: paymentForm.transactionId || `WALLET-${Date.now()}`,
+          senderPhone: paymentForm.senderPhone,
+          senderName: paymentForm.senderName
+        })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      // Send WhatsApp to Admin
+      const waMsg = `HABARI ADMIN! MNADA UMEKAMILIKA 🐔\n\nBIDHAA: *${selectedAuction.productName}*\nMUUZAJI: *${selectedAuction.vendorName}*\nMSHINDI: *${user.name}*\nKIASI: *${formatCurrency(selectedAuction.currentBid, currency)}*\nNJIA: *${paymentMethod}*\nTXID: *${paymentForm.transactionId || 'WALLET'}*\n\nTafadhali hakiki malipo haya.`;
+      window.open(`https://wa.me/${systemSettings?.adminWhatsApp || '255764225358'}?text=${encodeURIComponent(waMsg)}`);
+
+      setPaymentStep('success');
+      toast.success('Malipo yamethibitishwa!');
+    } catch (err: any) {
+      toast.error(err.message || 'Imeshindwa kuthibitisha malipo');
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
+  const isWinner = selectedAuction?.status === 'ended' && selectedAuction?.winnerId === user?.id;
+  const isPaid = selectedAuction?.paymentStatus === 'paid';
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
@@ -241,6 +302,181 @@ export const AuctionPage: React.FC = () => {
                 <h2 className="text-3xl font-black text-slate-900 mb-4">{selectedAuction.productName}</h2>
                 <p className="text-slate-500 font-bold leading-relaxed mb-8">{selectedAuction.description}</p>
 
+                {/* Winner Status */}
+                {selectedAuction.status === 'ended' && (
+                  <div className={cn(
+                    "p-6 rounded-[32px] border mb-8 flex items-center gap-4",
+                    isWinner ? "bg-emerald-50 border-emerald-100" : "bg-slate-50 border-slate-100"
+                  )}>
+                    <div className={cn(
+                      "w-12 h-12 rounded-2xl flex items-center justify-center text-2xl",
+                      isWinner ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"
+                    )}>
+                      {isWinner ? '🏆' : '🏁'}
+                    </div>
+                    <div>
+                      <h4 className={cn("font-black", isWinner ? "text-emerald-900" : "text-slate-900")}>
+                        {isWinner ? 'Hongera! Wewe ndiye mshindi!' : 'Mnada Umekwisha'}
+                      </h4>
+                      <p className="text-xs font-bold text-slate-500">
+                        {isWinner ? 'Tafadhali kamilisha malipo ili kupata bidhaa yako.' : `Mshindi ni ${selectedAuction.winnerName || 'hakuna'}`}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Payment Section for Winner */}
+                {isWinner && !isPaid && (
+                  <div className="bg-white rounded-[32px] border-2 border-amber-400 p-8 mb-10 shadow-xl shadow-amber-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                      <CreditCard className="text-amber-500" /> Kamilisha Malipo
+                    </h3>
+                    
+                    {paymentStep === 'options' && (
+                      <div className="space-y-4">
+                        <p className="text-sm text-slate-500 font-bold mb-4">Chagua njia ya kulipa kiasi cha <span className="text-emerald-600">{formatCurrency(selectedAuction.currentBid, currency)}</span></p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <button 
+                            onClick={() => setPaymentMethod('wallet')}
+                            className={cn(
+                              "p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3",
+                              paymentMethod === 'wallet' ? "border-amber-500 bg-amber-50" : "border-slate-100 hover:border-slate-200"
+                            )}
+                          >
+                            <Wallet size={32} className={paymentMethod === 'wallet' ? "text-amber-600" : "text-slate-400"} />
+                            <span className="font-black text-xs uppercase">Wallet Balance</span>
+                          </button>
+                          <button 
+                            onClick={() => setPaymentMethod('mobile')}
+                            className={cn(
+                              "p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3",
+                              paymentMethod === 'mobile' ? "border-amber-500 bg-amber-50" : "border-slate-100 hover:border-slate-200"
+                            )}
+                          >
+                            <Smartphone size={32} className={paymentMethod === 'mobile' ? "text-amber-600" : "text-slate-400"} />
+                            <span className="font-black text-xs uppercase">Mobile Money</span>
+                          </button>
+                        </div>
+                        <button 
+                          onClick={() => setPaymentStep('details')}
+                          className="w-full bg-amber-500 text-white py-5 rounded-3xl font-black text-sm uppercase tracking-widest shadow-lg shadow-amber-100 mt-4"
+                        >
+                          ENDELEA →
+                        </button>
+                      </div>
+                    )}
+
+                    {paymentStep === 'details' && (
+                      <div className="space-y-6">
+                        {paymentMethod === 'mobile' ? (
+                          <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lipia kupitia: M-Pesa / Tigo Pesa / Airtel Money</p>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs text-slate-500">Namba ya Malipo:</p>
+                                <p className="text-lg font-black text-slate-900">{systemSettings?.paymentNumber || '0687225353'}</p>
+                              </div>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(systemSettings?.paymentNumber || '0687225353');
+                                  toast.success('Namba imenakiliwa!');
+                                }}
+                                className="p-3 bg-white rounded-xl text-amber-600 shadow-sm"
+                              >
+                                <Copy size={18} />
+                              </button>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-500">Jina:</p>
+                              <p className="text-sm font-black text-slate-900">{systemSettings?.paymentName || 'Amour'}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center">
+                            <p className="text-sm font-bold text-emerald-800 mb-2">Salio lako la Wallet litatumika kulipia mnada huu.</p>
+                            <p className="text-2xl font-black text-emerald-600">{formatCurrency(selectedAuction.currentBid, currency)}</p>
+                          </div>
+                        )}
+
+                        <div className="space-y-4">
+                          {paymentMethod === 'mobile' && (
+                            <div>
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Transaction ID (Kutoka kwenye SMS)</label>
+                              <input 
+                                type="text" 
+                                value={paymentForm.transactionId}
+                                onChange={(e) => setPaymentForm({...paymentForm, transactionId: e.target.value})}
+                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-bold"
+                                placeholder="Mf. 8G76H5J4K"
+                              />
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Jina la Mtumaji</label>
+                              <input 
+                                type="text" 
+                                value={paymentForm.senderName}
+                                onChange={(e) => setPaymentForm({...paymentForm, senderName: e.target.value})}
+                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Namba ya Mtumaji</label>
+                              <input 
+                                type="text" 
+                                value={paymentForm.senderPhone}
+                                onChange={(e) => setPaymentForm({...paymentForm, senderPhone: e.target.value})}
+                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-bold"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                          <button 
+                            onClick={() => setPaymentStep('options')}
+                            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-sm uppercase transition-all"
+                          >
+                            RUDI
+                          </button>
+                          <button 
+                            onClick={handleAuctionPayment}
+                            disabled={isPaying || (paymentMethod === 'mobile' && !paymentForm.transactionId)}
+                            className="flex-[2] bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-emerald-100 disabled:opacity-50"
+                          >
+                            {isPaying ? 'Inatuma...' : 'THIBITISHA MALIPO'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {paymentStep === 'success' && (
+                      <div className="text-center py-6">
+                        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 text-4xl mx-auto mb-4">✅</div>
+                        <h4 className="text-xl font-black text-slate-900 mb-2">Malipo Yametumwa!</h4>
+                        <p className="text-sm text-slate-500 font-bold mb-6">Admin anahakiki malipo yako sasa hivi. Utapokea taarifa punde tu itakapokamilika.</p>
+                        <button 
+                          onClick={() => setSelectedAuction(null)}
+                          className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest"
+                        >
+                          FUNGA
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {isPaid && (
+                  <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-[32px] mb-10 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-emerald-500 text-white rounded-2xl flex items-center justify-center text-2xl">✅</div>
+                    <div>
+                      <h4 className="font-black text-emerald-900">Malipo Yamethibitishwa</h4>
+                      <p className="text-xs font-bold text-emerald-600">Bidhaa hii imeshalipiwa kikamilifu.</p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-6 mb-10">
                   <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('starting_price')}</p>
@@ -326,5 +562,12 @@ export const AuctionPage: React.FC = () => {
 const X: React.FC<{ size?: number }> = ({ size = 24 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
     <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+);
+
+const Copy: React.FC<{ size?: number }> = ({ size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
   </svg>
 );

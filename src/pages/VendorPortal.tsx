@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { User, Product, Order, Activity, Withdrawal, ProductUnit, WithdrawalStatus } from '../types';
+import { User, Product, Order, Activity, Withdrawal, ProductUnit, WithdrawalStatus, Auction } from '../types';
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
 import { Modal } from '../components/Modal';
@@ -62,16 +62,56 @@ export const VendorPortal: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [isAuctionModalOpen, setIsAuctionModalOpen] = useState(false);
+  const [withdrawStep, setWithdrawStep] = useState<'form' | 'summary' | 'whatsapp'>('form');
+  const [lastWithdrawalId, setLastWithdrawalId] = useState<string | null>(null);
+  const [walletData, setWalletData] = useState<{ balance: number, transactions: any[] }>({ balance: 0, transactions: [] });
+  const [isWalletLoading, setIsWalletLoading] = useState(true);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
   const [withdrawForm, setWithdrawForm] = useState({
     method: 'mobile' as 'mobile' | 'bank',
+    amount: '',
     network: 'M-Pesa' as any,
-    phoneNumber: '',
+    phoneNumber: user?.contact || '',
     bankName: '',
     accountNumber: '',
     accountName: ''
   });
+
+  const [auctionForm, setAuctionForm] = useState({
+    productName: '',
+    description: '',
+    startingPrice: '',
+    minIncrement: '20000',
+    durationHours: '24',
+    location: user.location || '',
+    image: ''
+  });
+
+  // Fetch Wallet Data
+  const fetchWallet = async () => {
+    if (!user) return;
+    try {
+      setIsWalletLoading(true);
+      const res = await fetch(`/api/wallet/${user.id}`);
+      const data = await res.json();
+      setWalletData({
+        balance: data.balance,
+        transactions: data.transactions
+      });
+    } catch (err) {
+      console.error('Fetch Wallet Error:', err);
+    } finally {
+      setIsWalletLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'wallet') {
+      fetchWallet();
+    }
+  }, [activeTab, user]);
   const [shopSettings, setShopSettings] = useState({
     openTime: user.openTime || "08:00",
     closeTime: user.closeTime || "18:00",
@@ -210,6 +250,44 @@ export const VendorPortal: React.FC = () => {
     }
   };
 
+  const handleStartAuction = async () => {
+    if (!auctionForm.productName || !auctionForm.startingPrice) {
+      toast.error('Tafadhali jaza taarifa zote muhimu');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auctions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...auctionForm,
+          vendorId: user.id,
+          vendorName: user.shopName || user.name
+        })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      
+      toast.success('Mnada umeanza rasmi!');
+      setIsAuctionModalOpen(false);
+      setAuctionForm({
+        productName: '',
+        description: '',
+        startingPrice: '',
+        minIncrement: '20000',
+        durationHours: '24',
+        location: user.location || '',
+        image: ''
+      });
+      addActivity('🐄', `Umeanzisha mnada wa ${auctionForm.productName}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Imeshindwa kuanzisha mnada');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateOrderStatus = async (order: Order, status: Order['status']) => {
     try {
       await updateDoc(doc(db, 'kuku_orders', order.id), { status });
@@ -250,7 +328,27 @@ export const VendorPortal: React.FC = () => {
     setIsWithdrawModalOpen(true);
   };
 
+  const calculateFee = (amount: number) => {
+    if (!systemSettings) return 5000;
+    if (systemSettings.withdrawalFeeType === 'percentage') {
+      return (amount * (systemSettings.withdrawalFeeValue || 0)) / 100;
+    }
+    return systemSettings.withdrawalFeeValue || 5000;
+  };
+
   const confirmWithdrawal = async () => {
+    if (!user) return;
+    const amountNum = Number(withdrawForm.amount);
+    if (!amountNum || amountNum <= 0) {
+      toast.error('Weka kiasi sahihi');
+      return;
+    }
+
+    if (amountNum > walletData.balance) {
+      toast.error('Salio halitoshi');
+      return;
+    }
+
     if (withdrawForm.method === 'mobile' && !withdrawForm.phoneNumber) {
       toast.error('Tafadhali weka namba ya simu');
       return;
@@ -262,28 +360,42 @@ export const VendorPortal: React.FC = () => {
 
     setLoading(true);
     try {
-      await addDoc(collection(db, 'kuku_withdrawals'), {
-        vendorId: user.id,
-        vendorName: user.shopName || user.name,
-        amount: availableBalance,
-        status: 'pending',
-        method: withdrawForm.method,
-        network: withdrawForm.method === 'mobile' ? withdrawForm.network : null,
-        phoneNumber: withdrawForm.method === 'mobile' ? withdrawForm.phoneNumber : null,
-        bankName: withdrawForm.method === 'bank' ? withdrawForm.bankName : null,
-        accountNumber: withdrawForm.method === 'bank' ? withdrawForm.accountNumber : null,
-        accountName: withdrawForm.method === 'bank' ? withdrawForm.accountName : null,
-        date: new Date().toISOString().split('T')[0],
-        createdAt: serverTimestamp()
+      const res = await fetch('/api/withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendorId: user.id,
+          amount: amountNum,
+          method: withdrawForm.method === 'mobile' ? withdrawForm.network : 'Visa / Mastercard',
+          phone: withdrawForm.method === 'mobile' ? withdrawForm.phoneNumber : `${withdrawForm.bankName} - ${withdrawForm.accountNumber}`
+        })
       });
-      addActivity('💸', `Maombi ya kutoa ${formatCurrency(availableBalance, currency)} kutoka kwa ${user.shopName}`);
-      toast.success('Maombi ya kutoa fedha yametumwa kwa Admin!');
-      setIsWithdrawModalOpen(false);
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      setLastWithdrawalId(data.id);
+      setWithdrawStep('whatsapp');
+      fetchWallet(); // Refresh
+      addActivity('💸', `Umeomba kutoa ${formatCurrency(amountNum, currency)}`);
     } catch (error: any) {
-      toast.error('Hitilafu wakati wa kutuma maombi');
+      toast.error(error.message || 'Hitilafu wakati wa kutuma maombi');
     } finally {
       setLoading(false);
     }
+  };
+
+  const getWhatsAppLink = () => {
+    if (!user) return '';
+    const amountNum = Number(withdrawForm.amount);
+    const fee = calculateFee(amountNum);
+    const net = amountNum - fee;
+    const method = withdrawForm.method === 'mobile' ? withdrawForm.network : 'Visa / Mastercard';
+    const phone = withdrawForm.method === 'mobile' ? withdrawForm.phoneNumber : `${withdrawForm.bankName} - ${withdrawForm.accountNumber}`;
+    
+    const message = `HABARI ADMIN! NAOMBA KUTOA PESA (WITHDRAW) 💸\n\nVENDOR: *${user.shopName || user.name}*\nKIASI: *${formatCurrency(amountNum, currency)}*\nMAKATO (FEE): *${formatCurrency(fee, currency)}*\nUTAPOKEA (NET): *${formatCurrency(net, currency)}*\nNJIA: *${method}*\nNAMBA/ACC: *${phone}*\nID: *${lastWithdrawalId}*\n\nTafadhali hakiki na kunitumia pesa. Asante!`;
+    
+    return `https://wa.me/${systemSettings?.adminWhatsApp || '255764225358'}?text=${encodeURIComponent(message)}`;
   };
 
   const updateShopSettings = async (settings: any) => {
@@ -517,14 +629,22 @@ export const VendorPortal: React.FC = () => {
 
         {activeTab === 'dash' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <h2 className="text-3xl font-black text-slate-900 dark:text-white">Habari, {user.name}! 👋</h2>
-              <button 
-                onClick={() => setIsAddModalOpen(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-100 dark:shadow-none transition-all active:scale-95"
-              >
-                <Plus size={20} /> Ongeza Bidhaa
-              </button>
+              <div className="flex flex-wrap gap-3">
+                <button 
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-100 dark:shadow-none transition-all active:scale-95"
+                >
+                  <Plus size={20} /> Uza Kawaida
+                </button>
+                <button 
+                  onClick={() => setIsAuctionModalOpen(true)}
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-2xl flex items-center gap-2 shadow-lg shadow-purple-100 dark:shadow-none transition-all active:scale-95"
+                >
+                  <TrendingUp size={20} /> Weka Mnada
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -743,21 +863,18 @@ export const VendorPortal: React.FC = () => {
         {activeTab === 'wallet' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <h2 className="text-3xl font-black text-slate-900 mb-8">💰 Wallet Yangu</h2>
+            
             <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-[40px] p-10 text-white shadow-2xl shadow-emerald-100 mb-10 relative overflow-hidden">
               <div className="relative z-10">
                 <p className="text-emerald-200 text-xs font-black uppercase tracking-[0.2em] mb-2">Salio la Wallet (Available)</p>
-                <h3 className="text-5xl font-black mb-6">{formatCurrency(availableBalance, currency)}</h3>
+                <h3 className="text-5xl font-black mb-6">{formatCurrency(walletData.balance, currency)}</h3>
                 <div className="flex gap-4">
                   <button 
-                    onClick={handleWithdrawRequest}
-                    className="bg-white text-emerald-800 px-6 py-3 rounded-2xl font-black text-sm transition-all active:scale-95"
+                    onClick={() => setIsWithdrawModalOpen(true)}
+                    className="bg-white text-emerald-800 px-8 py-4 rounded-2xl font-black text-sm transition-all active:scale-95 shadow-lg"
                   >
                     💸 Omba Malipo (Withdraw)
                   </button>
-                </div>
-                <div className="mt-4 flex gap-6 text-[10px] font-bold text-emerald-100/60 uppercase tracking-widest">
-                  <p>Jumla ya Mapato: {formatCurrency(totalRevenue, currency)}</p>
-                  <p>Zilizotolewa: {formatCurrency(withdrawnAmount, currency)}</p>
                 </div>
               </div>
               <div className="absolute right-[-40px] top-[-40px] text-[240px] opacity-10 select-none pointer-events-none">💰</div>
@@ -765,44 +882,85 @@ export const VendorPortal: React.FC = () => {
 
             <div className="grid lg:grid-cols-2 gap-10">
               <div>
-                <h4 className="text-lg font-black text-slate-900 mb-6">Historia ya Mapato</h4>
-                <div className="space-y-3">
-                  {myOrders.filter(o => o.status === 'delivered').map(order => (
-                    <div key={order.id} className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
-                          <TrendingUp size={20} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-black text-slate-900">{order.userName}</p>
-                          <p className="text-[10px] text-slate-400">{order.date} · {order.items[0].name}</p>
-                        </div>
-                      </div>
-                      <p className="font-black text-emerald-700">+{formatCurrency(order.vendorNet || (order.total - (order.deliveryFee || 0)) * 0.94, currency)}</p>
+                <h4 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+                  <TrendingUp size={20} className="text-emerald-500" /> Historia ya Miamala
+                </h4>
+                <div className="bg-white rounded-[40px] border border-slate-100 overflow-hidden shadow-sm">
+                  {isWalletLoading ? (
+                    <div className="p-20 text-center">
+                      <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                      <p className="text-slate-400 font-bold">Inapakia miamala...</p>
                     </div>
-                  ))}
+                  ) : walletData.transactions.length === 0 ? (
+                    <div className="p-20 text-center">
+                      <Wallet size={48} className="mx-auto text-slate-200 mb-4" />
+                      <p className="text-slate-400">Bado huna miamala yoyote.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-50">
+                      {walletData.transactions.map((tx: any) => (
+                        <div key={tx.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center gap-4">
+                            <div className={cn(
+                              "w-12 h-12 rounded-2xl flex items-center justify-center text-xl",
+                              tx.amount > 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                            )}>
+                              {tx.amount > 0 ? '📈' : '📉'}
+                            </div>
+                            <div>
+                              <p className="font-black text-slate-900">{tx.description || tx.type.toUpperCase()}</p>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                                {tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleString() : tx.date || 'Sasa hivi'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className={cn(
+                              "font-black",
+                              tx.amount > 0 ? "text-emerald-600" : "text-red-600"
+                            )}>
+                              {tx.amount > 0 ? '+' : ''}{formatCurrency(tx.amount, currency)}
+                            </p>
+                            <span className={cn(
+                              "text-[9px] font-black px-2 py-0.5 rounded-full uppercase",
+                              tx.status === 'Completed' || tx.status === 'approved' ? "bg-emerald-100 text-emerald-700" : 
+                              tx.status === 'Pending' || tx.status === 'pending' ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                            )}>
+                              {tx.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div>
-                <h4 className="text-lg font-black text-slate-900 mb-6">Maombi ya Withdraw</h4>
-                <div className="space-y-3">
+                <h4 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+                  <Clock size={20} className="text-amber-500" /> Maombi ya Withdraw
+                </h4>
+                <div className="space-y-4">
                   {myWithdrawals.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic">Bado hujaomba malipo yoyote.</p>
+                    <div className="bg-white rounded-[32px] border border-slate-100 p-10 text-center">
+                      <p className="text-slate-400 text-sm italic">Bado hujaomba malipo yoyote.</p>
+                    </div>
                   ) : (
                     myWithdrawals.map(w => (
-                      <div key={w.id} className="bg-white rounded-2xl border border-slate-100 p-5 flex items-center justify-between">
+                      <div key={w.id} className="bg-white rounded-3xl border border-slate-100 p-6 flex items-center justify-between shadow-sm">
                         <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-lg">💸</div>
+                          <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-xl">💸</div>
                           <div>
                             <p className="text-sm font-black text-slate-900">{formatCurrency(w.amount, currency)}</p>
-                            <p className="text-[10px] text-slate-400">{w.date} · {w.method === 'mobile' ? w.network : 'Bank'}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                              {w.date} · {w.method === 'mobile' ? w.network : 'Bank'}
+                            </p>
                           </div>
                         </div>
                         <span className={cn(
-                          "text-[9px] font-black px-2 py-0.5 rounded-full uppercase",
-                          w.status === 'paid' ? "bg-emerald-100 text-emerald-700" : 
-                          w.status === 'pending' ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                          "text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-wider",
+                          w.status === 'Completed' || w.status === 'paid' ? "bg-emerald-100 text-emerald-700" : 
+                          w.status === 'Pending' || w.status === 'pending' ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
                         )}>
                           {w.status}
                         </span>
@@ -1473,110 +1631,351 @@ export const VendorPortal: React.FC = () => {
       {/* Withdraw Modal */}
       <Modal 
         isOpen={isWithdrawModalOpen} 
-        onClose={() => setIsWithdrawModalOpen(false)}
-        title="Omba Malipo (Withdraw)"
+        onClose={() => {
+          setIsWithdrawModalOpen(false);
+          setWithdrawStep('form');
+        }}
+        title={withdrawStep === 'form' ? "Omba Malipo (Withdraw)" : withdrawStep === 'summary' ? "Thibitisha Malipo" : "Tuma Ombi WhatsApp"}
       >
-        <div className="space-y-6">
-          <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center">
-            <p className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-1">Salio Linaloweza Kutolewa</p>
-            <p className="text-3xl font-black text-emerald-800">{formatCurrency(availableBalance, currency)}</p>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Njia ya Malipo</label>
-            <div className="grid grid-cols-2 gap-3">
-              <button 
-                onClick={() => setWithdrawForm({...withdrawForm, method: 'mobile'})}
-                className={cn(
-                  "py-4 rounded-2xl font-black text-xs transition-all border-2",
-                  withdrawForm.method === 'mobile' ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-100 text-slate-400"
-                )}
-              >
-                📱 Mtandao wa Simu
-              </button>
-              <button 
-                onClick={() => setWithdrawForm({...withdrawForm, method: 'bank'})}
-                className={cn(
-                  "py-4 rounded-2xl font-black text-xs transition-all border-2",
-                  withdrawForm.method === 'bank' ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-100 text-slate-400"
-                )}
-              >
-                🏦 Benki
-              </button>
+        {withdrawStep === 'form' && (
+          <div className="space-y-6">
+            <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center">
+              <p className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-1">Salio la Wallet</p>
+              <p className="text-3xl font-black text-emerald-800">{formatCurrency(walletData.balance, currency)}</p>
             </div>
-          </div>
 
-          {withdrawForm.method === 'mobile' ? (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Chagua Mtandao</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {['M-Pesa', 'Tigo Pesa', 'Airtel Money', 'HaloPesa'].map(net => (
-                    <button 
-                      key={net}
-                      onClick={() => setWithdrawForm({...withdrawForm, network: net as any})}
-                      className={cn(
-                        "py-3 rounded-xl text-[10px] font-black border transition-all",
-                        withdrawForm.network === net ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-500 border-slate-100"
-                      )}
-                    >
-                      {net}
-                    </button>
-                  ))}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kiasi cha Kutoa (TZS)</label>
+              <input 
+                type="number" 
+                placeholder="Mf. 50000"
+                className="input-field"
+                value={withdrawForm.amount}
+                onChange={e => setWithdrawForm({...withdrawForm, amount: e.target.value})}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Njia ya Malipo</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  onClick={() => setWithdrawForm({...withdrawForm, method: 'mobile'})}
+                  className={cn(
+                    "py-4 rounded-2xl font-black text-xs transition-all border-2",
+                    withdrawForm.method === 'mobile' ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-100 text-slate-400"
+                  )}
+                >
+                  📱 Mtandao wa Simu
+                </button>
+                <button 
+                  onClick={() => setWithdrawForm({...withdrawForm, method: 'bank'})}
+                  className={cn(
+                    "py-4 rounded-2xl font-black text-xs transition-all border-2",
+                    withdrawForm.method === 'bank' ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-100 text-slate-400"
+                  )}
+                >
+                  💳 Visa / Mastercard
+                </button>
+              </div>
+            </div>
+
+            {withdrawForm.method === 'mobile' ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Chagua Mtandao</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'M-Pesa', label: 'Vodacom M-Pesa' },
+                      { id: 'Airtel Money', label: 'Airtel Money' },
+                      { id: 'Tigo Pesa', label: 'Tigo Pesa' },
+                      { id: 'HaloPesa', label: 'HaloPesa' }
+                    ].map(net => (
+                      <button 
+                        key={net.id}
+                        onClick={() => setWithdrawForm({...withdrawForm, network: net.id as any})}
+                        className={cn(
+                          "py-3 rounded-xl text-[10px] font-black border transition-all",
+                          withdrawForm.network === net.id ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-500 border-slate-100"
+                        )}
+                      >
+                        {net.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Namba ya Simu</label>
+                  <input 
+                    type="tel" 
+                    placeholder="07XXXXXXXX"
+                    className="input-field"
+                    value={withdrawForm.phoneNumber}
+                    onChange={e => setWithdrawForm({...withdrawForm, phoneNumber: e.target.value})}
+                  />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Namba ya Simu</label>
-                <input 
-                  type="tel" 
-                  placeholder="07XXXXXXXX"
-                  className="input-field"
-                  value={withdrawForm.phoneNumber}
-                  onChange={e => setWithdrawForm({...withdrawForm, phoneNumber: e.target.value})}
-                />
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Card Number / Account Number</label>
+                  <input 
+                    type="text" 
+                    placeholder="Weka namba ya kadi au akaunti"
+                    className="input-field"
+                    value={withdrawForm.accountNumber}
+                    onChange={e => setWithdrawForm({...withdrawForm, accountNumber: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Bank Name (Optional)</label>
+                  <input 
+                    type="text" 
+                    placeholder="Mf. CRDB, NMB"
+                    className="input-field"
+                    value={withdrawForm.bankName}
+                    onChange={e => setWithdrawForm({...withdrawForm, bankName: e.target.value})}
+                  />
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jina la Benki</label>
-                <input 
-                  type="text" 
-                  placeholder="Mf. CRDB, NMB"
-                  className="input-field"
-                  value={withdrawForm.bankName}
-                  onChange={e => setWithdrawForm({...withdrawForm, bankName: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Namba ya Akaunti</label>
-                <input 
-                  type="text" 
-                  placeholder="01XXXXXXXX"
-                  className="input-field"
-                  value={withdrawForm.accountNumber}
-                  onChange={e => setWithdrawForm({...withdrawForm, accountNumber: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jina la Akaunti</label>
-                <input 
-                  type="text" 
-                  placeholder="Jina kamili"
-                  className="input-field"
-                  value={withdrawForm.accountName}
-                  onChange={e => setWithdrawForm({...withdrawForm, accountName: e.target.value})}
-                />
-              </div>
-            </div>
-          )}
+            )}
 
+            <button 
+              onClick={() => {
+                if (!withdrawForm.amount || Number(withdrawForm.amount) <= 0) {
+                  toast.error('Weka kiasi sahihi');
+                  return;
+                }
+                setWithdrawStep('summary');
+              }}
+              className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-lg shadow-xl shadow-slate-100 transition-all active:scale-95"
+            >
+              SUBMIT WITHDRAW
+            </button>
+          </div>
+        )}
+
+        {withdrawStep === 'summary' && (
+          <div className="space-y-6">
+            <div className="bg-slate-50 p-8 rounded-[32px] border border-slate-100 space-y-4">
+              <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+                <span className="text-xs font-bold text-slate-400 uppercase">Vendor</span>
+                <span className="font-black text-slate-900">{user.shopName || user.name}</span>
+              </div>
+              <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+                <span className="text-xs font-bold text-slate-400 uppercase">Kiasi</span>
+                <span className="font-black text-slate-900 text-xl">{formatCurrency(Number(withdrawForm.amount), currency)}</span>
+              </div>
+              <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+                <span className="text-xs font-bold text-slate-400 uppercase">Makato (Fee)</span>
+                <span className="font-black text-red-500">-{formatCurrency(calculateFee(Number(withdrawForm.amount)), currency)}</span>
+              </div>
+              <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+                <span className="text-xs font-bold text-slate-400 uppercase">Utapokea (Net)</span>
+                <span className="font-black text-emerald-600 text-xl">{formatCurrency(Number(withdrawForm.amount) - calculateFee(Number(withdrawForm.amount)), currency)}</span>
+              </div>
+              <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+                <span className="text-xs font-bold text-slate-400 uppercase">Njia</span>
+                <span className="font-black text-slate-900">{withdrawForm.method === 'mobile' ? withdrawForm.network : 'Visa / Mastercard'}</span>
+              </div>
+              <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+                <span className="text-xs font-bold text-slate-400 uppercase">Namba</span>
+                <span className="font-black text-slate-900">{withdrawForm.method === 'mobile' ? withdrawForm.phoneNumber : withdrawForm.accountNumber}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-400 uppercase">Hali</span>
+                <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">Pending</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setWithdrawStep('form')}
+                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black transition-all"
+              >
+                RUDI NYUMA
+              </button>
+              <button 
+                onClick={confirmWithdrawal}
+                disabled={loading}
+                className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black transition-all shadow-lg shadow-emerald-100 flex items-center justify-center gap-2"
+              >
+                {loading ? 'INAHIFADHI...' : 'CONFIRM WITHDRAW'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {withdrawStep === 'whatsapp' && (
+          <div className="space-y-8 text-center py-6">
+            <div className="w-24 h-24 bg-emerald-50 rounded-[40px] flex items-center justify-center text-5xl mx-auto mb-4">
+              ✅
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-slate-900 mb-2">Ombi Limehifadhiwa!</h3>
+              <p className="text-slate-500 text-sm leading-relaxed px-6">
+                Sasa tuma ombi lako kwa Admin kupitia WhatsApp ili akutumie pesa haraka iwezekanavyo.
+              </p>
+            </div>
+
+            <button 
+              onClick={() => {
+                window.open(getWhatsAppLink(), '_blank');
+                setIsWithdrawModalOpen(false);
+                setWithdrawStep('form');
+              }}
+              className="w-full py-5 bg-emerald-600 text-white rounded-3xl font-black text-lg shadow-xl shadow-emerald-100 transition-all active:scale-95 flex items-center justify-center gap-3"
+            >
+              <Send size={24} /> SEND WITHDRAW REQUEST
+            </button>
+          </div>
+        )}
+      </Modal>
+
+      {/* Auction Modal */}
+      <Modal 
+        isOpen={isAuctionModalOpen} 
+        onClose={() => setIsAuctionModalOpen(false)}
+        title="Weka Mnada (Auction)"
+      >
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jina la Mfugo</label>
+              <input 
+                type="text" 
+                className="input-field"
+                placeholder="Mf. Ng'ombe wa maziwa"
+                value={auctionForm.productName}
+                onChange={e => setAuctionForm({...auctionForm, productName: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Bei ya Kuanzia (TZS)</label>
+              <input 
+                type="number" 
+                className="input-field"
+                placeholder="500000"
+                value={auctionForm.startingPrice}
+                onChange={e => setAuctionForm({...auctionForm, startingPrice: e.target.value})}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ongezeko la chini (Bid)</label>
+              <input 
+                type="number" 
+                className="input-field"
+                placeholder="20000"
+                value={auctionForm.minIncrement}
+                onChange={e => setAuctionForm({...auctionForm, minIncrement: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Muda wa Mnada (Saa)</label>
+              <select 
+                className="input-field"
+                value={auctionForm.durationHours}
+                onChange={e => setAuctionForm({...auctionForm, durationHours: e.target.value})}
+              >
+                <option value="1">Saa 1</option>
+                <option value="6">Saa 6</option>
+                <option value="12">Saa 12</option>
+                <option value="24">Saa 24</option>
+                <option value="48">Saa 48</option>
+                <option value="72">Saa 72</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Location</label>
+            <input 
+              type="text" 
+              className="input-field"
+              placeholder="Mf. Morogoro"
+              value={auctionForm.location}
+              onChange={e => setAuctionForm({...auctionForm, location: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Maelezo</label>
+            <textarea 
+              className="input-field resize-none"
+              rows={3}
+              placeholder="Elezea mfugo wako hapa..."
+              value={auctionForm.description}
+              onChange={e => setAuctionForm({...auctionForm, description: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Picha ya Mfugo</label>
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden">
+                {auctionForm.image ? (
+                  <img src={auctionForm.image} alt="Preview" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-2xl opacity-20">📸</span>
+                )}
+              </div>
+              <div className="flex-1">
+                {isImageKitConfigured ? (
+                  <IKContext 
+                    publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
+                    urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
+                    authenticator={async () => {
+                      const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
+                      return await res.json();
+                    }}
+                  >
+                      <IKUpload
+                        fileName={`auction_${Date.now()}.png`}
+                        tags={["auction"]}
+                        useUniqueFileName={true}
+                        onSuccess={(res) => {
+                          setAuctionForm({...auctionForm, image: res.url});
+                          toast.success('Picha imepakiwa!');
+                        }}
+                        onError={(err) => {
+                          console.error('Upload Error:', err);
+                          toast.error('Imeshindwa kupakia picha.');
+                        }}
+                        className="hidden"
+                        id="auction-image"
+                      />
+                  </IKContext>
+                ) : (
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setAuctionForm({...auctionForm, image: reader.result as string});
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                    id="auction-image"
+                  />
+                )}
+                <label 
+                  htmlFor="auction-image"
+                  className="inline-block px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-black cursor-pointer hover:bg-slate-200 transition-all"
+                >
+                  {isImageKitConfigured ? 'PAKIA PICHA' : 'CHAGUA PICHA'}
+                </label>
+              </div>
+            </div>
+          </div>
           <button 
-            onClick={confirmWithdrawal}
+            onClick={handleStartAuction}
             disabled={loading}
-            className="w-full btn-primary bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100 py-5 text-lg"
+            className="w-full py-5 bg-purple-600 text-white rounded-3xl font-black text-lg shadow-xl shadow-purple-100 transition-all active:scale-95"
           >
-            {loading ? 'INATUMA...' : '💸 Omba Malipo (Withdraw)'}
+            {loading ? 'INAHIFADHI...' : '🚀 ANZISHA MNADA'}
           </button>
         </div>
       </Modal>
