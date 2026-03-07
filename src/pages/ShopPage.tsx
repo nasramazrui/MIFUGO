@@ -846,17 +846,20 @@ export const ShopPage: React.FC = () => {
 
           <nav className="space-y-2">
             {[
-              { id: 'cart', label: t('cart_title'), icon: ShoppingCart },
               { id: 'browse', label: t('market'), icon: ShoppingBag },
               { id: 'auctions', label: t('auctions'), icon: Gavel },
+              { id: 'cart', label: t('cart_title'), icon: ShoppingCart },
               { id: 'stores', label: t('stores'), icon: Store },
               { id: 'orders', label: t('orders'), icon: Package },
+              { id: 'profile', label: t('profile'), icon: UserIcon },
             ].map((item) => (
               <button
                 key={item.id}
                 onClick={() => {
                   if (item.id === 'cart') {
                     setIsCartModalOpen(true);
+                  } else if (item.id === 'profile') {
+                    setIsProfileModalOpen(true);
                   } else {
                     setActiveTab(item.id as any);
                   }
@@ -1334,65 +1337,70 @@ export const ShopPage: React.FC = () => {
       </div> {/* End of lg:pl-72 */}
 
       {/* Bottom Nav (Mobile Only) */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-950/90 backdrop-blur-2xl border-t border-slate-100 dark:border-slate-800/50 px-6 py-4 z-40">
-        <div className="max-w-md mx-auto flex justify-between items-center">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#050A18] border-t border-white/5 px-4 py-3 z-40 pb-safe">
+        <div className="max-w-md mx-auto flex justify-between items-end">
           <button 
             onClick={() => setActiveTab('browse')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all", activeTab === 'browse' ? "text-amber-600 scale-110" : "text-slate-400")}
+            className={cn("flex flex-col items-center gap-1 transition-all flex-1", activeTab === 'browse' ? "text-amber-500" : "text-slate-500")}
           >
-            <ShoppingBag size={22} strokeWidth={activeTab === 'browse' ? 3 : 2} />
-            <span className="text-[9px] font-black uppercase tracking-widest">{t('market')}</span>
+            <ShoppingBag size={20} strokeWidth={2} />
+            <span className="text-[8px] font-black uppercase tracking-widest">{t('market')}</span>
           </button>
+          
           <button 
             onClick={() => setActiveTab('auctions')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all", activeTab === 'auctions' ? "text-amber-600 scale-110" : "text-slate-400")}
+            className={cn("flex flex-col items-center gap-1 transition-all flex-1", activeTab === 'auctions' ? "text-amber-500" : "text-slate-500")}
           >
-            <Gavel size={22} strokeWidth={activeTab === 'auctions' ? 3 : 2} />
-            <span className="text-[9px] font-black uppercase tracking-widest">{t('auctions')}</span>
+            <Gavel size={20} strokeWidth={2} />
+            <span className="text-[8px] font-black uppercase tracking-widest">{t('auctions')}</span>
           </button>
 
-          {/* Raised Cart Button */}
-          <div className="relative -top-8">
-            <button 
-              onClick={() => setIsCartModalOpen(true)}
-              className={cn(
-                "w-16 h-16 rounded-[24px] flex items-center justify-center shadow-2xl transition-all active:scale-90 border-4 border-white dark:border-slate-950 group overflow-hidden",
-                cart.length > 0 ? "bg-amber-600 text-white shadow-amber-600/40" : "bg-slate-100 dark:bg-slate-900 text-slate-400"
-              )}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative">
-                <ShoppingCart size={28} strokeWidth={2.5} />
-                {cart.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white dark:border-amber-600 animate-bounce">
-                    {cart.reduce((sum, item) => sum + item.qty, 0)}
-                  </span>
+          {/* Center Item with Raised Cart */}
+          <div className="flex-1 flex flex-col items-center relative">
+            {/* Raised Cart Button */}
+            <div className="absolute -top-14 left-1/2 -translate-x-1/2">
+              <button 
+                onClick={() => setIsCartModalOpen(true)}
+                className={cn(
+                  "w-16 h-16 rounded-[24px] flex items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all active:scale-90 group overflow-hidden relative",
+                  cart.length > 0 ? "bg-[#1A2235] text-white" : "bg-[#1A2235] text-slate-500"
                 )}
-              </div>
+              >
+                <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative">
+                  <ShoppingCart size={28} strokeWidth={2} />
+                  {cart.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#1A2235] animate-bounce">
+                      {cart.reduce((sum, item) => sum + item.qty, 0)}
+                    </span>
+                  )}
+                </div>
+              </button>
+            </div>
+
+            <button 
+              onClick={() => setActiveTab('stores')}
+              className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'stores' ? "text-amber-500" : "text-slate-500")}
+            >
+              <Store size={20} strokeWidth={2} />
+              <span className="text-[8px] font-black uppercase tracking-widest">{t('stores')}</span>
             </button>
           </div>
 
           <button 
-            onClick={() => setActiveTab('stores')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all", activeTab === 'stores' ? "text-amber-600 scale-110" : "text-slate-400")}
-          >
-            <Store size={22} strokeWidth={activeTab === 'stores' ? 3 : 2} />
-            <span className="text-[9px] font-black uppercase tracking-widest">{t('stores')}</span>
-          </button>
-
-          <button 
             onClick={() => setActiveTab('orders')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all", activeTab === 'orders' ? "text-amber-600 scale-110" : "text-slate-400")}
+            className={cn("flex flex-col items-center gap-1 transition-all flex-1", activeTab === 'orders' ? "text-amber-500" : "text-slate-500")}
           >
-            <Package size={22} strokeWidth={activeTab === 'orders' ? 3 : 2} />
-            <span className="text-[9px] font-black uppercase tracking-widest">{t('orders')}</span>
+            <Package size={20} strokeWidth={2} />
+            <span className="text-[8px] font-black uppercase tracking-widest">{t('orders')}</span>
           </button>
+          
           <button 
             onClick={() => setIsProfileModalOpen(true)}
-            className={cn("flex flex-col items-center gap-1.5 transition-all text-slate-400")}
+            className={cn("flex flex-col items-center gap-1 transition-all flex-1 text-slate-500")}
           >
-            <UserIcon size={22} />
-            <span className="text-[9px] font-black uppercase tracking-widest">{t('profile')}</span>
+            <UserIcon size={20} strokeWidth={2} />
+            <span className="text-[8px] font-black uppercase tracking-widest">{t('profile')}</span>
           </button>
         </div>
       </nav>
