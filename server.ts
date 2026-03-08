@@ -16,11 +16,14 @@ dotenv.config();
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
+  const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || 'kuku-market-default';
+  console.log(`Initializing Firebase Admin for project: ${projectId}`);
   admin.initializeApp({
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'kuku-market-default'
+    projectId
   });
 }
 const db = admin.firestore();
+db.settings({ ignoreUndefinedProperties: true });
 
 // Twilio Setup
 const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN 
@@ -65,9 +68,14 @@ app.get('/api/wallet/:vendorId', async (req, res) => {
       vendorName: walletData?.shopName || walletData?.name || 'Vendor',
       transactions
     });
-  } catch (err) {
-    console.error('Wallet Error:', err);
-    res.status(500).json({ error: 'Failed to fetch wallet data' });
+  } catch (err: any) {
+    console.error('Wallet Error Details:', {
+      message: err.message,
+      code: err.code,
+      details: err.details,
+      vendorId: req.params.vendorId
+    });
+    res.status(500).json({ error: 'Failed to fetch wallet data', details: err.message });
   }
 });
 
@@ -141,10 +149,11 @@ app.post('/api/withdraw', async (req, res) => {
       const fromPhone = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
       
       try {
+        const formattedAmount = isNaN(amountNum) ? '0' : amountNum.toLocaleString();
         await twilioClient.messages.create({
           from: fromPhone,
           to: adminPhone,
-          body: `*WITHDRAW REQUEST*\n\nVendor: ${vendorName}\nAmount: ${amountNum.toLocaleString()} TZS\nMethod: ${method}\nPhone: ${phone}\n\nStatus: Pending Approval`
+          body: `*WITHDRAW REQUEST*\n\nVendor: ${vendorName}\nAmount: ${formattedAmount} TZS\nMethod: ${method}\nPhone: ${phone}\n\nStatus: Pending Approval`
         });
         console.log('WhatsApp notification sent');
       } catch (twErr) {
@@ -153,9 +162,14 @@ app.post('/api/withdraw', async (req, res) => {
     }
 
     res.json({ id: withdrawRef.id, status: 'Pending' });
-  } catch (err) {
-    console.error('Withdraw Error:', err);
-    res.status(500).json({ error: 'Failed to process withdrawal' });
+  } catch (err: any) {
+    console.error('Withdraw Error Details:', {
+      message: err.message,
+      code: err.code,
+      details: err.details,
+      vendorId: req.body.vendorId
+    });
+    res.status(500).json({ error: 'Failed to process withdrawal', details: err.message });
   }
 });
 
@@ -172,9 +186,13 @@ app.get('/api/admin/withdrawals', async (req, res) => {
     }));
 
     res.json(withdrawals);
-  } catch (err) {
-    console.error('Admin Withdrawals Error:', err);
-    res.status(500).json({ error: 'Failed to fetch withdrawals' });
+  } catch (err: any) {
+    console.error('Admin Withdrawals Error Details:', {
+      message: err.message,
+      code: err.code,
+      details: err.details
+    });
+    res.status(500).json({ error: 'Failed to fetch withdrawals', details: err.message });
   }
 });
 
@@ -222,9 +240,14 @@ app.post('/api/admin/withdrawals/:id/update', async (req, res) => {
     }
 
     res.json({ success: true, status });
-  } catch (err) {
-    console.error('Update Withdrawal Error:', err);
-    res.status(500).json({ error: 'Failed to update withdrawal' });
+  } catch (err: any) {
+    console.error('Update Withdrawal Error Details:', {
+      message: err.message,
+      code: err.code,
+      details: err.details,
+      id: req.params.id
+    });
+    res.status(500).json({ error: 'Failed to update withdrawal', details: err.message });
   }
 });
 
@@ -252,9 +275,13 @@ app.get('/api/imagekit/auth', async (req, res) => {
 
     const result = ik.getAuthenticationParameters();
     res.send(result);
-  } catch (err) {
-    console.error('ImageKit Auth Error:', err);
-    res.status(500).json({ error: 'Failed to get auth parameters' });
+  } catch (err: any) {
+    console.error('ImageKit Auth Error Details:', {
+      message: err.message,
+      code: err.code,
+      details: err.details
+    });
+    res.status(500).json({ error: 'Failed to get auth parameters', details: err.message });
   }
 });
 
@@ -323,6 +350,7 @@ app.post('/api/auctions', async (req, res) => {
 
     res.json({ id: auctionRef.id });
   } catch (error: any) {
+    console.error('Create Auction Error:', error);
     res.status(500).json({ error: error.message });
   }
 });

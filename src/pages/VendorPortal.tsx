@@ -913,7 +913,9 @@ export const VendorPortal: React.FC = () => {
                             <div>
                               <p className="font-black text-slate-900">{tx.description || tx.type.toUpperCase()}</p>
                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                                {tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleString() : tx.date || 'Sasa hivi'}
+                                {tx.createdAt?.toDate ? tx.createdAt.toDate().toLocaleString() : 
+                                 tx.createdAt?._seconds ? new Date(tx.createdAt._seconds * 1000).toLocaleString() :
+                                 tx.date || 'Sasa hivi'}
                               </p>
                             </div>
                           </div>

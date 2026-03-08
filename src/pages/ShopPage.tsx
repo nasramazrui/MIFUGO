@@ -1358,7 +1358,7 @@ export const ShopPage: React.FC = () => {
           {/* Center Item with Raised Cart */}
           <div className="flex-1 flex flex-col items-center relative">
             {/* Raised Cart Button */}
-            <div className="absolute -top-14 left-1/2 -translate-x-1/2">
+            <div className="absolute -top-24 left-1/2 -translate-x-1/2">
               <button 
                 onClick={() => setIsCartModalOpen(true)}
                 className={cn(

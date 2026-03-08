@@ -5,7 +5,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number, currency: string = 'TZS') {
+export function formatCurrency(amount: number | undefined | null, currency: string = 'TZS') {
+  if (amount === undefined || amount === null || isNaN(amount)) return `${currency} 0`;
   return `${currency} ${amount.toLocaleString()}`;
 }
 
