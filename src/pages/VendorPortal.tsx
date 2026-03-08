@@ -28,7 +28,8 @@ import {
   ArrowLeft,
   Camera,
   MessageSquare,
-  Star
+  Star,
+  Gavel
 } from 'lucide-react';
 import { cn } from '../utils';
 
@@ -44,9 +45,9 @@ import {
 import { toast } from 'react-hot-toast';
 
 export const VendorPortal: React.FC = () => {
-  const { user, products, orders, withdrawals, statuses, categories, reviews, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t } = useApp();
+  const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t } = useApp();
   const currency = systemSettings?.currency || 'TZS';
-  const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status' | 'reviews'>('dash');
+  const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status' | 'reviews' | 'auctions'>('dash');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -63,9 +64,11 @@ export const VendorPortal: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [isAuctionModalOpen, setIsAuctionModalOpen] = useState(false);
-  const [productImageSource, setProductImageSource] = useState<'upload' | 'link'>('upload');
-  const [auctionImageSource, setAuctionImageSource] = useState<'upload' | 'link'>('upload');
-  const [editProductImageSource, setEditProductImageSource] = useState<'upload' | 'link'>('upload');
+  const [isAuctionEditModalOpen, setIsAuctionEditModalOpen] = useState(false);
+  const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
+  const [productImageSource, setProductImageSource] = useState<'upload' | 'link'>('link');
+  const [auctionImageSource, setAuctionImageSource] = useState<'upload' | 'link'>('link');
+  const [editProductImageSource, setEditProductImageSource] = useState<'upload' | 'link'>('link');
   const [withdrawStep, setWithdrawStep] = useState<'form' | 'summary' | 'whatsapp'>('form');
   const [lastWithdrawalId, setLastWithdrawalId] = useState<string | null>(null);
   const [walletData, setWalletData] = useState<{ balance: number, transactions: any[] }>({ balance: 0, transactions: [] });
@@ -98,13 +101,24 @@ export const VendorPortal: React.FC = () => {
     try {
       setIsWalletLoading(true);
       const res = await fetch(`/api/wallet/${user.id}`);
+      
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('Wallet API Error Response:', text);
+        throw new Error(`Server returned ${res.status}: ${text.substring(0, 100)}`);
+      }
+      
       const data = await res.json();
       setWalletData({
         balance: data.balance,
         transactions: data.transactions
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Fetch Wallet Error:', err);
+      // Only show toast if it's a real error, not just a cancelation
+      if (err.name !== 'AbortError') {
+        toast.error(`Hitilafu ya Wallet: ${err.message}`);
+      }
     } finally {
       setIsWalletLoading(false);
     }
@@ -185,6 +199,7 @@ export const VendorPortal: React.FC = () => {
   const myOrders = orders.filter(o => o.vendorId === user.id);
   const myWithdrawals = withdrawals.filter(w => w.vendorId === user.id);
   const myStatuses = statuses.filter(s => s.vendorId === user.id);
+  const myAuctions = auctions.filter(a => a.vendorId === user.id);
   
   const totalRevenue = myOrders
     .filter(o => o.status === 'delivered')
@@ -253,6 +268,41 @@ export const VendorPortal: React.FC = () => {
     }
   };
 
+  const handleDeleteAuction = async (id: string) => {
+    if (!window.confirm('Je, una uhakika unataka kufuta mnada huu?')) return;
+    try {
+      await deleteDoc(doc(db, 'kuku_auctions', id));
+      toast.success('Mnada umefutwa!');
+      addActivity('🗑️', 'Umefuta mnada');
+    } catch (err) {
+      toast.error('Imeshindwa kufuta mnada');
+    }
+  };
+
+  const handleUpdateAuction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAuction) return;
+    setLoading(true);
+    try {
+      const auctionRef = doc(db, 'kuku_auctions', editingAuction.id);
+      await updateDoc(auctionRef, {
+        productName: auctionForm.productName,
+        description: auctionForm.description,
+        startingPrice: Number(auctionForm.startingPrice),
+        minIncrement: Number(auctionForm.minIncrement),
+        location: auctionForm.location,
+        image: auctionForm.image
+      });
+      toast.success('Mnada umesasishwa!');
+      setIsAuctionEditModalOpen(false);
+      setEditingAuction(null);
+    } catch (err: any) {
+      toast.error('Imeshindwa kusasisha mnada');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleStartAuction = async () => {
     if (!auctionForm.productName || !auctionForm.startingPrice) {
       toast.error('Tafadhali jaza taarifa zote muhimu');
@@ -260,17 +310,26 @@ export const VendorPortal: React.FC = () => {
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/auctions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...auctionForm,
-          vendorId: user.id,
-          vendorName: user.shopName || user.name
-        })
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      // Create auction directly on client-side to avoid server-side permission issues
+      const endTime = new Date();
+      endTime.setHours(endTime.getHours() + Number(auctionForm.durationHours || 24));
+      
+      const auctionData = {
+        vendorId: user.id,
+        vendorName: user.shopName || user.name,
+        productName: auctionForm.productName,
+        description: auctionForm.description,
+        startingPrice: Number(auctionForm.startingPrice),
+        minIncrement: Number(auctionForm.minIncrement || 0),
+        currentBid: Number(auctionForm.startingPrice),
+        endTime: endTime,
+        location: auctionForm.location,
+        image: auctionForm.image,
+        status: 'active' as const,
+        createdAt: serverTimestamp()
+      };
+      
+      await addDoc(collection(db, 'kuku_auctions'), auctionData);
       
       toast.success('Mnada umeanza rasmi!');
       setIsAuctionModalOpen(false);
@@ -285,6 +344,7 @@ export const VendorPortal: React.FC = () => {
       });
       addActivity('🐄', `Umeanzisha mnada wa ${auctionForm.productName}`);
     } catch (err: any) {
+      console.error('Auction creation error:', err);
       toast.error(err.message || 'Imeshindwa kuanzisha mnada');
     } finally {
       setLoading(false);
@@ -560,6 +620,7 @@ export const VendorPortal: React.FC = () => {
           {[
             { id: 'dash', label: 'Dashibodi', icon: LayoutDashboard },
             { id: 'products', label: 'Bidhaa Zangu', icon: Package },
+            { id: 'auctions', label: 'Minada Yangu', icon: Gavel },
             { id: 'orders', label: 'Maagizo', icon: ClipboardList },
             { id: 'wallet', label: 'Wallet', icon: Wallet },
             { id: 'reviews', label: 'Maoni (Reviews)', icon: MessageSquare },
@@ -977,6 +1038,73 @@ export const VendorPortal: React.FC = () => {
             </div>
           </motion.div>
         )}
+        {activeTab === 'auctions' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-3xl font-black text-slate-900">Minada Yangu</h2>
+              <button onClick={() => setIsAuctionModalOpen(true)} className="btn-primary flex items-center gap-2">
+                <Plus size={20} /> Anza Mnada
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {myAuctions.map(a => (
+                <div key={a.id} className="bg-white rounded-[28px] border border-slate-100 overflow-hidden shadow-sm group">
+                  <div className="aspect-video bg-slate-50 flex items-center justify-center text-5xl relative overflow-hidden">
+                    {a.image ? (
+                      <img src={a.image} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      '🐄'
+                    )}
+                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => {
+                          setEditingAuction(a);
+                          setAuctionForm({
+                            productName: a.productName,
+                            description: a.description,
+                            startingPrice: a.startingPrice.toString(),
+                            minIncrement: a.minIncrement.toString(),
+                            durationHours: '24',
+                            location: a.location,
+                            image: a.image || ''
+                          });
+                          setIsAuctionEditModalOpen(true);
+                        }}
+                        className="w-10 h-10 bg-white shadow-lg rounded-xl flex items-center justify-center text-blue-500 hover:bg-blue-50 transition-colors"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteAuction(a.id)}
+                        className="w-10 h-10 bg-white shadow-lg rounded-xl flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                    <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm">
+                      {a.status}
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <h4 className="font-black text-slate-900 mb-1">{a.productName}</h4>
+                    <p className="text-xs text-slate-400 mb-4 line-clamp-2">{a.description}</p>
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Current Bid</p>
+                        <p className="text-sm font-black text-emerald-700">{formatCurrency(a.currentBid, currency)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Bidders</p>
+                        <p className="text-sm font-black text-slate-900">{a.highestBidderName || 'No bids'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'reviews' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <h2 className="text-3xl font-black text-slate-900 mb-8">Maoni ya Wateja</h2>
@@ -1375,7 +1503,7 @@ export const VendorPortal: React.FC = () => {
                   productImageSource === 'link' ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"
                 )}
               >
-                Link
+                Link ya Picha
               </button>
             </div>
 
@@ -1395,8 +1523,17 @@ export const VendorPortal: React.FC = () => {
                         publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
                         urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
                         authenticator={async () => {
-                          const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
-                          return await res.json();
+                          try {
+                            const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
+                            if (!res.ok) {
+                              const errorData = await res.json();
+                              throw new Error(errorData.error || `Server returned ${res.status}`);
+                            }
+                            return await res.json();
+                          } catch (err: any) {
+                            console.error('Authenticator Error:', err);
+                            throw new Error(`Authentication failed: ${err.message}`);
+                          }
                         }}
                       >
                           <IKUpload
@@ -1407,9 +1544,10 @@ export const VendorPortal: React.FC = () => {
                               setNewProduct({...newProduct, image: res.url});
                               toast.success('Picha imepakiwa!');
                             }}
-                            onError={(err) => {
+                            onError={(err: any) => {
                               console.error('Upload Error:', err);
-                              toast.error('Imeshindwa kupakia picha. Hakikisha ImageKit Keys zipo kwenye Secrets.');
+                              const msg = err.message || 'Imeshindwa kupakia picha. Hakikisha ImageKit Keys zipo kwenye Secrets.';
+                              toast.error(msg);
                             }}
                             className="hidden"
                             id="product-image"
@@ -1444,7 +1582,7 @@ export const VendorPortal: React.FC = () => {
                   <input 
                     type="text"
                     className="input-field"
-                    placeholder="Weka link ya picha hapa..."
+                    placeholder="Weka link yoyote ya picha hapa (mfano: https://...)"
                     value={newProduct.image}
                     onChange={e => setNewProduct({...newProduct, image: e.target.value})}
                   />
@@ -1587,7 +1725,7 @@ export const VendorPortal: React.FC = () => {
                     editProductImageSource === 'link' ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"
                   )}
                 >
-                  Link
+                  Link ya Picha
                 </button>
               </div>
 
@@ -1607,8 +1745,17 @@ export const VendorPortal: React.FC = () => {
                           publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
                           urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
                           authenticator={async () => {
-                            const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
-                            return await res.json();
+                            try {
+                              const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
+                              if (!res.ok) {
+                                const errorData = await res.json();
+                                throw new Error(errorData.error || `Server returned ${res.status}`);
+                              }
+                              return await res.json();
+                            } catch (err: any) {
+                              console.error('Authenticator Error:', err);
+                              throw new Error(`Authentication failed: ${err.message}`);
+                            }
                           }}
                         >
                           <IKUpload
@@ -1619,9 +1766,10 @@ export const VendorPortal: React.FC = () => {
                               setEditingProduct({...editingProduct, image: res.url});
                               toast.success('Picha imesasishwa!');
                             }}
-                            onError={(err) => {
+                            onError={(err: any) => {
                               console.error('Upload Error:', err);
-                              toast.error('Imeshindwa kupakia picha. Hakikisha ImageKit Keys zipo kwenye Secrets.');
+                              const msg = err.message || 'Imeshindwa kupakia picha. Hakikisha ImageKit Keys zipo kwenye Secrets.';
+                              toast.error(msg);
                             }}
                             className="hidden"
                             id="edit-product-image"
@@ -1656,7 +1804,7 @@ export const VendorPortal: React.FC = () => {
                     <input 
                       type="text"
                       className="input-field"
-                      placeholder="Weka link ya picha hapa..."
+                      placeholder="Weka link yoyote ya picha hapa (mfano: https://...)"
                       value={editingProduct.image}
                       onChange={e => setEditingProduct({...editingProduct, image: e.target.value})}
                     />
@@ -1997,7 +2145,7 @@ export const VendorPortal: React.FC = () => {
                   auctionImageSource === 'link' ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-500"
                 )}
               >
-                Link
+                Link ya Picha
               </button>
             </div>
 
@@ -2017,8 +2165,17 @@ export const VendorPortal: React.FC = () => {
                         publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
                         urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
                         authenticator={async () => {
-                          const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
-                          return await res.json();
+                          try {
+                            const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
+                            if (!res.ok) {
+                              const errorData = await res.json();
+                              throw new Error(errorData.error || `Server returned ${res.status}`);
+                            }
+                            return await res.json();
+                          } catch (err: any) {
+                            console.error('Authenticator Error:', err);
+                            throw new Error(`Authentication failed: ${err.message}`);
+                          }
                         }}
                       >
                           <IKUpload
@@ -2029,9 +2186,10 @@ export const VendorPortal: React.FC = () => {
                               setAuctionForm({...auctionForm, image: res.url});
                               toast.success('Picha imepakiwa!');
                             }}
-                            onError={(err) => {
+                            onError={(err: any) => {
                               console.error('Upload Error:', err);
-                              toast.error('Imeshindwa kupakia picha.');
+                              const msg = err.message || 'Imeshindwa kupakia picha. Hakikisha ImageKit Keys zipo kwenye Secrets.';
+                              toast.error(msg);
                             }}
                             className="hidden"
                             id="auction-image"
@@ -2066,7 +2224,7 @@ export const VendorPortal: React.FC = () => {
                   <input 
                     type="text"
                     className="input-field"
-                    placeholder="Weka link ya picha hapa..."
+                    placeholder="Weka link yoyote ya picha hapa (mfano: https://...)"
                     value={auctionForm.image}
                     onChange={e => setAuctionForm({...auctionForm, image: e.target.value})}
                   />
@@ -2080,6 +2238,82 @@ export const VendorPortal: React.FC = () => {
             className="w-full py-5 bg-purple-600 text-white rounded-3xl font-black text-lg shadow-xl shadow-purple-100 transition-all active:scale-95"
           >
             {loading ? 'INAHIFADHI...' : '🚀 ANZISHA MNADA'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Edit Auction Modal */}
+      <Modal 
+        isOpen={isAuctionEditModalOpen} 
+        onClose={() => {
+          setIsAuctionEditModalOpen(false);
+          setEditingAuction(null);
+        }}
+        title="Hariri Mnada"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jina la Bidhaa *</label>
+            <input 
+              type="text" 
+              className="input-field"
+              value={auctionForm.productName}
+              onChange={e => setAuctionForm({...auctionForm, productName: e.target.value})}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Bei ya Kuanzia (TZS) *</label>
+              <input 
+                type="number" 
+                className="input-field"
+                value={auctionForm.startingPrice}
+                onChange={e => setAuctionForm({...auctionForm, startingPrice: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ongezeko la Chini (TZS)</label>
+              <input 
+                type="number" 
+                className="input-field"
+                value={auctionForm.minIncrement}
+                onChange={e => setAuctionForm({...auctionForm, minIncrement: e.target.value})}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Eneo</label>
+            <input 
+              type="text" 
+              className="input-field"
+              value={auctionForm.location}
+              onChange={e => setAuctionForm({...auctionForm, location: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Maelezo</label>
+            <textarea 
+              className="input-field resize-none"
+              rows={3}
+              value={auctionForm.description}
+              onChange={e => setAuctionForm({...auctionForm, description: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Picha ya Mnada (URL)</label>
+            <input 
+              type="text" 
+              className="input-field"
+              value={auctionForm.image}
+              onChange={e => setAuctionForm({...auctionForm, image: e.target.value})}
+            />
+          </div>
+          <button 
+            onClick={handleUpdateAuction}
+            disabled={loading}
+            className="w-full py-5 bg-blue-600 text-white rounded-3xl font-black text-lg shadow-xl shadow-blue-100 transition-all active:scale-95"
+          >
+            {loading ? 'INAHIFADHI...' : 'HIFADHI MABADILIKO'}
           </button>
         </div>
       </Modal>

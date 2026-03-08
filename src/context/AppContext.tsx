@@ -247,16 +247,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as Category)));
     });
 
+    // Auctions
+    const qAuctions = query(collection(db, 'kuku_auctions'), orderBy('createdAt', 'desc'));
+    const unsubAuctions = onSnapshot(qAuctions, (snap) => {
+      setAuctions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Auction)));
+    });
+
     // Wallet Transactions
     const qWallet = query(collection(db, 'kuku_wallet'), orderBy('createdAt', 'desc'));
     const unsubWallet = onSnapshot(qWallet, (snap) => {
       setWalletTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction)));
-    });
-
-    // Auctions
-    const qAuctions = query(collection(db, 'kuku_auctions'), orderBy('endTime', 'asc'));
-    const unsubAuctions = onSnapshot(qAuctions, (snap) => {
-      setAuctions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Auction)));
     });
 
     return () => {

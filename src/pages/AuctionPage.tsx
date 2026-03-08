@@ -40,7 +40,21 @@ export const AuctionPage: React.FC = () => {
 
   const finalizeAuction = async (auctionId: string) => {
     try {
-      await fetch(`/api/auctions/${auctionId}/finalize`, { method: 'POST' });
+      const auctionRef = doc(db, 'kuku_auctions', auctionId);
+      const auctionSnap = await getDoc(auctionRef);
+      
+      if (auctionSnap.exists()) {
+        const auction = auctionSnap.data();
+        if (auction.status !== 'ended') {
+          await updateDoc(auctionRef, {
+            status: 'ended',
+            winnerId: auction.highestBidderId || null,
+            winnerName: auction.highestBidderName || null,
+            paymentStatus: 'pending'
+          });
+          console.log(`Auction ${auctionId} finalized on client`);
+        }
+      }
     } catch (err) {
       console.error('Finalize error:', err);
     }
@@ -132,24 +146,71 @@ export const AuctionPage: React.FC = () => {
       if (paymentMethod === 'wallet') {
         if ((user.walletBalance || 0) < selectedAuction.currentBid) {
           toast.error('Salio la wallet halitoshi.');
+          setIsPaying(false);
           return;
         }
-        // Logic for wallet payment would go here (API call)
-        // For now, we'll use the confirm payment API
+        
+        // Deduct from wallet
+        await updateDoc(doc(db, 'kuku_users', user.id), {
+          walletBalance: increment(-selectedAuction.currentBid)
+        });
+        
+        // Record transaction
+        await addDoc(collection(db, 'kuku_wallet'), {
+          userId: user.id,
+          userName: user.name,
+          amount: selectedAuction.currentBid,
+          type: 'purchase',
+          status: 'approved',
+          method: 'wallet',
+          date: new Date().toISOString(),
+          createdAt: serverTimestamp()
+        });
       }
 
-      const res = await fetch(`/api/auctions/${selectedAuction.id}/pay`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paymentMethod,
-          transactionId: paymentForm.transactionId || `WALLET-${Date.now()}`,
-          senderPhone: paymentForm.senderPhone,
-          senderName: paymentForm.senderName
-        })
+      // Update auction payment status
+      await updateDoc(doc(db, 'kuku_auctions', selectedAuction.id), {
+        paymentStatus: 'paid',
+        paymentMethod,
+        transactionId: paymentForm.transactionId || `WALLET-${Date.now()}`,
+        senderPhone: paymentForm.senderPhone,
+        senderName: paymentForm.senderName,
+        paidAt: serverTimestamp()
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+
+      // Create a real order in kuku_orders for the vendor to manage
+      const orderData = {
+        userId: user.id,
+        userName: user.name,
+        userContact: user.contact || '',
+        userWA: user.contact || '',
+        payPhone: paymentForm.senderPhone || user.contact || '',
+        vendorId: selectedAuction.vendorId,
+        vendorName: selectedAuction.vendorName,
+        productId: selectedAuction.id, // Use auction ID as product ID for reference
+        productPrice: selectedAuction.currentBid,
+        qty: 1,
+        deliveryFee: 0, // Auctions usually handle delivery separately or included
+        deliveryMethod: 'pickup', // Default to pickup for auctions
+        total: selectedAuction.currentBid,
+        payMethod: paymentMethod === 'wallet' ? 'wallet' : 'tigo', // Default to tigo if mobile
+        senderName: paymentForm.senderName,
+        transactionId: paymentForm.transactionId || `WALLET-${Date.now()}`,
+        sentAmount: selectedAuction.currentBid.toString(),
+        status: 'pending',
+        items: [{
+          name: `MNADA: ${selectedAuction.productName}`,
+          qty: 1,
+          price: selectedAuction.currentBid,
+          emoji: '🏆',
+          image: selectedAuction.image || ''
+        }],
+        date: new Date().toLocaleString(),
+        createdAt: new Date().toISOString(),
+        serverCreatedAt: serverTimestamp()
+      };
+
+      await addDoc(collection(db, 'kuku_orders'), orderData);
 
       // Send WhatsApp to Admin
       const waMsg = `HABARI ADMIN! MNADA UMEKAMILIKA 🐔\n\nBIDHAA: *${selectedAuction.productName}*\nMUUZAJI: *${selectedAuction.vendorName}*\nMSHINDI: *${user.name}*\nKIASI: *${formatCurrency(selectedAuction.currentBid, currency)}*\nNJIA: *${paymentMethod}*\nTXID: *${paymentForm.transactionId || 'WALLET'}*\n\nTafadhali hakiki malipo haya.`;
@@ -158,6 +219,7 @@ export const AuctionPage: React.FC = () => {
       setPaymentStep('success');
       toast.success('Malipo yamethibitishwa!');
     } catch (err: any) {
+      console.error('Payment error:', err);
       toast.error(err.message || 'Imeshindwa kuthibitisha malipo');
     } finally {
       setIsPaying(false);

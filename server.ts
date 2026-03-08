@@ -16,11 +16,37 @@ dotenv.config();
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
-  const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || 'kuku-market-default';
-  console.log(`Initializing Firebase Admin for project: ${projectId}`);
-  admin.initializeApp({
-    projectId
-  });
+  const projectId = process.env.VITE_FIREBASE_PROJECT_ID || 'fleet-a4a43';
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+  
+  try {
+    if (serviceAccount) {
+      console.log(`Initializing Firebase Admin with Service Account for project: ${projectId}`);
+      const cert = JSON.parse(serviceAccount);
+      admin.initializeApp({
+        credential: admin.credential.cert(cert),
+        projectId
+      });
+    } else {
+      // Try default initialization first (standard for Cloud Run)
+      try {
+        admin.initializeApp();
+        console.log("Firebase Admin initialized with default credentials");
+      } catch (e) {
+        console.log(`Default initialization failed, falling back to project ID: ${projectId}`);
+        admin.initializeApp({
+          projectId
+        });
+      }
+    }
+    console.log(`Firebase Admin ready for project: ${admin.app().options.projectId || projectId}`);
+  } catch (err) {
+    console.error('Firebase Admin Initialization Error:', err);
+    // Final fallback
+    if (!admin.apps.length) {
+      admin.initializeApp({ projectId });
+    }
+  }
 }
 const db = admin.firestore();
 db.settings({ ignoreUndefinedProperties: true });
@@ -256,15 +282,30 @@ app.post('/api/admin/withdrawals/:id/update', async (req, res) => {
 // ImageKit Auth Endpoint
 app.get('/api/imagekit/auth', async (req, res) => {
   try {
-    const configDoc = await db.collection('kuku_config').doc('settings').get();
-    const config = configDoc.exists ? configDoc.data() : null;
+    let publicKey = process.env.VITE_IMAGEKIT_PUBLIC_KEY;
+    let privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+    let urlEndpoint = process.env.VITE_IMAGEKIT_URL_ENDPOINT;
 
-    const publicKey = config?.imagekit_public_key || process.env.VITE_IMAGEKIT_PUBLIC_KEY;
-    const privateKey = config?.imagekit_private_key || process.env.IMAGEKIT_PRIVATE_KEY;
-    const urlEndpoint = config?.imagekit_url_endpoint || process.env.VITE_IMAGEKIT_URL_ENDPOINT;
+    // Try to get from Firestore if env vars are missing
+    if (!publicKey || !privateKey) {
+      try {
+        const configDoc = await db.collection('kuku_config').doc('settings').get().catch(() => null);
+        if (configDoc && configDoc.exists) {
+          const config = configDoc.data();
+          publicKey = publicKey || config?.imagekit_public_key;
+          privateKey = privateKey || config?.imagekit_private_key;
+          urlEndpoint = urlEndpoint || config?.imagekit_url_endpoint;
+        }
+      } catch (dbErr) {
+        console.warn('Firestore config fetch failed, using env vars only');
+      }
+    }
 
     if (!publicKey || !privateKey) {
-      return res.status(503).json({ error: 'ImageKit not configured' });
+      console.error('ImageKit Configuration Missing:', { publicKey: !!publicKey, privateKey: !!privateKey });
+      return res.status(503).json({ 
+        error: 'ImageKit not configured. Please add IMAGEKIT_PRIVATE_KEY and VITE_IMAGEKIT_PUBLIC_KEY to your Secrets.' 
+      });
     }
 
     const ik = new ImageKit({
@@ -276,12 +317,11 @@ app.get('/api/imagekit/auth', async (req, res) => {
     const result = ik.getAuthenticationParameters();
     res.send(result);
   } catch (err: any) {
-    console.error('ImageKit Auth Error Details:', {
-      message: err.message,
-      code: err.code,
-      details: err.details
+    console.error('ImageKit Auth Error:', err);
+    res.status(500).json({ 
+      error: `Failed to get ImageKit auth parameters: ${err.message}`,
+      details: err.stack
     });
-    res.status(500).json({ error: 'Failed to get auth parameters', details: err.message });
   }
 });
 
@@ -318,8 +358,9 @@ async function setupVite() {
 // Only setup Vite if we are not on Vercel (Vercel handles static files separately)
 if (!process.env.VERCEL) {
   setupVite().catch(err => console.error('Vite setup failed:', err));
-  
-  // --- AUCTION SYSTEM ---
+}
+
+// --- AUCTION SYSTEM ---
 
 // Create Auction
 app.post('/api/auctions', async (req, res) => {
@@ -437,14 +478,27 @@ app.post('/api/auctions/:id/pay', async (req, res) => {
 
     res.json({ success: true });
   } catch (error: any) {
+    console.error('Pay Auction Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-const PORT = 3000;
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+// Global Error Handler
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('Global Server Error:', err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(500).json({ 
+    error: 'Internal Server Error', 
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
-}
+});
+
+const PORT = 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
+});
 
 export default app;
