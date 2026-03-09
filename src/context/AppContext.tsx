@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Product, Order, Review, Activity, Withdrawal, Status, Category, WalletTransaction, Auction } from '../types';
+import { User, Product, Order, Review, Activity, Withdrawal, Status, Category, WalletTransaction, Auction, CartItem } from '../types';
 import { generateId } from '../utils';
 import { ADMIN_EMAIL, ADMIN_PASS, TRANSLATIONS } from '../constants';
 import { auth, db } from '../services/firebase';
@@ -56,6 +56,11 @@ interface AppContextType {
   setLanguage: (lang: 'sw' | 'en' | 'ar' | 'hi') => void;
   view: 'auto' | 'shop' | 'dashboard';
   setView: (view: 'auto' | 'shop' | 'dashboard') => void;
+  cart: CartItem[];
+  setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
+  addToCart: (product: Product, quantity: number) => void;
+  removeFromCart: (id: string) => void;
+  updateCartQty: (productId: string, delta: number) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -79,6 +84,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [theme, setThemeState] = useState<'light' | 'dark'>((localStorage.getItem('theme') as 'light' | 'dark') || 'light');
   const [language, setLanguageState] = useState<'sw' | 'en' | 'ar' | 'hi'>((localStorage.getItem('language') as 'sw' | 'en' | 'ar' | 'hi') || 'sw');
   const [view, setView] = useState<'auto' | 'shop' | 'dashboard'>('auto');
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    const saved = localStorage.getItem('kuku_cart');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('kuku_cart', JSON.stringify(cart));
+  }, [cart]);
+
+  const addToCart = (product: Product, quantity: number) => {
+    const existing = cart.find(item => item.productId === product.id);
+    if (existing) {
+      setCart(cart.map(item => 
+        item.productId === product.id 
+          ? { ...item, qty: item.qty + quantity } 
+          : item
+      ));
+    } else {
+      setCart([...cart, {
+        id: generateId(),
+        productId: product.id,
+        name: product.name,
+        price: product.price,
+        qty: quantity,
+        image: product.image || '',
+        vendorId: product.vendorId
+      }]);
+    }
+  };
+
+  const removeFromCart = (id: string) => {
+    setCart(cart.filter(item => item.id !== id));
+  };
+
+  const updateCartQty = (productId: string, delta: number) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.productId === productId);
+      if (!existing) return prev;
+      
+      const newQty = existing.qty + delta;
+      if (newQty <= 0) {
+        return prev.filter(item => item.productId !== productId);
+      }
+      
+      return prev.map(item => 
+        item.productId === productId 
+          ? { ...item, qty: newQty } 
+          : item
+      );
+    });
+  };
 
   const setTheme = async (newTheme: 'light' | 'dark') => {
     try {
@@ -332,7 +388,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       language,
       setLanguage,
       view,
-      setView
+      setView,
+      cart,
+      setCart,
+      addToCart,
+      removeFromCart,
+      updateCartQty
     }}>
       {children}
     </AppContext.Provider>

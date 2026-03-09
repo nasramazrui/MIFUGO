@@ -15,6 +15,7 @@ import { createUserWithEmailAndPassword, updateProfile, deleteUser } from 'fireb
 import { AuctionPage } from './AuctionPage';
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
+import { CartFloatingBar } from '../components/CartFloatingBar';
 
 interface CartItem {
   id: string;
@@ -27,7 +28,7 @@ interface CartItem {
 }
 
 export const ShopPage: React.FC = () => {
-  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView } = useApp();
+  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, setCart, addToCart, removeFromCart, updateCartQty } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'cart' | 'auctions'>('browse');
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
@@ -35,7 +36,6 @@ export const ShopPage: React.FC = () => {
     const saved = localStorage.getItem('viewed_statuses');
     return saved ? JSON.parse(saved) : [];
   });
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [selectedCat, setSelectedCat] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -509,31 +509,14 @@ export const ShopPage: React.FC = () => {
     }
   };
 
-  const addToCart = (product: any, quantity: number) => {
-    const existing = cart.find(item => item.productId === product.id);
-    if (existing) {
-      setCart(cart.map(item => 
-        item.productId === product.id 
-          ? { ...item, qty: item.qty + quantity } 
-          : item
-      ));
-    } else {
-      setCart([...cart, {
-        id: Math.random().toString(36).substr(2, 9),
-        productId: product.id,
-        name: product.name,
-        price: product.price,
-        qty: quantity,
-        image: product.image,
-        vendorId: product.vendorId
-      }]);
-    }
+  const addToCartLocal = (product: any, quantity: number) => {
+    addToCart(product, quantity);
     toast.success('Imeongezwa kwenye kikapu! 🛒');
     setSelectedProduct(null);
   };
 
-  const removeFromCart = (id: string) => {
-    setCart(cart.filter(item => item.id !== id));
+  const removeFromCartLocal = (id: string) => {
+    removeFromCart(id);
   };
 
   const [isOrderLoading, setIsOrderLoading] = useState(false);
@@ -2278,7 +2261,7 @@ export const ShopPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-3">
               <button 
                 disabled={!isStoreOpen(selectedProduct.vendorId)}
-                onClick={() => addToCart(selectedProduct, qty)}
+                onClick={() => addToCartLocal(selectedProduct, qty)}
                 className={cn(
                   "py-5 rounded-[24px] font-black text-sm transition-all border-2",
                   isStoreOpen(selectedProduct.vendorId) 
@@ -2411,20 +2394,14 @@ export const ShopPage: React.FC = () => {
                         <div className="flex items-center justify-between mt-4">
                           <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-2xl p-1 border border-slate-100 dark:border-slate-700">
                             <button 
-                              onClick={() => {
-                                if (item.qty > 1) {
-                                  setCart(cart.map(c => c.id === item.id ? { ...c, qty: c.qty - 1 } : c));
-                                } else {
-                                  removeFromCart(item.id);
-                                }
-                              }}
+                              onClick={() => updateCartQty(item.productId, -1)}
                               className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-red-500 transition-all shadow-sm"
                             >
                               <Minus size={16} />
                             </button>
                             <span className="text-sm font-black w-10 text-center dark:text-white">{item.qty}</span>
                             <button 
-                              onClick={() => setCart(cart.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c))}
+                              onClick={() => updateCartQty(item.productId, 1)}
                               className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-emerald-500 transition-all shadow-sm"
                             >
                               <Plus size={16} />
@@ -3088,6 +3065,13 @@ export const ShopPage: React.FC = () => {
             // Admin panel handled by parent App.tsx
           }
         }}
+      />
+
+      <CartFloatingBar 
+        onClick={() => {
+          setActiveTab('cart');
+          setIsCartModalOpen(true);
+        }} 
       />
     </div>
   );

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Product } from '../types';
 import { formatCurrency, cn } from '../utils';
-import { Star } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Star, Plus, Minus } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
 
 interface ProductCardProps {
@@ -13,17 +13,21 @@ interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOpen = true, rating = 0 }) => {
-  const { t, systemSettings } = useApp();
+  const { t, systemSettings, cart, addToCart, updateCartQty } = useApp();
   const currency = systemSettings?.currency || 'TZS';
+
+  const cartItem = cart.find(item => item.productId === product.id);
   
   return (
     <motion.div
       whileHover={{ y: -4 }}
       whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className="group bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800/50 overflow-hidden cursor-pointer shadow-sm hover:shadow-2xl hover:shadow-amber-900/5 transition-all duration-500"
+      className="group bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800/50 overflow-hidden cursor-pointer shadow-sm hover:shadow-2xl hover:shadow-amber-900/5 transition-all duration-500 flex flex-col h-full"
     >
-      <div className="aspect-[4/5] bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center relative overflow-hidden">
+      <div 
+        onClick={onClick}
+        className="aspect-[4/5] bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center relative overflow-hidden"
+      >
         {product.image ? (
           <img 
             src={product.image} 
@@ -50,15 +54,56 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
           </div>
         </div>
 
-        {/* Price Tag Overlay */}
-        <div className="absolute bottom-4 right-4 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
-          <div className="bg-amber-600 text-white px-4 py-2 rounded-2xl font-black text-xs shadow-xl">
-            {formatCurrency(product.price, currency)}
-          </div>
+        {/* Add Button Overlay */}
+        <div className="absolute bottom-4 right-4 z-10">
+          <AnimatePresence mode="wait">
+            {!cartItem ? (
+              <motion.button
+                key="add"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isOpen) addToCart(product, 1);
+                }}
+                disabled={!isOpen}
+                className={cn(
+                  "bg-black text-white px-6 py-2.5 rounded-2xl font-black text-xs shadow-xl active:scale-90 transition-all",
+                  !isOpen && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                Add
+              </motion.button>
+            ) : (
+              <motion.div
+                key="qty"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                className="bg-black text-white rounded-2xl flex items-center shadow-xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button 
+                  onClick={() => updateCartQty(product.id, -1)}
+                  className="p-2.5 hover:bg-white/10 transition-colors"
+                >
+                  <Minus size={14} />
+                </button>
+                <span className="w-6 text-center text-xs font-black">{cartItem.qty}</span>
+                <button 
+                  onClick={() => updateCartQty(product.id, 1)}
+                  className="p-2.5 hover:bg-white/10 transition-colors"
+                >
+                  <Plus size={14} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
-      <div className="p-5">
+      <div className="p-5 flex-1 flex flex-col" onClick={onClick}>
         <div className="mb-3">
           <span className="text-[10px] font-black text-amber-600/60 dark:text-amber-500/60 uppercase tracking-[0.2em] mb-1 block">
             {t(product.category)}

@@ -221,6 +221,16 @@ export interface Auction {
   createdAt: any;
 }
 
+export interface CartItem {
+  id: string;
+  productId: string;
+  name: string;
+  price: number;
+  qty: number;
+  image: string;
+  vendorId: string;
+}
+
 export interface SystemSettings {
   id: string;
   withdrawalFeeType: 'fixed' | 'percentage';
