@@ -17,7 +17,7 @@ export const AuctionPage: React.FC = () => {
   const [auctionBids, setAuctionBids] = useState<Bid[]>([]);
   const [isPaying, setIsPaying] = useState(false);
   const [paymentStep, setPaymentStep] = useState<'options' | 'details' | 'success'>('options');
-  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'mobile'>('mobile');
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'tigo' | 'mpesa' | 'airtel' | 'halopesa' | 'cash'>('tigo');
   const [paymentForm, setPaymentForm] = useState({
     transactionId: '',
     senderPhone: user?.contact || '',
@@ -172,7 +172,7 @@ export const AuctionPage: React.FC = () => {
       await updateDoc(doc(db, 'kuku_auctions', selectedAuction.id), {
         paymentStatus: 'paid',
         paymentMethod,
-        transactionId: paymentForm.transactionId || `WALLET-${Date.now()}`,
+        transactionId: paymentForm.transactionId || (paymentMethod === 'wallet' ? `WALLET-${Date.now()}` : `CASH-${Date.now()}`),
         senderPhone: paymentForm.senderPhone,
         senderName: paymentForm.senderName,
         paidAt: serverTimestamp()
@@ -193,9 +193,9 @@ export const AuctionPage: React.FC = () => {
         deliveryFee: 0, // Auctions usually handle delivery separately or included
         deliveryMethod: 'pickup', // Default to pickup for auctions
         total: selectedAuction.currentBid,
-        payMethod: paymentMethod === 'wallet' ? 'wallet' : 'tigo', // Default to tigo if mobile
+        payMethod: paymentMethod,
         senderName: paymentForm.senderName,
-        transactionId: paymentForm.transactionId || `WALLET-${Date.now()}`,
+        transactionId: paymentForm.transactionId || (paymentMethod === 'wallet' ? `WALLET-${Date.now()}` : `CASH-${Date.now()}`),
         sentAmount: selectedAuction.currentBid.toString(),
         status: 'pending',
         items: [{
@@ -397,42 +397,48 @@ export const AuctionPage: React.FC = () => {
                     {paymentStep === 'options' && (
                       <div className="space-y-4">
                         <p className="text-sm text-slate-500 font-bold mb-4">Chagua njia ya kulipa kiasi cha <span className="text-emerald-600">{formatCurrency(selectedAuction.currentBid, currency)}</span></p>
-                        <div className="grid grid-cols-2 gap-4">
-                          <button 
-                            onClick={() => setPaymentMethod('wallet')}
-                            className={cn(
-                              "p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3",
-                              paymentMethod === 'wallet' ? "border-amber-500 bg-amber-50" : "border-slate-100 hover:border-slate-200"
-                            )}
-                          >
-                            <Wallet size={32} className={paymentMethod === 'wallet' ? "text-amber-600" : "text-slate-400"} />
-                            <span className="font-black text-xs uppercase">Wallet Balance</span>
-                          </button>
-                          <button 
-                            onClick={() => setPaymentMethod('mobile')}
-                            className={cn(
-                              "p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3",
-                              paymentMethod === 'mobile' ? "border-amber-500 bg-amber-50" : "border-slate-100 hover:border-slate-200"
-                            )}
-                          >
-                            <Smartphone size={32} className={paymentMethod === 'mobile' ? "text-amber-600" : "text-slate-400"} />
-                            <span className="font-black text-xs uppercase">Mobile Money</span>
-                          </button>
+                        <div className="grid grid-cols-1 gap-2">
+                          {[
+                            { id: 'wallet', label: 'Wallet Balance', icon: <Wallet size={20} />, color: 'bg-amber-50 text-amber-600' },
+                            { id: 'tigo', label: 'Mix by Yas (Tigo Pesa)', icon: <Smartphone size={20} />, color: 'bg-blue-50 text-blue-600' },
+                            { id: 'mpesa', label: 'M-Pesa', icon: <Smartphone size={20} />, color: 'bg-red-50 text-red-600' },
+                            { id: 'airtel', label: 'Airtel Money', icon: <Smartphone size={20} />, color: 'bg-red-50 text-red-600' },
+                            { id: 'halopesa', label: 'HaloPesa', icon: <Smartphone size={20} />, color: 'bg-orange-50 text-orange-600' },
+                            { id: 'cash', label: 'Pesa Taslimu (Cash)', icon: <CreditCard size={20} />, color: 'bg-emerald-50 text-emerald-600' }
+                          ].map((m) => (
+                            <button
+                              key={m.id}
+                              onClick={() => {
+                                setPaymentMethod(m.id as any);
+                                if (m.id === 'cash') {
+                                  handleAuctionPayment();
+                                } else {
+                                  setPaymentStep('details');
+                                }
+                              }}
+                              className={cn(
+                                "flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left group",
+                                paymentMethod === m.id ? "border-amber-500 bg-amber-50" : "border-slate-100 hover:border-slate-200"
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className={cn("w-10 h-10 rounded-xl flex items-center justify-center", m.color)}>{m.icon}</span>
+                                <div>
+                                  <p className="font-bold text-sm">{m.label}</p>
+                                  <p className="text-[10px] text-slate-400">{m.id === 'cash' ? 'Lipa ukipokea mzigo' : 'Lipa sasa kwa usalama'}</p>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
                         </div>
-                        <button 
-                          onClick={() => setPaymentStep('details')}
-                          className="w-full bg-amber-500 text-white py-5 rounded-3xl font-black text-sm uppercase tracking-widest shadow-lg shadow-amber-100 mt-4"
-                        >
-                          ENDELEA →
-                        </button>
                       </div>
                     )}
 
                     {paymentStep === 'details' && (
                       <div className="space-y-6">
-                        {paymentMethod === 'mobile' ? (
+                        {paymentMethod !== 'wallet' ? (
                           <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lipia kupitia: M-Pesa / Tigo Pesa / Airtel Money</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lipia kupitia: {paymentMethod.toUpperCase()}</p>
                             <div className="flex items-center justify-between">
                               <div>
                                 <p className="text-xs text-slate-500">Namba ya Malipo:</p>
@@ -457,11 +463,12 @@ export const AuctionPage: React.FC = () => {
                           <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center">
                             <p className="text-sm font-bold text-emerald-800 mb-2">Salio lako la Wallet litatumika kulipia mnada huu.</p>
                             <p className="text-2xl font-black text-emerald-600">{formatCurrency(selectedAuction.currentBid, currency)}</p>
+                            <p className="text-xs text-emerald-600 mt-2">Salio la sasa: {formatCurrency(user?.walletBalance || 0, currency)}</p>
                           </div>
                         )}
 
                         <div className="space-y-4">
-                          {paymentMethod === 'mobile' && (
+                          {paymentMethod !== 'wallet' && (
                             <div>
                               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Transaction ID (Kutoka kwenye SMS)</label>
                               <input 
@@ -504,7 +511,7 @@ export const AuctionPage: React.FC = () => {
                           </button>
                           <button 
                             onClick={handleAuctionPayment}
-                            disabled={isPaying || (paymentMethod === 'mobile' && !paymentForm.transactionId)}
+                            disabled={isPaying || (paymentMethod !== 'wallet' && paymentMethod !== 'cash' && !paymentForm.transactionId)}
                             className="flex-[2] bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-emerald-100 disabled:opacity-50"
                           >
                             {isPaying ? 'Inatuma...' : 'THIBITISHA MALIPO'}

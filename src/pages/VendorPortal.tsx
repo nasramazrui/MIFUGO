@@ -285,13 +285,23 @@ export const VendorPortal: React.FC = () => {
     setLoading(true);
     try {
       const auctionRef = doc(db, 'kuku_auctions', editingAuction.id);
+      
+      // Calculate new end time if duration is provided
+      let endTime = editingAuction.endTime;
+      if (auctionForm.durationHours) {
+        const newEnd = new Date();
+        newEnd.setHours(newEnd.getHours() + Number(auctionForm.durationHours));
+        endTime = newEnd;
+      }
+
       await updateDoc(auctionRef, {
         productName: auctionForm.productName,
         description: auctionForm.description,
         startingPrice: Number(auctionForm.startingPrice),
         minIncrement: Number(auctionForm.minIncrement),
         location: auctionForm.location,
-        image: auctionForm.image
+        image: auctionForm.image,
+        endTime: endTime
       });
       toast.success('Mnada umesasishwa!');
       setIsAuctionEditModalOpen(false);
@@ -1094,8 +1104,12 @@ export const VendorPortal: React.FC = () => {
                         <p className="text-sm font-black text-emerald-700">{formatCurrency(a.currentBid, currency)}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Bidders</p>
-                        <p className="text-sm font-black text-slate-900">{a.highestBidderName || 'No bids'}</p>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                          {a.status === 'ended' ? 'Winner' : 'Highest Bidder'}
+                        </p>
+                        <p className="text-sm font-black text-slate-900">
+                          {a.status === 'ended' ? (a.winnerName || 'No winner') : (a.highestBidderName || 'No bids')}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -2307,6 +2321,17 @@ export const VendorPortal: React.FC = () => {
               value={auctionForm.image}
               onChange={e => setAuctionForm({...auctionForm, image: e.target.value})}
             />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Muda wa Mnada (Saa kuanzia sasa)</label>
+            <input 
+              type="number" 
+              className="input-field"
+              placeholder="Mf: 24"
+              value={auctionForm.durationHours}
+              onChange={e => setAuctionForm({...auctionForm, durationHours: e.target.value})}
+            />
+            <p className="text-[10px] text-slate-400 mt-1 italic">* Acha wazi ikiwa hutaki kubadilisha muda wa mwisho uliopo.</p>
           </div>
           <button 
             onClick={handleUpdateAuction}
