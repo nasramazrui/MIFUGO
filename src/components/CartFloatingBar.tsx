@@ -15,8 +15,8 @@ export const CartFloatingBar: React.FC<CartFloatingBarProps> = ({ onClick }) => 
 
   const totalItems = cart.reduce((sum, item) => sum + item.qty, 0);
   
-  // Get unique item images (up to 3)
-  const thumbnails = cart.slice(0, 3).map(item => item.image || item.emoji);
+  // Get unique item images (up to 5)
+  const thumbnails = cart.slice(0, 5).map(item => item.image || item.emoji);
 
   return (
     <motion.div
@@ -30,11 +30,11 @@ export const CartFloatingBar: React.FC<CartFloatingBarProps> = ({ onClick }) => 
         className="bg-emerald-600 text-white px-6 py-4 rounded-[32px] shadow-2xl shadow-emerald-900/40 flex items-center gap-6 group hover:bg-emerald-700 transition-all active:scale-95 border border-emerald-500/30 backdrop-blur-md"
       >
         <div className="flex -space-x-3">
-          {cart.slice(0, 3).map((item, i) => (
+          {cart.slice(0, 5).map((item, i) => (
             <div 
               key={item.id} 
               className="w-10 h-10 rounded-full border-2 border-emerald-600 bg-white overflow-hidden flex items-center justify-center shadow-lg"
-              style={{ zIndex: 3 - i }}
+              style={{ zIndex: 5 - i }}
             >
               {item.image ? (
                 <img src={item.image} alt="" className="w-full h-full object-cover" />
@@ -43,9 +43,9 @@ export const CartFloatingBar: React.FC<CartFloatingBarProps> = ({ onClick }) => 
               )}
             </div>
           ))}
-          {cart.length > 3 && (
+          {cart.length > 5 && (
             <div className="w-10 h-10 rounded-full border-2 border-emerald-600 bg-emerald-800 flex items-center justify-center text-[10px] font-black z-0 shadow-lg">
-              +{cart.length - 3}
+              +{cart.length - 5}
             </div>
           )}
         </div>

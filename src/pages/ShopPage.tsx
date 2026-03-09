@@ -292,6 +292,11 @@ export const ShopPage: React.FC = () => {
   const [reviewRating, setReviewRating] = useState(5);
   const [isReviewLoading, setIsReviewLoading] = useState(false);
 
+  const currentDeliveryFee = deliveryMethod === 'city' ? (selectedProduct?.deliveryCity || 0) : 
+                            deliveryMethod === 'out' ? (selectedProduct?.deliveryOut || 0) : 0;
+  const currentTotalCost = (selectedProduct?.price || 0) * qty + currentDeliveryFee;
+  const hasEnoughWallet = (user?.walletBalance || 0) >= currentTotalCost;
+
   const productReviews = reviews.filter(r => r.productId === selectedProduct?.id);
 
   const handleVendorReview = async () => {
@@ -2686,13 +2691,18 @@ export const ShopPage: React.FC = () => {
 
               <button 
                 onClick={confirmOrder}
-                disabled={isOrderLoading}
-                className="w-full bg-amber-500 text-amber-950 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+                disabled={isOrderLoading || (payMethod === 'wallet' && !hasEnoughWallet)}
+                className={cn(
+                  "w-full py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-2 shadow-lg transition-all",
+                  isOrderLoading || (payMethod === 'wallet' && !hasEnoughWallet)
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-amber-500 text-amber-950 shadow-amber-500/20 active:scale-95"
+                )}
               >
                 {isOrderLoading ? (
                   <div className="w-6 h-6 border-2 border-amber-950 border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  payMethod === 'wallet' ? 'CONFIRM PAYMENT 💳' : 'THIBITISHA MALIPO ✅'
+                  payMethod === 'wallet' ? (hasEnoughWallet ? 'CONFIRM PAYMENT 💳' : 'SALIO HALITOSHI ❌') : 'THIBITISHA MALIPO ✅'
                 )}
               </button>
               <button 
