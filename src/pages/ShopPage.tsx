@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { Status } from '../types';
 import { ProductCard } from '../components/ProductCard';
+import { CartFloatingBar } from '../components/CartFloatingBar';
 import { CATEGORIES, DAYS, ADMIN_WA } from '../constants';
 import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
@@ -15,33 +16,22 @@ import { createUserWithEmailAndPassword, updateProfile, deleteUser } from 'fireb
 import { AuctionPage } from './AuctionPage';
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
-import { CartFloatingBar } from '../components/CartFloatingBar';
-
-interface CartItem {
-  id: string;
-  productId: string;
-  name: string;
-  price: number;
-  qty: number;
-  image: string;
-  vendorId: string;
-}
 
 export const ShopPage: React.FC = () => {
-  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, setCart, addToCart, removeFromCart, updateCartQty } = useApp();
+  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty } = useApp();
   const currency = systemSettings?.currency || 'TZS';
-  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'cart' | 'auctions'>('browse');
+  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'auctions'>('browse');
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
   const [viewedStatuses, setViewedStatuses] = useState<string[]>(() => {
     const saved = localStorage.getItem('viewed_statuses');
     return saved ? JSON.parse(saved) : [];
   });
-  const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [selectedCat, setSelectedCat] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [isWalletHistoryOpen, setIsWalletHistoryOpen] = useState(false);
   const [walletAmount, setWalletAmount] = useState('');
@@ -507,16 +497,6 @@ export const ShopPage: React.FC = () => {
     } else {
       setIsPaymentModalOpen(true);
     }
-  };
-
-  const addToCartLocal = (product: any, quantity: number) => {
-    addToCart(product, quantity);
-    toast.success('Imeongezwa kwenye kikapu! 🛒');
-    setSelectedProduct(null);
-  };
-
-  const removeFromCartLocal = (id: string) => {
-    removeFromCart(id);
   };
 
   const [isOrderLoading, setIsOrderLoading] = useState(false);
@@ -1338,37 +1318,13 @@ export const ShopPage: React.FC = () => {
             <span className="text-[8px] font-black uppercase tracking-widest">{t('auctions')}</span>
           </button>
 
-          {/* Center Item with Raised Cart */}
-          <div className="flex-1 flex flex-col items-center relative">
-            {/* Raised Cart Button */}
-            <div className="absolute -top-24 left-1/2 -translate-x-1/2">
-              <button 
-                onClick={() => setIsCartModalOpen(true)}
-                className={cn(
-                  "w-16 h-16 rounded-[24px] flex items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all active:scale-90 group overflow-hidden relative",
-                  cart.length > 0 ? "bg-[#1A2235] text-white" : "bg-[#1A2235] text-slate-500"
-                )}
-              >
-                <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative">
-                  <ShoppingCart size={28} strokeWidth={2} />
-                  {cart.length > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#1A2235] animate-bounce">
-                      {cart.reduce((sum, item) => sum + item.qty, 0)}
-                    </span>
-                  )}
-                </div>
-              </button>
-            </div>
-
-            <button 
-              onClick={() => setActiveTab('stores')}
-              className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'stores' ? "text-amber-500" : "text-slate-500")}
-            >
-              <Store size={20} strokeWidth={2} />
-              <span className="text-[8px] font-black uppercase tracking-widest">{t('stores')}</span>
-            </button>
-          </div>
+          <button 
+            onClick={() => setActiveTab('stores')}
+            className={cn("flex flex-col items-center gap-1 transition-all flex-1", activeTab === 'stores' ? "text-amber-500" : "text-slate-500")}
+          >
+            <Store size={20} strokeWidth={2} />
+            <span className="text-[8px] font-black uppercase tracking-widest">{t('stores')}</span>
+          </button>
 
           <button 
             onClick={() => setActiveTab('orders')}
@@ -2261,7 +2217,11 @@ export const ShopPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-3">
               <button 
                 disabled={!isStoreOpen(selectedProduct.vendorId)}
-                onClick={() => addToCartLocal(selectedProduct, qty)}
+                onClick={() => {
+                  addToCart(selectedProduct, qty);
+                  toast.success('Imeongezwa kwenye kikapu! 🛒');
+                  setSelectedProduct(null);
+                }}
                 className={cn(
                   "py-5 rounded-[24px] font-black text-sm transition-all border-2",
                   isStoreOpen(selectedProduct.vendorId) 
@@ -2323,155 +2283,6 @@ export const ShopPage: React.FC = () => {
             {isStatusLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Send size={18} /> WEKA STATUS</>}
           </button>
         </form>
-      </Modal>
-
-      {/* Cart Modal */}
-      <Modal 
-        isOpen={isCartModalOpen} 
-        onClose={() => setIsCartModalOpen(false)}
-        title={`${t('cart_title')} 🛒`}
-      >
-        <div className="space-y-6">
-          {cart.length === 0 ? (
-            <div className="text-center py-20">
-              <motion.div 
-                initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
-                animate={{ scale: 1, opacity: 1, rotate: 0 }}
-                transition={{ type: "spring", damping: 12 }}
-                className="w-32 h-32 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-[40px] flex items-center justify-center mx-auto mb-8 shadow-inner relative"
-              >
-                <ShoppingCart size={48} className="text-slate-200 dark:text-slate-700" />
-                <motion.div 
-                  animate={{ y: [0, -10, 0] }}
-                  transition={{ repeat: Infinity, duration: 2 }}
-                  className="absolute -top-2 -right-2 text-4xl"
-                >
-                  🛒
-                </motion.div>
-              </motion.div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">{t('cart_empty')}</h3>
-              <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.2em] mb-10">Hujachagua bidhaa yoyote bado</p>
-              <button 
-                onClick={() => setIsCartModalOpen(false)}
-                className="px-10 py-5 bg-amber-600 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-2xl shadow-amber-600/30 active:scale-95 transition-all hover:bg-amber-700"
-              >
-                {t('start_shopping')}
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-4 max-h-[480px] overflow-y-auto pr-2 scrollbar-hide">
-                <AnimatePresence mode="popLayout">
-                  {cart.map(item => (
-                    <motion.div 
-                      key={item.id}
-                      layout
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      className="flex items-center gap-5 bg-white dark:bg-slate-900 p-5 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-amber-100 dark:hover:border-amber-900/30 transition-all group"
-                    >
-                      <div className="w-24 h-24 bg-slate-50 dark:bg-slate-800 rounded-[24px] overflow-hidden border border-slate-100 dark:border-slate-800 flex-shrink-0 relative">
-                        {item.image ? (
-                          <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-4xl">📦</div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start gap-2">
-                          <h4 className="font-black text-slate-900 dark:text-white truncate text-base">{item.name}</h4>
-                          <button 
-                            onClick={() => removeFromCart(item.id)}
-                            className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-full transition-all"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                        <p className="text-sm font-black text-amber-600 dark:text-amber-500 mt-1">{formatCurrency(item.price, currency)}</p>
-                        
-                        <div className="flex items-center justify-between mt-4">
-                          <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-2xl p-1 border border-slate-100 dark:border-slate-700">
-                            <button 
-                              onClick={() => updateCartQty(item.productId, -1)}
-                              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-red-500 transition-all shadow-sm"
-                            >
-                              <Minus size={16} />
-                            </button>
-                            <span className="text-sm font-black w-10 text-center dark:text-white">{item.qty}</span>
-                            <button 
-                              onClick={() => updateCartQty(item.productId, 1)}
-                              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-emerald-500 transition-all shadow-sm"
-                            >
-                              <Plus size={16} />
-                            </button>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Subtotal</p>
-                            <p className="text-sm font-black text-slate-900 dark:text-white">
-                              {formatCurrency(item.price * item.qty, currency)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-
-              <div className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950 p-8 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-inner">
-                <div className="flex justify-between items-end mb-8">
-                  <div>
-                    <span className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] block mb-2">{t('total')}</span>
-                    <motion.span 
-                      key={cart.reduce((sum, item) => sum + (item.price * item.qty), 0)}
-                      initial={{ scale: 0.9, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter"
-                    >
-                      {formatCurrency(cart.reduce((sum, item) => sum + (item.price * item.qty), 0), currency)}
-                    </motion.span>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="flex -space-x-2">
-                      {[1, 2, 3].map(i => (
-                        <div key={i} className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px]">
-                          {i === 1 ? '💳' : i === 2 ? '📱' : '🚚'}
-                        </div>
-                      ))}
-                    </div>
-                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-1.5 rounded-full uppercase tracking-widest">
-                      Malipo Salama
-                    </span>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => {
-                    if (!user) {
-                      setIsCartModalOpen(false);
-                      setIsAuthModalOpen(true);
-                    } else {
-                      const firstItem = cart[0];
-                      const product = products.find(p => p.id === firstItem.productId);
-                      if (product) {
-                        setSelectedProduct(product);
-                        setQty(firstItem.qty);
-                        setIsCartModalOpen(false);
-                        setIsPaymentModalOpen(true);
-                      }
-                    }
-                  }}
-                  className="w-full bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 bg-[length:200%_auto] hover:bg-right text-white font-black py-6 rounded-[32px] shadow-2xl shadow-amber-600/30 transition-all active:scale-95 flex items-center justify-center gap-4 group overflow-hidden relative"
-                >
-                  <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
-                  <span className="text-base uppercase tracking-[0.3em] relative z-10">{t('checkout')}</span>
-                  <ArrowRight size={24} className="group-hover:translate-x-2 transition-transform relative z-10" />
-                </button>
-              </div>
-            </>
-          )}
-        </div>
       </Modal>
 
       {/* Wallet Modal (Add Money) */}
@@ -2711,31 +2522,47 @@ export const ShopPage: React.FC = () => {
                   { id: 'airtel', label: 'Airtel Money', icon: '📱', color: 'bg-red-50 text-red-600' },
                   { id: 'halopesa', label: 'HaloPesa', icon: '📱', color: 'bg-orange-50 text-orange-600' },
                   { id: 'cash', label: 'Pesa Taslimu (Cash)', icon: '💵', color: 'bg-emerald-50 text-emerald-600' }
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      setPayMethod(m.id as any);
-                      if (m.id === 'cash') {
-                        confirmOrder();
-                      } else if (m.id === 'wallet') {
-                        setPaymentStep('confirm'); // Go straight to summary
-                      } else {
-                        setPaymentStep('details');
-                      }
-                    }}
-                    className="flex items-center justify-between p-4 rounded-2xl border-2 border-slate-100 hover:border-amber-500 bg-white transition-all text-left group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-xl", m.color)}>{m.icon}</span>
-                      <div>
-                        <p className="font-bold text-sm">{m.label}</p>
-                        <p className="text-[10px] text-slate-400">{m.id === 'cash' ? 'Lipa ukipokea mzigo' : 'Lipa sasa kwa usalama'}</p>
+                ].map((m) => {
+                  const deliveryFee = deliveryMethod === 'city' ? (selectedProduct?.deliveryCity || 0) : 
+                                     deliveryMethod === 'out' ? (selectedProduct?.deliveryOut || 0) : 0;
+                  const total = (selectedProduct?.price || 0) * qty + deliveryFee;
+                  const hasEnough = m.id === 'wallet' ? (user?.walletBalance || 0) >= total : true;
+
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => {
+                        if (m.id === 'wallet' && !hasEnough) {
+                          toast.error('Salio la Wallet halitoshi. Tafadhali ongeza pesa.');
+                          return;
+                        }
+                        setPayMethod(m.id as any);
+                        if (m.id === 'cash') {
+                          confirmOrder();
+                        } else if (m.id === 'wallet') {
+                          setPaymentStep('confirm');
+                        } else {
+                          setPaymentStep('details');
+                        }
+                      }}
+                      className={cn(
+                        "flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left group",
+                        !hasEnough && m.id === 'wallet' ? "opacity-50 cursor-not-allowed border-slate-100" : "border-slate-100 hover:border-amber-500 bg-white"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-xl", m.color)}>{m.icon}</span>
+                        <div>
+                          <p className="font-bold text-sm">{m.label}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {m.id === 'wallet' ? `Salio: ${formatCurrency(user?.walletBalance || 0, currency)}` : m.id === 'cash' ? 'Lipa ukipokea mzigo' : 'Lipa sasa kwa usalama'}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <ChevronRight size={18} className="text-slate-300 group-hover:text-amber-500 transition-colors" />
-                  </button>
-                ))}
+                      <ChevronRight size={18} className="text-slate-300 group-hover:text-amber-500 transition-colors" />
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -3057,6 +2884,157 @@ export const ShopPage: React.FC = () => {
         )}
       </AnimatePresence>
 
+      <CartFloatingBar onClick={() => setIsCartModalOpen(true)} />
+
+      {/* Cart Modal */}
+      <Modal 
+        isOpen={isCartModalOpen} 
+        onClose={() => setIsCartModalOpen(false)}
+        title={`${t('cart_title')} 🛒`}
+      >
+        <div className="space-y-6">
+          {cart.length === 0 ? (
+            <div className="text-center py-20">
+              <motion.div 
+                initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
+                animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                transition={{ type: "spring", damping: 12 }}
+                className="w-32 h-32 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-[40px] flex items-center justify-center mx-auto mb-8 shadow-inner relative"
+              >
+                <ShoppingCart size={48} className="text-slate-200 dark:text-slate-700" />
+                <motion.div 
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                  className="absolute -top-2 -right-2 text-4xl"
+                >
+                  🛒
+                </motion.div>
+              </motion.div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">{t('cart_empty')}</h3>
+              <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.2em] mb-10">Hujachagua bidhaa yoyote bado</p>
+              <button 
+                onClick={() => setIsCartModalOpen(false)}
+                className="px-10 py-5 bg-amber-600 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-2xl shadow-amber-600/30 active:scale-95 transition-all hover:bg-amber-700"
+              >
+                {t('start_shopping')}
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4 max-h-[480px] overflow-y-auto pr-2 scrollbar-hide">
+                <AnimatePresence mode="popLayout">
+                  {cart.map(item => (
+                    <motion.div 
+                      key={item.id}
+                      layout
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      className="flex items-center gap-5 bg-white dark:bg-slate-900 p-5 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-amber-100 dark:hover:border-amber-900/30 transition-all group"
+                    >
+                      <div className="w-24 h-24 bg-slate-50 dark:bg-slate-800 rounded-[24px] overflow-hidden border border-slate-100 dark:border-slate-800 flex-shrink-0 relative">
+                        {item.image ? (
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-4xl">📦</div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start gap-2">
+                          <h4 className="font-black text-slate-900 dark:text-white truncate text-base">{item.name}</h4>
+                          <button 
+                            onClick={() => removeFromCart(item.id)}
+                            className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-full transition-all"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                        <p className="text-sm font-black text-amber-600 dark:text-amber-500 mt-1">{formatCurrency(item.price, currency)}</p>
+                        
+                        <div className="flex items-center justify-between mt-4">
+                          <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-2xl p-1 border border-slate-100 dark:border-slate-700">
+                            <button 
+                              onClick={() => updateCartQty(item.productId, -1)}
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-red-500 transition-all shadow-sm"
+                            >
+                              <Minus size={16} />
+                            </button>
+                            <span className="text-sm font-black w-10 text-center dark:text-white">{item.qty}</span>
+                            <button 
+                              onClick={() => updateCartQty(item.productId, 1)}
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-emerald-500 transition-all shadow-sm"
+                            >
+                              <Plus size={16} />
+                            </button>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Subtotal</p>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">
+                              {formatCurrency(item.price * item.qty, currency)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950 p-8 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-inner">
+                <div className="flex justify-between items-end mb-8">
+                  <div>
+                    <span className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] block mb-2">{t('total')}</span>
+                    <motion.span 
+                      key={cart.reduce((sum, item) => sum + (item.price * item.qty), 0)}
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter"
+                    >
+                      {formatCurrency(cart.reduce((sum, item) => sum + (item.price * item.qty), 0), currency)}
+                    </motion.span>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex -space-x-2">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px]">
+                          {i === 1 ? '💳' : i === 2 ? '📱' : '🚚'}
+                        </div>
+                      ))}
+                    </div>
+                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-1.5 rounded-full uppercase tracking-widest">
+                      Malipo Salama
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => {
+                    if (!user) {
+                      setIsCartModalOpen(false);
+                      setIsAuthModalOpen(true);
+                    } else {
+                      const firstItem = cart[0];
+                      const product = products.find(p => p.id === firstItem.productId);
+                      if (product) {
+                        setSelectedProduct(product);
+                        setQty(firstItem.qty);
+                        setIsCartModalOpen(false);
+                        setIsPaymentModalOpen(true);
+                      }
+                    }
+                  }}
+                  className="w-full bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 bg-[length:200%_auto] hover:bg-right text-white font-black py-6 rounded-[32px] shadow-2xl shadow-amber-600/30 transition-all active:scale-95 flex items-center justify-center gap-4 group overflow-hidden relative"
+                >
+                  <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
+                  <span className="text-base uppercase tracking-[0.3em] relative z-10">{t('checkout')}</span>
+                  <ArrowRight size={24} className="group-hover:translate-x-2 transition-transform relative z-10" />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
       <AuthModal 
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)} 
@@ -3065,13 +3043,6 @@ export const ShopPage: React.FC = () => {
             // Admin panel handled by parent App.tsx
           }
         }}
-      />
-
-      <CartFloatingBar 
-        onClick={() => {
-          setActiveTab('cart');
-          setIsCartModalOpen(true);
-        }} 
       />
     </div>
   );

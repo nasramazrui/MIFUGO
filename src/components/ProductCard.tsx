@@ -54,50 +54,46 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
           </div>
         </div>
 
-        {/* Add Button Overlay */}
-        <div className="absolute bottom-4 right-4 z-10">
+        {/* Add to Cart Button */}
+        <div className="absolute bottom-4 right-4">
           <AnimatePresence mode="wait">
-            {!cartItem ? (
-              <motion.button
-                key="add"
+            {cartItem ? (
+              <motion.div 
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.8, opacity: 0 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isOpen) addToCart(product, 1);
-                }}
-                disabled={!isOpen}
-                className={cn(
-                  "bg-black text-white px-6 py-2.5 rounded-2xl font-black text-xs shadow-xl active:scale-90 transition-all",
-                  !isOpen && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                Add
-              </motion.button>
-            ) : (
-              <motion.div
-                key="qty"
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                className="bg-black text-white rounded-2xl flex items-center shadow-xl overflow-hidden"
+                className="flex items-center bg-amber-600 text-white rounded-2xl p-1 shadow-lg"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button 
                   onClick={() => updateCartQty(product.id, -1)}
-                  className="p-2.5 hover:bg-white/10 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-xl transition-colors"
                 >
                   <Minus size={14} />
                 </button>
-                <span className="w-6 text-center text-xs font-black">{cartItem.qty}</span>
+                <span className="w-8 text-center text-xs font-black">{cartItem.qty}</span>
                 <button 
                   onClick={() => updateCartQty(product.id, 1)}
-                  className="p-2.5 hover:bg-white/10 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-xl transition-colors"
                 >
                   <Plus size={14} />
                 </button>
               </motion.div>
+            ) : (
+              <motion.button
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  addToCart(product, 1);
+                }}
+                className="w-10 h-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-amber-600 rounded-2xl flex items-center justify-center shadow-lg hover:bg-amber-600 hover:text-white transition-all duration-300 pointer-events-auto"
+              >
+                <Plus size={20} strokeWidth={3} />
+              </motion.button>
             )}
           </AnimatePresence>
         </div>

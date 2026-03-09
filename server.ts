@@ -80,14 +80,20 @@ app.get('/api/wallet/:vendorId', async (req, res) => {
     // Get transactions
     const transactionsSnapshot = await db.collection('kuku_wallet')
       .where('userId', '==', vendorId)
-      .orderBy('createdAt', 'desc')
-      .limit(20)
       .get();
     
-    const transactions = transactionsSnapshot.docs.map(doc => ({
+    let transactions = transactionsSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+
+    // Sort and limit on server side to avoid index requirement
+    transactions.sort((a: any, b: any) => {
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+      return dateB - dateA;
+    });
+    transactions = transactions.slice(0, 20);
 
     res.json({
       balance: walletData?.walletBalance || 0,

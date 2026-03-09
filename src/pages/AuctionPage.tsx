@@ -28,11 +28,13 @@ export const AuctionPage: React.FC = () => {
     if (selectedAuction) {
       const q = query(
         collection(db, 'kuku_bids'),
-        where('auctionId', '==', selectedAuction.id),
-        orderBy('amount', 'desc')
+        where('auctionId', '==', selectedAuction.id)
       );
       const unsub = onSnapshot(q, (snap) => {
-        setAuctionBids(snap.docs.map(d => ({ id: d.id, ...d.data() } as Bid)));
+        const bids = snap.docs.map(d => ({ id: d.id, ...d.data() } as Bid));
+        // Sort by amount descending on client side to avoid index requirement
+        bids.sort((a, b) => b.amount - a.amount);
+        setAuctionBids(bids);
       });
       return unsub;
     }
@@ -405,31 +407,42 @@ export const AuctionPage: React.FC = () => {
                             { id: 'airtel', label: 'Airtel Money', icon: <Smartphone size={20} />, color: 'bg-red-50 text-red-600' },
                             { id: 'halopesa', label: 'HaloPesa', icon: <Smartphone size={20} />, color: 'bg-orange-50 text-orange-600' },
                             { id: 'cash', label: 'Pesa Taslimu (Cash)', icon: <CreditCard size={20} />, color: 'bg-emerald-50 text-emerald-600' }
-                          ].map((m) => (
-                            <button
-                              key={m.id}
-                              onClick={() => {
-                                setPaymentMethod(m.id as any);
-                                if (m.id === 'cash') {
-                                  handleAuctionPayment();
-                                } else {
-                                  setPaymentStep('details');
-                                }
-                              }}
-                              className={cn(
-                                "flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left group",
-                                paymentMethod === m.id ? "border-amber-500 bg-amber-50" : "border-slate-100 hover:border-slate-200"
-                              )}
-                            >
-                              <div className="flex items-center gap-3">
-                                <span className={cn("w-10 h-10 rounded-xl flex items-center justify-center", m.color)}>{m.icon}</span>
-                                <div>
-                                  <p className="font-bold text-sm">{m.label}</p>
-                                  <p className="text-[10px] text-slate-400">{m.id === 'cash' ? 'Lipa ukipokea mzigo' : 'Lipa sasa kwa usalama'}</p>
+                          ].map((m) => {
+                            const hasEnough = m.id === 'wallet' ? (user?.walletBalance || 0) >= selectedAuction.currentBid : true;
+                            
+                            return (
+                              <button
+                                key={m.id}
+                                onClick={() => {
+                                  if (m.id === 'wallet' && !hasEnough) {
+                                    toast.error('Salio la wallet halitoshi.');
+                                    return;
+                                  }
+                                  setPaymentMethod(m.id as any);
+                                  if (m.id === 'cash') {
+                                    handleAuctionPayment();
+                                  } else {
+                                    setPaymentStep('details');
+                                  }
+                                }}
+                                className={cn(
+                                  "flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left group",
+                                  paymentMethod === m.id ? "border-amber-500 bg-amber-50" : 
+                                  (!hasEnough && m.id === 'wallet' ? "opacity-50 cursor-not-allowed border-slate-100" : "border-slate-100 hover:border-slate-200")
+                                )}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <span className={cn("w-10 h-10 rounded-xl flex items-center justify-center", m.color)}>{m.icon}</span>
+                                  <div>
+                                    <p className="font-bold text-sm">{m.label}</p>
+                                    <p className="text-[10px] text-slate-400">
+                                      {m.id === 'wallet' ? `Salio: ${formatCurrency(user?.walletBalance || 0, currency)}` : m.id === 'cash' ? 'Lipa ukipokea mzigo' : 'Lipa sasa kwa usalama'}
+                                    </p>
+                                  </div>
                                 </div>
-                              </div>
-                            </button>
-                          ))}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
