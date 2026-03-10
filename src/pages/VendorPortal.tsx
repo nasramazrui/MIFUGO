@@ -29,7 +29,8 @@ import {
   Camera,
   MessageSquare,
   Star,
-  Gavel
+  Gavel,
+  Settings
 } from 'lucide-react';
 import { cn } from '../utils';
 
@@ -390,6 +391,16 @@ export const VendorPortal: React.FC = () => {
       }
     } catch (error: any) {
       toast.error('Hitilafu wakati wa kubadilisha hali');
+    }
+  };
+
+  const deleteOrder = async (orderId: string) => {
+    if (!confirm('Je, una uhakika unataka kufuta agizo hili?')) return;
+    try {
+      await deleteDoc(doc(db, 'kuku_orders', orderId));
+      toast.success('Agizo limefutwa');
+    } catch (err) {
+      toast.error('Imeshindwa kufuta agizo');
     }
   };
 
@@ -927,6 +938,15 @@ export const VendorPortal: React.FC = () => {
                     >
                       <Send size={14} /> WhatsApp Mteja
                     </button>
+
+                    {(order.status === 'delivered' || order.status === 'completed' || order.status === 'pickup') && (
+                      <button 
+                        onClick={() => deleteOrder(order.id)}
+                        className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-black hover:bg-red-100 transition-all ml-auto"
+                      >
+                        <Trash2 size={14} /> Futa Agizo
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -2342,6 +2362,29 @@ export const VendorPortal: React.FC = () => {
           </button>
         </div>
       </Modal>
+
+      {/* Mobile Bottom Nav */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 px-6 py-3 flex items-center justify-between z-40">
+        {[
+          { id: 'over', icon: LayoutDashboard, label: 'Dash' },
+          { id: 'orders', icon: ClipboardList, label: 'Oda' },
+          { id: 'products', icon: Package, label: 'Bidhaa' },
+          { id: 'wallet', icon: Wallet, label: 'Wallet' },
+          { id: 'settings', icon: Settings, label: 'Seti' }
+        ].map(item => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id as any)}
+            className={cn(
+              "flex flex-col items-center gap-1 transition-all",
+              activeTab === item.id ? "text-emerald-600" : "text-slate-400"
+            )}
+          >
+            <item.icon size={20} />
+            <span className="text-[8px] font-black uppercase tracking-widest">{item.label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 };

@@ -513,7 +513,8 @@ export const ShopPage: React.FC = () => {
     if (payMethod === 'wallet') {
       const deliveryFee = deliveryMethod === 'city' ? (p.deliveryCity || 0) : 
                          deliveryMethod === 'out' ? (p.deliveryOut || 0) : 0;
-      const total = (p.price || 0) * qty + deliveryFee;
+      const actualDeliveryFee = deliveryMethod === 'pickup' ? 0 : deliveryFee;
+      const total = (p.price || 0) * qty + actualDeliveryFee;
       if ((user.walletBalance || 0) < total) {
         toast.error('Salio la Wallet halitoshi. Tafadhali ongeza pesa.');
         return;
@@ -533,11 +534,12 @@ export const ShopPage: React.FC = () => {
     setIsOrderLoading(true);
     const deliveryFee = deliveryMethod === 'city' ? (p.deliveryCity || 0) : 
                        deliveryMethod === 'out' ? (p.deliveryOut || 0) : 0;
+    const actualDeliveryFee = deliveryMethod === 'pickup' ? 0 : deliveryFee;
     
     const subtotal = (p.price || 0) * qty;
     const adminCommission = subtotal * 0.06;
     const vendorNet = subtotal - adminCommission;
-    const total = subtotal + deliveryFee;
+    const total = subtotal + actualDeliveryFee;
 
     const orderData = {
       userId: user.id || '',
@@ -561,7 +563,7 @@ export const ShopPage: React.FC = () => {
       vendorName: p.vendorName || '',
       productPrice: Number(p.price || 0),
       qty: Number(qty),
-      deliveryFee: Number(deliveryFee),
+      deliveryFee: Number(actualDeliveryFee),
       deliveryMethod,
       adminCommission: Number(adminCommission),
       vendorNet: Number(vendorNet),
@@ -664,6 +666,16 @@ export const ShopPage: React.FC = () => {
       toast.success('Asante kwa kuthibitisha! Tafadhali acha maoni yako.');
     } catch (error) {
       toast.error('Hitilafu imetokea wakati wa kuthibitisha.');
+    }
+  };
+
+  const deleteOrder = async (orderId: string) => {
+    if (!confirm('Je, una uhakika unataka kufuta agizo hili kutoka kwenye historia yako?')) return;
+    try {
+      await deleteDoc(doc(db, 'kuku_orders', orderId));
+      toast.success('Agizo limefutwa');
+    } catch (err) {
+      toast.error('Imeshindwa kufuta agizo');
     }
   };
 
@@ -1283,15 +1295,26 @@ export const ShopPage: React.FC = () => {
                        </div>
                        <div className="flex items-center justify-between pt-4 border-t border-slate-50">
                          <p className="font-black text-amber-700">{formatCurrency(order.total, currency)}</p>
-                         <button 
-                           onClick={() => {
-                             setSelectedOrder(order);
-                             setIsTrackingModalOpen(true);
-                           }}
-                           className="text-xs font-black text-blue-600 hover:underline"
-                         >
-                           FUATILIA →
-                         </button>
+                         <div className="flex items-center gap-2">
+                           {(order.status === 'delivered' || order.status === 'completed' || order.status === 'pickup') && (
+                             <button 
+                               onClick={() => deleteOrder(order.id)}
+                               className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                               title="Futa Agizo"
+                             >
+                               <Trash2 size={16} />
+                             </button>
+                           )}
+                           <button 
+                             onClick={() => {
+                               setSelectedOrder(order);
+                               setIsTrackingModalOpen(true);
+                             }}
+                             className="text-xs font-black text-blue-600 hover:underline"
+                           >
+                             FUATILIA →
+                           </button>
+                         </div>
                        </div>
                      </div>
                    ))
@@ -2518,8 +2541,41 @@ export const ShopPage: React.FC = () => {
           )}
 
           {paymentStep === 'method' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 gap-2">
+            <div className="space-y-6">
+              {/* Delivery Method Selector */}
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Njia ya Usafirishaji</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'city', label: 'Mjini', icon: '🏙️' },
+                    { id: 'out', label: 'Nje ya Mji', icon: '🚚' },
+                    { id: 'pickup', label: 'Pickup', icon: '🏪' }
+                  ].map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => setDeliveryMethod(m.id as any)}
+                      className={cn(
+                        "flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all",
+                        deliveryMethod === m.id 
+                          ? "border-amber-500 bg-amber-50 text-amber-900" 
+                          : "border-slate-100 bg-white text-slate-500 hover:border-slate-200"
+                      )}
+                    >
+                      <span className="text-xl">{m.icon}</span>
+                      <span className="text-[10px] font-black uppercase">{m.label}</span>
+                    </button>
+                  ))}
+                </div>
+                {deliveryMethod === 'pickup' && (
+                  <p className="text-[10px] text-emerald-600 font-bold text-center bg-emerald-50 py-2 rounded-xl">
+                    Utakuja kuchukua mwenyewe dukani (Gharama ya usafiri ni 0)
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Njia ya Malipo</p>
+                <div className="grid grid-cols-1 gap-2">
                 {[
                   { id: 'wallet', label: 'Pay with Wallet', icon: '💳', color: 'bg-amber-50 text-amber-600' },
                   { id: 'tigo', label: 'Mix by Yas (Tigo Pesa)', icon: '📱', color: 'bg-blue-50 text-blue-600' },
@@ -2530,7 +2586,7 @@ export const ShopPage: React.FC = () => {
                 ].map((m) => {
                   const deliveryFee = deliveryMethod === 'city' ? (selectedProduct?.deliveryCity || 0) : 
                                      deliveryMethod === 'out' ? (selectedProduct?.deliveryOut || 0) : 0;
-                  const total = (selectedProduct?.price || 0) * qty + deliveryFee;
+                  const total = (selectedProduct?.price || 0) * qty + (deliveryMethod === 'pickup' ? 0 : deliveryFee);
                   const hasEnough = m.id === 'wallet' ? (user?.walletBalance || 0) >= total : true;
 
                   return (
@@ -2570,6 +2626,7 @@ export const ShopPage: React.FC = () => {
                 })}
               </div>
             </div>
+          </div>
           )}
 
           {paymentStep === 'details' && (

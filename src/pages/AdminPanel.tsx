@@ -365,6 +365,16 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  const deleteOrder = async (id: string) => {
+    if (!confirm('Una uhakika unataka kufuta agizo hili?')) return;
+    try {
+      await deleteDoc(doc(db, 'kuku_orders', id));
+      toast.success('Agizo limefutwa');
+    } catch (error: any) {
+      toast.error('Hitilafu wakati wa kufuta');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col lg:flex-row pb-20 lg:pb-0 transition-colors duration-300">
       {/* Mobile Header */}
@@ -908,6 +918,9 @@ export const AdminPanel: React.FC = () => {
                             o.status === 'delivered' ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
                           )}>
                             {o.status}
+                          </span>
+                          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+                            {o.deliveryMethod || 'city'}
                           </span>
                           {o.paymentProof && (
                             <span className={cn(
@@ -2000,6 +2013,29 @@ export const AdminPanel: React.FC = () => {
           </button>
         </div>
       </Modal>
+
+      {/* Mobile Bottom Nav */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-amber-950 border-t border-white/5 px-6 py-3 flex items-center justify-between z-40">
+        {[
+          { id: 'over', icon: BarChart3, label: 'Dash' },
+          { id: 'orders', icon: ClipboardList, label: 'Oda' },
+          { id: 'vendors', icon: Store, label: 'Wauuzaji' },
+          { id: 'users', icon: Users, label: 'Watu' },
+          { id: 'settings', icon: Settings, label: 'Seti' }
+        ].map(item => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id as any)}
+            className={cn(
+              "flex flex-col items-center gap-1 transition-all",
+              activeTab === item.id ? "text-amber-400" : "text-amber-100/40"
+            )}
+          >
+            <item.icon size={20} />
+            <span className="text-[8px] font-black uppercase tracking-widest">{item.label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 };
