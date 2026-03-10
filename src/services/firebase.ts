@@ -10,7 +10,8 @@ const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "fleet-a4a43",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "fleet-a4a43.firebasestorage.app",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "763957167114",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:763957167114:web:dd7a26ed4ada24c74c0bf3"
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:763957167114:web:dd7a26ed4ada24c74c0bf3",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-SQXZWLKRQZ"
 };
 
 console.log("Initializing Firebase with project:", firebaseConfig.projectId);

@@ -7,7 +7,6 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
-import twilio from 'twilio';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,45 +15,40 @@ dotenv.config();
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
-  const projectId = process.env.VITE_FIREBASE_PROJECT_ID || 'fleet-a4a43';
   const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+  let projectId = process.env.VITE_FIREBASE_PROJECT_ID || 'fleet-a4a43';
   
   try {
     if (serviceAccount) {
-      console.log(`Initializing Firebase Admin with Service Account for project: ${projectId}`);
+      console.log("Found FIREBASE_SERVICE_ACCOUNT, length:", serviceAccount.length);
+      console.log("First 20 chars:", serviceAccount.substring(0, 20));
       const cert = JSON.parse(serviceAccount);
+      projectId = cert.project_id || projectId;
+      
+      console.log(`Initializing Firebase Admin with Service Account for project: ${projectId}`);
       admin.initializeApp({
         credential: admin.credential.cert(cert),
         projectId
       });
     } else {
-      // Try default initialization first (standard for Cloud Run)
-      try {
-        admin.initializeApp();
-        console.log("Firebase Admin initialized with default credentials");
-      } catch (e) {
-        console.log(`Default initialization failed, falling back to project ID: ${projectId}`);
-        admin.initializeApp({
-          projectId
-        });
-      }
+      console.log("No FIREBASE_SERVICE_ACCOUNT found, attempting default initialization...");
+      admin.initializeApp({
+        projectId: projectId
+      });
     }
-    console.log(`Firebase Admin ready for project: ${admin.app().options.projectId || projectId}`);
-  } catch (err) {
-    console.error('Firebase Admin Initialization Error:', err);
+    
+    const initializedProject = admin.app().options.projectId;
+    console.log(`Firebase Admin successfully initialized for project: ${initializedProject}`);
+  } catch (err: any) {
+    console.error('Firebase Admin Initialization Error:', err.message);
     // Final fallback
     if (!admin.apps.length) {
-      admin.initializeApp({ projectId });
+      admin.initializeApp({ projectId: projectId });
     }
   }
 }
 const db = admin.firestore();
 db.settings({ ignoreUndefinedProperties: true });
-
-// Twilio Setup
-const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN 
-  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-  : null;
 
 const app = express();
 app.use(cors());
@@ -174,24 +168,6 @@ app.post('/api/withdraw', async (req, res) => {
     await db.collection('kuku_users').doc(vendorId).update({
       walletBalance: admin.firestore.FieldValue.increment(-amountNum)
     });
-
-    // Send WhatsApp Notification to Admin
-    if (twilioClient) {
-      const adminPhone = process.env.ADMIN_WHATSAPP_NUMBER || 'whatsapp:+255764225358';
-      const fromPhone = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
-      
-      try {
-        const formattedAmount = isNaN(amountNum) ? '0' : amountNum.toLocaleString();
-        await twilioClient.messages.create({
-          from: fromPhone,
-          to: adminPhone,
-          body: `*WITHDRAW REQUEST*\n\nVendor: ${vendorName}\nAmount: ${formattedAmount} TZS\nMethod: ${method}\nPhone: ${phone}\n\nStatus: Pending Approval`
-        });
-        console.log('WhatsApp notification sent');
-      } catch (twErr) {
-        console.error('Twilio Error:', twErr);
-      }
-    }
 
     res.json({ id: withdrawRef.id, status: 'Pending' });
   } catch (err: any) {
@@ -337,8 +313,27 @@ app.get('/api/health', (req, res) => {
     status: 'ok', 
     time: new Date().toISOString(),
     env: process.env.NODE_ENV || 'development',
-    vercel: !!process.env.VERCEL
+    vercel: !!process.env.VERCEL,
+    firebase: admin.apps.length > 0
   });
+});
+
+app.get("/api/test-firebase", async (req, res) => {
+  try {
+    const collections = await db.listCollections();
+    res.json({ 
+      status: "connected", 
+      collections: collections.map(c => c.id),
+      projectId: admin.app().options.projectId
+    });
+  } catch (err: any) {
+    res.status(500).json({ 
+      status: "error", 
+      message: err.message, 
+      code: err.code,
+      projectId: admin.app().options.projectId
+    });
+  }
 });
 
 async function setupVite() {

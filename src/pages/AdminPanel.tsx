@@ -192,7 +192,8 @@ export const AdminPanel: React.FC = () => {
     withdrawalFeeValue: 0,
     adminWhatsApp: '255764225358',
     paymentNumber: '0687225353',
-    paymentName: 'Amour'
+    paymentName: 'Amour',
+    firebase_service_account: ''
   });
 
   useEffect(() => {
@@ -214,7 +215,8 @@ export const AdminPanel: React.FC = () => {
         withdrawalFeeValue: systemSettings.withdrawalFeeValue || 0,
         adminWhatsApp: systemSettings.adminWhatsApp || '255764225358',
         paymentNumber: systemSettings.paymentNumber || '0687225353',
-        paymentName: systemSettings.paymentName || 'Amour'
+        paymentName: systemSettings.paymentName || 'Amour',
+        firebase_service_account: systemSettings.firebase_service_account || ''
       });
     }
   }, [systemSettings]);
@@ -1712,6 +1714,18 @@ export const AdminPanel: React.FC = () => {
                       onChange={(e) => setLocalSettings(prev => ({ ...prev, firebase_project_id: e.target.value }))}
                       className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
                     />
+                  </div>
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Service Account JSON (Sensitive)</label>
+                    <textarea 
+                      value={localSettings.firebase_service_account}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, firebase_service_account: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm min-h-[200px] font-mono"
+                      placeholder='{"type": "service_account", ...}'
+                    />
+                    <p className="text-[10px] text-amber-600 font-bold px-2 italic">
+                      * Kumbuka: Hii ni siri kubwa. Inatumika kwa ajili ya Admin SDK upande wa server.
+                    </p>
                   </div>
                 </div>
               </div>
