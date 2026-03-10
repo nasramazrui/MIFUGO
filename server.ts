@@ -11,44 +11,68 @@ import admin from 'firebase-admin';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Process-level error handlers
+process.on('uncaughtException', (err) => {
+  console.error('[CRASH] Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[CRASH] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 dotenv.config();
 
 // Initialize Firebase Admin
-if (!admin.apps.length) {
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-  let projectId = process.env.VITE_FIREBASE_PROJECT_ID || 'fleet-a4a43';
-  
-  try {
-    if (serviceAccount) {
-      console.log("Found FIREBASE_SERVICE_ACCOUNT, length:", serviceAccount.length);
-      console.log("First 20 chars:", serviceAccount.substring(0, 20));
-      const cert = JSON.parse(serviceAccount);
-      projectId = cert.project_id || projectId;
-      
-      console.log(`Initializing Firebase Admin with Service Account for project: ${projectId}`);
-      admin.initializeApp({
-        credential: admin.credential.cert(cert),
-        projectId
-      });
-    } else {
-      console.log("No FIREBASE_SERVICE_ACCOUNT found, attempting default initialization...");
-      admin.initializeApp({
-        projectId: projectId
-      });
-    }
+let db: admin.firestore.Firestore;
+
+try {
+  if (!admin.apps.length) {
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+    let projectId = process.env.VITE_FIREBASE_PROJECT_ID || 'fleet-a4a43';
     
-    const initializedProject = admin.app().options.projectId;
-    console.log(`Firebase Admin successfully initialized for project: ${initializedProject}`);
-  } catch (err: any) {
-    console.error('Firebase Admin Initialization Error:', err.message);
-    // Final fallback
-    if (!admin.apps.length) {
-      admin.initializeApp({ projectId: projectId });
+    if (serviceAccount) {
+      console.log("[Firebase] Found FIREBASE_SERVICE_ACCOUNT, length:", serviceAccount.length);
+      try {
+        const cert = JSON.parse(serviceAccount);
+        projectId = cert.project_id || projectId;
+        
+        console.log(`[Firebase] Initializing with Service Account for project: ${projectId}`);
+        admin.initializeApp({
+          credential: admin.credential.cert(cert),
+          projectId
+        });
+      } catch (parseErr: any) {
+        console.error('[Firebase] JSON Parse Error for Service Account:', parseErr.message);
+        console.log('[Firebase] Attempting default initialization as fallback...');
+        admin.initializeApp({ projectId });
+      }
+    } else {
+      console.log("[Firebase] No FIREBASE_SERVICE_ACCOUNT found, using default initialization...");
+      admin.initializeApp({ projectId });
     }
   }
+  
+  db = admin.firestore();
+  db.settings({ ignoreUndefinedProperties: true });
+  console.log(`[Firebase] Admin initialized. Project: ${admin.app().options.projectId}`);
+} catch (err: any) {
+  console.error('[Firebase] Fatal Initialization Error:', err.message);
+  // We still need to define db to avoid crashes later, even if it's broken
+  // @ts-ignore
+  db = {
+    collection: () => ({
+      doc: () => ({
+        get: () => Promise.reject(new Error('Firebase not initialized: ' + err.message)),
+        set: () => Promise.reject(new Error('Firebase not initialized: ' + err.message)),
+        update: () => Promise.reject(new Error('Firebase not initialized: ' + err.message)),
+      }),
+      where: () => ({
+        get: () => Promise.reject(new Error('Firebase not initialized: ' + err.message)),
+      }),
+      listCollections: () => Promise.reject(new Error('Firebase not initialized: ' + err.message)),
+    })
+  } as any;
 }
-const db = admin.firestore();
-db.settings({ ignoreUndefinedProperties: true });
 
 const app = express();
 app.use(cors());
@@ -58,24 +82,40 @@ app.use(express.json());
 
 // Get Wallet Balance & Transactions
 app.get('/api/wallet/:vendorId', async (req, res) => {
+  const { vendorId } = req.params;
+  console.log(`[Wallet] Fetching data for vendor: ${vendorId}`);
+  
   try {
-    const { vendorId } = req.params;
-    
+    if (!admin.apps.length) {
+      console.error('[Wallet] Firebase Admin not initialized!');
+      return res.status(500).json({ error: 'Firebase Admin not initialized' });
+    }
+
     // Get balance
+    console.log(`[Wallet] Fetching user doc: kuku_users/${vendorId}`);
     const walletDoc = await db.collection('kuku_users').doc(vendorId).get();
-    let walletData = walletDoc.exists ? walletDoc.data() : { walletBalance: 0, shopName: 'Vendor' };
+    let walletData = walletDoc.exists ? walletDoc.data() : null;
     
     if (!walletDoc.exists) {
+      console.log(`[Wallet] User doc not found, initializing default for: ${vendorId}`);
       // Initialize if not exists (for demo)
-      walletData = { walletBalance: 320000, shopName: 'Amour', contact: '0764225358' };
+      walletData = { 
+        walletBalance: 320000, 
+        shopName: 'Amour', 
+        contact: '0764225358',
+        role: 'vendor',
+        createdAt: new Date().toISOString()
+      };
       await db.collection('kuku_users').doc(vendorId).set(walletData, { merge: true });
     }
 
     // Get transactions
+    console.log(`[Wallet] Fetching transactions for userId: ${vendorId}`);
     const transactionsSnapshot = await db.collection('kuku_wallet')
       .where('userId', '==', vendorId)
       .get();
     
+    console.log(`[Wallet] Found ${transactionsSnapshot.size} transactions`);
     let transactions = transactionsSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -83,25 +123,34 @@ app.get('/api/wallet/:vendorId', async (req, res) => {
 
     // Sort and limit on server side to avoid index requirement
     transactions.sort((a: any, b: any) => {
-      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-      return dateB - dateA;
+      try {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        return dateB.getTime() - dateA.getTime();
+      } catch (e) {
+        return 0;
+      }
     });
     transactions = transactions.slice(0, 20);
 
+    console.log(`[Wallet] Success for ${vendorId}`);
     res.json({
       balance: walletData?.walletBalance || 0,
       vendorName: walletData?.shopName || walletData?.name || 'Vendor',
       transactions
     });
   } catch (err: any) {
-    console.error('Wallet Error Details:', {
+    console.error('[Wallet] Error Details:', {
       message: err.message,
       code: err.code,
-      details: err.details,
-      vendorId: req.params.vendorId
+      stack: err.stack,
+      vendorId
     });
-    res.status(500).json({ error: 'Failed to fetch wallet data', details: err.message });
+    res.status(500).json({ 
+      error: 'Failed to fetch wallet data', 
+      details: err.message,
+      code: err.code 
+    });
   }
 });
 

@@ -1728,6 +1728,26 @@ export const AdminPanel: React.FC = () => {
                     </p>
                   </div>
                 </div>
+                <div className="mt-6 flex justify-start">
+                  <button 
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('/api/test-firebase');
+                        const data = await res.json();
+                        if (res.ok) {
+                          toast.success(`Imeunganishwa! Project: ${data.projectId}`);
+                        } else {
+                          toast.error(`Hitilafu: ${data.message || 'Unknown error'}`);
+                        }
+                      } catch (err: any) {
+                        toast.error(`Imeshindwa kuunganisha: ${err.message}`);
+                      }
+                    }}
+                    className="bg-slate-900 text-white px-6 py-3 rounded-2xl text-xs font-black hover:bg-slate-800 transition-all flex items-center gap-2"
+                  >
+                    <Globe size={16} /> JARIBU MUUNGANISHO WA FIREBASE
+                  </button>
+                </div>
               </div>
 
               <div className="flex justify-end pt-6">
