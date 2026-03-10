@@ -41,7 +41,8 @@ import {
   Globe,
   ArrowLeft,
   Grid,
-  MessageSquare
+  MessageSquare,
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '../utils';
 import { CATEGORIES } from '../constants';
@@ -334,6 +335,61 @@ export const AdminPanel: React.FC = () => {
       toast.success('Deposit imekataliwa');
     } catch (err) {
       toast.error('Imeshindwa kukataa deposit');
+    }
+  };
+
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const syncWallets = async () => {
+    if (!confirm('Je, unataka kusawazisha (Sync) Wallet za wauzaji? Hii itahakikisha miamala yote ya mauzo iliyokamilika imeingizwa kwenye Wallet zao.')) return;
+    
+    setIsSyncing(true);
+    try {
+      let fixedCount = 0;
+      
+      // 1. Get all completed orders
+      const completedOrders = orders.filter(o => o.status === 'completed' || o.status === 'delivered');
+      
+      for (const order of completedOrders) {
+        // Check if this order already has a 'sale' transaction in kuku_wallet
+        const existingTx = walletTransactions.find(t => t.orderId === order.id && t.type === 'sale');
+        
+        if (!existingTx) {
+          // Missing sale transaction!
+          const amountToRelease = order.vendorNet || (order.total - (order.deliveryFee || 0)) * 0.94;
+          
+          // Add transaction
+          await addDoc(collection(db, 'kuku_wallet'), {
+            userId: order.vendorId,
+            userName: order.vendorName,
+            amount: amountToRelease,
+            type: 'sale',
+            status: 'approved',
+            orderId: order.id,
+            description: `Mauzo ya #${order.id.substring(0,8)} (Sync Fix)`,
+            date: order.date || new Date().toISOString().split('T')[0],
+            createdAt: serverTimestamp()
+          });
+          
+          // Update vendor balance
+          await updateDoc(doc(db, 'kuku_users', order.vendorId), {
+            walletBalance: increment(amountToRelease)
+          });
+          
+          fixedCount++;
+        }
+      }
+      
+      if (fixedCount > 0) {
+        toast.success(`Usawazishaji umekamilika! Miamala ${fixedCount} imerekebishwa.`);
+      } else {
+        toast.success('Wallet zote ziko sawa. Hakuna miamala iliyokosekana.');
+      }
+    } catch (err: any) {
+      console.error("Sync Error:", err);
+      toast.error('Hitilafu wakati wa kusawazisha: ' + err.message);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -1083,25 +1139,34 @@ export const AdminPanel: React.FC = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
               <h2 className="text-3xl font-black text-slate-900">Usimamizi wa Wallet</h2>
-              <div className="flex bg-slate-100 p-1 rounded-2xl">
+              <div className="flex flex-wrap items-center gap-3">
                 <button 
-                  onClick={() => setWalletSubTab('deposits')}
-                  className={cn(
-                    "px-6 py-2 rounded-xl text-xs font-black transition-all",
-                    walletSubTab === 'deposits' ? "bg-white text-amber-600 shadow-sm" : "text-slate-400"
-                  )}
+                  onClick={syncWallets}
+                  disabled={isSyncing}
+                  className="bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black hover:bg-slate-800 transition-all flex items-center gap-2 disabled:opacity-50"
                 >
-                  DEPOSITS ({walletTransactions.filter(t => t.type === 'deposit' && t.status === 'pending').length})
+                  <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} /> {isSyncing ? 'SYNCING...' : 'SYNC WALLETS'}
                 </button>
-                <button 
-                  onClick={() => setWalletSubTab('withdrawals')}
-                  className={cn(
-                    "px-6 py-2 rounded-xl text-xs font-black transition-all",
-                    walletSubTab === 'withdrawals' ? "bg-white text-amber-600 shadow-sm" : "text-slate-400"
-                  )}
-                >
-                  WITHDRAWALS ({withdrawals.filter(w => w.status === 'pending').length})
-                </button>
+                <div className="flex bg-slate-100 p-1 rounded-2xl">
+                  <button 
+                    onClick={() => setWalletSubTab('deposits')}
+                    className={cn(
+                      "px-6 py-2 rounded-xl text-xs font-black transition-all",
+                      walletSubTab === 'deposits' ? "bg-white text-amber-600 shadow-sm" : "text-slate-400"
+                    )}
+                  >
+                    DEPOSITS ({walletTransactions.filter(t => t.type === 'deposit' && t.status === 'pending').length})
+                  </button>
+                  <button 
+                    onClick={() => setWalletSubTab('withdrawals')}
+                    className={cn(
+                      "px-6 py-2 rounded-xl text-xs font-black transition-all",
+                      walletSubTab === 'withdrawals' ? "bg-white text-amber-600 shadow-sm" : "text-slate-400"
+                    )}
+                  >
+                    WITHDRAWALS ({withdrawals.filter(w => w.status === 'pending').length})
+                  </button>
+                </div>
               </div>
             </div>
 

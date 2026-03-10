@@ -59,7 +59,7 @@ export interface OrderItem {
   image?: string;
 }
 
-export type OrderStatus = 'pending' | 'processing' | 'waiting' | 'onway' | 'pickup' | 'delivered';
+export type OrderStatus = 'pending' | 'processing' | 'waiting' | 'onway' | 'pickup' | 'delivered' | 'completed';
 
 export interface Order {
   id: string;

@@ -657,14 +657,42 @@ export const ShopPage: React.FC = () => {
     if (!selectedOrder) return;
     
     try {
-      await updateDoc(doc(db, 'kuku_orders', selectedOrder.id), { 
+      const orderRef = doc(db, 'kuku_orders', selectedOrder.id);
+      const vendorRef = doc(db, 'kuku_users', selectedOrder.vendorId);
+      
+      // 1. Update order status
+      await updateDoc(orderRef, { 
         status: 'completed',
         receivedAt: serverTimestamp()
       });
+
+      // 2. Release funds to vendor wallet
+      // vendorNet is the amount after 6% commission
+      const amountToRelease = selectedOrder.vendorNet || (selectedOrder.total - (selectedOrder.deliveryFee || 0)) * 0.94;
+      
+      await updateDoc(vendorRef, {
+        walletBalance: increment(amountToRelease)
+      });
+
+      // 3. Record transaction in kuku_wallet for the vendor
+      await addDoc(collection(db, 'kuku_wallet'), {
+        userId: selectedOrder.vendorId,
+        userName: selectedOrder.vendorName,
+        amount: amountToRelease,
+        type: 'sale',
+        status: 'approved',
+        orderId: selectedOrder.id,
+        description: `Mauzo ya #${selectedOrder.id.substring(0,8)} - ${selectedOrder.items[0].name}`,
+        date: new Date().toISOString().split('T')[0],
+        createdAt: serverTimestamp()
+      });
+
       setIsTrackingModalOpen(false);
       setIsOrderReviewModalOpen(true);
-      toast.success('Asante kwa kuthibitisha! Tafadhali acha maoni yako.');
+      toast.success('Asante kwa kuthibitisha! Malipo yameingizwa kwenye Wallet ya Muuzaji.');
+      addActivity('✅', `Mteja amethibitisha kupokea agizo #${selectedOrder.id.substring(0,8)}. Pesa imetumwa kwa muuzaji.`);
     } catch (error) {
+      console.error("Confirm Receipt Error:", error);
       toast.error('Hitilafu imetokea wakati wa kuthibitisha.');
     }
   };

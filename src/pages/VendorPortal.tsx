@@ -203,7 +203,7 @@ export const VendorPortal: React.FC = () => {
   const myAuctions = auctions.filter(a => a.vendorId === user.id);
   
   const totalRevenue = myOrders
-    .filter(o => o.status === 'delivered')
+    .filter(o => o.status === 'delivered' || o.status === 'completed')
     .reduce((s, o) => s + (o.vendorNet || (o.total - (o.deliveryFee || 0)) * 0.94), 0);
 
   const withdrawnAmount = myWithdrawals
