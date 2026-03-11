@@ -86,66 +86,59 @@ app.get('/api/wallet/:vendorId', async (req, res) => {
   console.log(`[Wallet] Fetching data for vendor: ${vendorId}`);
   
   try {
-    if (!admin.apps.length) {
-      console.error('[Wallet] Firebase Admin not initialized!');
-      return res.status(500).json({ error: 'Firebase Admin not initialized' });
+    if (!db || typeof db.collection !== 'function') {
+      console.error('[Wallet] Database not properly initialized!');
+      return res.status(500).json({ error: 'Database not initialized' });
+    }
+
+    if (!vendorId || vendorId === 'undefined') {
+      return res.status(400).json({ error: 'Invalid vendor ID' });
     }
 
     // Get balance
-    console.log(`[Wallet] Fetching user doc: kuku_users/${vendorId}`);
     const walletDoc = await db.collection('kuku_users').doc(vendorId).get();
     let walletData = walletDoc.exists ? walletDoc.data() : null;
     
     if (!walletDoc.exists) {
-      console.log(`[Wallet] User doc not found, initializing default for: ${vendorId}`);
-      // Initialize if not exists (for demo)
+      console.log(`[Wallet] User doc not found for: ${vendorId}`);
+      // Return 0 balance instead of initializing with demo data to avoid confusion
       walletData = { 
-        walletBalance: 320000, 
-        shopName: 'Amour', 
-        contact: '0764225358',
-        role: 'vendor',
-        createdAt: new Date().toISOString()
+        walletBalance: 0, 
+        shopName: 'Mtumiaji Mpya', 
+        role: 'user'
       };
-      await db.collection('kuku_users').doc(vendorId).set(walletData, { merge: true });
     }
 
     // Get transactions
-    console.log(`[Wallet] Fetching transactions for userId: ${vendorId}`);
     const transactionsSnapshot = await db.collection('kuku_wallet')
       .where('userId', '==', vendorId)
       .get();
     
-    console.log(`[Wallet] Found ${transactionsSnapshot.size} transactions`);
-    let transactions = transactionsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-
-    // Sort and limit on server side to avoid index requirement
-    transactions.sort((a: any, b: any) => {
-      try {
-        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-        return dateB.getTime() - dateA.getTime();
-      } catch (e) {
-        return 0;
-      }
+    let transactions = transactionsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        // Ensure createdAt is serializable
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || data.date || new Date().toISOString())
+      };
     });
-    transactions = transactions.slice(0, 20);
 
-    console.log(`[Wallet] Success for ${vendorId}`);
+    // Sort and limit
+    transactions.sort((a: any, b: any) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return dateB - dateA;
+    });
+    transactions = transactions.slice(0, 50);
+
     res.json({
       balance: walletData?.walletBalance || 0,
-      vendorName: walletData?.shopName || walletData?.name || 'Vendor',
+      vendorName: walletData?.shopName || walletData?.name || 'Mtumiaji',
       transactions
     });
   } catch (err: any) {
-    console.error('[Wallet] Error Details:', {
-      message: err.message,
-      code: err.code,
-      stack: err.stack,
-      vendorId
-    });
+    console.error('[Wallet] Error:', err);
     res.status(500).json({ 
       error: 'Failed to fetch wallet data', 
       details: err.message,
@@ -415,7 +408,12 @@ if (!process.env.VERCEL) {
 // Create Auction
 app.post('/api/auctions', async (req, res) => {
   try {
-    const { vendorId, vendorName, productName, description, startingPrice, minIncrement, durationHours, location, image } = req.body;
+    const { 
+      vendorId, vendorName, productName, description, 
+      startingPrice, minIncrement, durationHours, 
+      location, image, canSlaughter, slaughterFee,
+      deliveryCity, deliveryOut
+    } = req.body;
     
     if (!vendorId || !productName || !startingPrice) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -436,6 +434,10 @@ app.post('/api/auctions', async (req, res) => {
       location,
       image,
       status: 'active',
+      canSlaughter: !!canSlaughter,
+      slaughterFee: Number(slaughterFee || 0),
+      deliveryCity: Number(deliveryCity || 0),
+      deliveryOut: Number(deliveryOut || 0),
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
 

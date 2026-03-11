@@ -16,7 +16,9 @@ export const AuctionPage: React.FC = () => {
   const [isBidding, setIsBidding] = useState(false);
   const [auctionBids, setAuctionBids] = useState<Bid[]>([]);
   const [isPaying, setIsPaying] = useState(false);
-  const [paymentStep, setPaymentStep] = useState<'options' | 'details' | 'success'>('options');
+  const [paymentStep, setPaymentStep] = useState<'shipping' | 'options' | 'details' | 'success'>('shipping');
+  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'city' | 'out'>('pickup');
+  const [slaughterRequested, setSlaughterRequested] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'tigo' | 'mpesa' | 'airtel' | 'halopesa' | 'cash'>('tigo');
   const [paymentForm, setPaymentForm] = useState({
     transactionId: '',
@@ -144,9 +146,15 @@ export const AuctionPage: React.FC = () => {
   const handleAuctionPayment = async () => {
     if (!selectedAuction || !user) return;
     setIsPaying(true);
+    
+    const deliveryFee = deliveryMethod === 'city' ? (selectedAuction.deliveryCity || 0) : 
+                       deliveryMethod === 'out' ? (selectedAuction.deliveryOut || 0) : 0;
+    const slaughterFee = slaughterRequested ? (selectedAuction.slaughterFee || 0) : 0;
+    const totalAmount = selectedAuction.currentBid + deliveryFee + slaughterFee;
+
     try {
       if (paymentMethod === 'wallet') {
-        if ((user.walletBalance || 0) < selectedAuction.currentBid) {
+        if ((user.walletBalance || 0) < totalAmount) {
           toast.error('Salio la wallet halitoshi.');
           setIsPaying(false);
           return;
@@ -154,14 +162,14 @@ export const AuctionPage: React.FC = () => {
         
         // Deduct from wallet
         await updateDoc(doc(db, 'kuku_users', user.id), {
-          walletBalance: increment(-selectedAuction.currentBid)
+          walletBalance: increment(-totalAmount)
         });
         
         // Record transaction
         await addDoc(collection(db, 'kuku_wallet'), {
           userId: user.id,
           userName: user.name,
-          amount: selectedAuction.currentBid,
+          amount: totalAmount,
           type: 'purchase',
           status: 'approved',
           method: 'wallet',
@@ -177,6 +185,11 @@ export const AuctionPage: React.FC = () => {
         transactionId: paymentForm.transactionId || (paymentMethod === 'wallet' ? `WALLET-${Date.now()}` : `CASH-${Date.now()}`),
         senderPhone: paymentForm.senderPhone,
         senderName: paymentForm.senderName,
+        deliveryMethod,
+        deliveryFee,
+        slaughterRequested,
+        slaughterFee,
+        totalAmount,
         paidAt: serverTimestamp()
       });
 
@@ -192,16 +205,18 @@ export const AuctionPage: React.FC = () => {
         productId: selectedAuction.id, // Use auction ID as product ID for reference
         productPrice: selectedAuction.currentBid,
         qty: 1,
-        deliveryFee: 0, // Auctions usually handle delivery separately or included
-        deliveryMethod: 'pickup', // Default to pickup for auctions
-        total: selectedAuction.currentBid,
+        deliveryFee,
+        deliveryMethod,
+        slaughterRequested,
+        slaughterFee,
+        total: totalAmount,
         payMethod: paymentMethod,
         senderName: paymentForm.senderName,
         transactionId: paymentForm.transactionId || (paymentMethod === 'wallet' ? `WALLET-${Date.now()}` : `CASH-${Date.now()}`),
-        sentAmount: selectedAuction.currentBid.toString(),
+        sentAmount: totalAmount.toString(),
         status: 'pending',
         items: [{
-          name: `MNADA: ${selectedAuction.productName}`,
+          name: `MNADA: ${selectedAuction.productName}${slaughterRequested ? ' (Aliyechinjwa)' : ''}`,
           qty: 1,
           price: selectedAuction.currentBid,
           emoji: '🏆',
@@ -396,9 +411,136 @@ export const AuctionPage: React.FC = () => {
                       <CreditCard className="text-amber-500" /> Kamilisha Malipo
                     </h3>
                     
+                    {paymentStep === 'shipping' && (
+                      <div className="space-y-6">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Chagua Njia ya Kupokea</label>
+                          <div className="grid grid-cols-1 gap-3">
+                            <button 
+                              onClick={() => setDeliveryMethod('pickup')}
+                              className={cn(
+                                "flex items-center justify-between p-4 rounded-2xl border-2 transition-all",
+                                deliveryMethod === 'pickup' ? "border-amber-500 bg-amber-50" : "border-slate-100"
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600">🏠</div>
+                                <div className="text-left">
+                                  <p className="font-bold text-sm">Nitakuja Kuchukua</p>
+                                  <p className="text-[10px] text-slate-400">Bure (Self-pickup)</p>
+                                </div>
+                              </div>
+                              {deliveryMethod === 'pickup' && <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>}
+                            </button>
+
+                            <button 
+                              onClick={() => setDeliveryMethod('city')}
+                              className={cn(
+                                "flex items-center justify-between p-4 rounded-2xl border-2 transition-all",
+                                deliveryMethod === 'city' ? "border-amber-500 bg-amber-50" : "border-slate-100"
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">🛵</div>
+                                <div className="text-left">
+                                  <p className="font-bold text-sm">Niletee (Ndani ya Mji)</p>
+                                  <p className="text-[10px] text-slate-400">Gharama: {formatCurrency(selectedAuction.deliveryCity || 0, currency)}</p>
+                                </div>
+                              </div>
+                              {deliveryMethod === 'city' && <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>}
+                            </button>
+
+                            <button 
+                              onClick={() => setDeliveryMethod('out')}
+                              className={cn(
+                                "flex items-center justify-between p-4 rounded-2xl border-2 transition-all",
+                                deliveryMethod === 'out' ? "border-amber-500 bg-amber-50" : "border-slate-100"
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600">🚚</div>
+                                <div className="text-left">
+                                  <p className="font-bold text-sm">Niletee (Nje ya Mji)</p>
+                                  <p className="text-[10px] text-slate-400">Gharama: {formatCurrency(selectedAuction.deliveryOut || 0, currency)}</p>
+                                </div>
+                              </div>
+                              {deliveryMethod === 'out' && <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>}
+                            </button>
+                          </div>
+                        </div>
+
+                        {selectedAuction.canSlaughter && (
+                          <div className="p-6 bg-slate-50 rounded-[32px] border border-slate-100">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <h4 className="font-black text-slate-900 text-sm">Je, unataka achinjwe?</h4>
+                                <p className="text-[10px] text-slate-400">Gharama ya kuchinja: {formatCurrency(selectedAuction.slaughterFee || 0, currency)}</p>
+                              </div>
+                              <button 
+                                onClick={() => setSlaughterRequested(!slaughterRequested)}
+                                className={cn(
+                                  "w-12 h-6 rounded-full transition-all relative",
+                                  slaughterRequested ? "bg-emerald-500" : "bg-slate-300"
+                                )}
+                              >
+                                <div className={cn(
+                                  "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                                  slaughterRequested ? "right-1" : "left-1"
+                                )} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="pt-4">
+                          <button 
+                            onClick={() => setPaymentStep('options')}
+                            className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-sm uppercase tracking-widest shadow-xl shadow-slate-200"
+                          >
+                            ENDELEA KWENYE MALIPO
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
                     {paymentStep === 'options' && (
                       <div className="space-y-4">
-                        <p className="text-sm text-slate-500 font-bold mb-4">Chagua njia ya kulipa kiasi cha <span className="text-emerald-600">{formatCurrency(selectedAuction.currentBid, currency)}</span></p>
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Muhtasari wa Malipo</p>
+                          <button onClick={() => setPaymentStep('shipping')} className="text-[10px] font-black text-amber-600 uppercase">Badili</button>
+                        </div>
+                        
+                        <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 space-y-3 mb-6">
+                          <div className="flex justify-between text-sm font-bold">
+                            <span className="text-slate-500">Bei ya Mnada:</span>
+                            <span className="text-slate-900">{formatCurrency(selectedAuction.currentBid, currency)}</span>
+                          </div>
+                          {deliveryMethod !== 'pickup' && (
+                            <div className="flex justify-between text-sm font-bold">
+                              <span className="text-slate-500">Usafiri ({deliveryMethod === 'city' ? 'Ndani' : 'Nje'}):</span>
+                              <span className="text-slate-900">{formatCurrency(deliveryMethod === 'city' ? (selectedAuction.deliveryCity || 0) : (selectedAuction.deliveryOut || 0), currency)}</span>
+                            </div>
+                          )}
+                          {slaughterRequested && (
+                            <div className="flex justify-between text-sm font-bold">
+                              <span className="text-slate-500">Gharama ya Kuchinja:</span>
+                              <span className="text-slate-900">{formatCurrency(selectedAuction.slaughterFee || 0, currency)}</span>
+                            </div>
+                          )}
+                          <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
+                            <span className="font-black text-slate-900">Jumla Kuu:</span>
+                            <span className="text-xl font-black text-emerald-600">
+                              {formatCurrency(
+                                selectedAuction.currentBid + 
+                                (deliveryMethod === 'city' ? (selectedAuction.deliveryCity || 0) : deliveryMethod === 'out' ? (selectedAuction.deliveryOut || 0) : 0) +
+                                (slaughterRequested ? (selectedAuction.slaughterFee || 0) : 0),
+                                currency
+                              )}
+                            </span>
+                          </div>
+                        </div>
+
+                        <p className="text-sm text-slate-500 font-bold mb-4">Chagua njia ya kulipa:</p>
                         <div className="grid grid-cols-1 gap-2">
                           {[
                             { id: 'wallet', label: 'Wallet Balance', icon: <Wallet size={20} />, color: 'bg-amber-50 text-amber-600' },
@@ -408,7 +550,10 @@ export const AuctionPage: React.FC = () => {
                             { id: 'halopesa', label: 'HaloPesa', icon: <Smartphone size={20} />, color: 'bg-orange-50 text-orange-600' },
                             { id: 'cash', label: 'Pesa Taslimu (Cash)', icon: <CreditCard size={20} />, color: 'bg-emerald-50 text-emerald-600' }
                           ].map((m) => {
-                            const hasEnough = m.id === 'wallet' ? (user?.walletBalance || 0) >= selectedAuction.currentBid : true;
+                            const total = selectedAuction.currentBid + 
+                                         (deliveryMethod === 'city' ? (selectedAuction.deliveryCity || 0) : deliveryMethod === 'out' ? (selectedAuction.deliveryOut || 0) : 0) +
+                                         (slaughterRequested ? (selectedAuction.slaughterFee || 0) : 0);
+                            const hasEnough = m.id === 'wallet' ? (user?.walletBalance || 0) >= total : true;
                             
                             return (
                               <button
@@ -475,7 +620,14 @@ export const AuctionPage: React.FC = () => {
                         ) : (
                           <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center">
                             <p className="text-sm font-bold text-emerald-800 mb-2">Salio lako la Wallet litatumika kulipia mnada huu.</p>
-                            <p className="text-2xl font-black text-emerald-600">{formatCurrency(selectedAuction.currentBid, currency)}</p>
+                            <p className="text-2xl font-black text-emerald-600">
+                              {formatCurrency(
+                                selectedAuction.currentBid + 
+                                (deliveryMethod === 'city' ? (selectedAuction.deliveryCity || 0) : deliveryMethod === 'out' ? (selectedAuction.deliveryOut || 0) : 0) +
+                                (slaughterRequested ? (selectedAuction.slaughterFee || 0) : 0), 
+                                currency
+                              )}
+                            </p>
                             <p className="text-xs text-emerald-600 mt-2">Salio la sasa: {formatCurrency(user?.walletBalance || 0, currency)}</p>
                           </div>
                         )}
