@@ -1087,50 +1087,51 @@ export const ShopPage: React.FC = () => {
       <div className="lg:pl-72 min-h-screen flex flex-col">
         {/* Header */}
         <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800/50">
-          <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="max-w-7xl mx-auto px-4 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3">
               <button 
                 onClick={() => setIsMobileMenuOpen(true)}
-                className="lg:hidden w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all"
+                className="lg:hidden w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all"
               >
-                <Menu size={24} />
+                <Menu size={20} className="sm:w-6 sm:h-6" />
               </button>
-              <button className="w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all">
-                <Search size={24} />
+              <button className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all">
+                <Search size={20} className="sm:w-6 sm:h-6" />
               </button>
               <button 
                 onClick={() => setIsLangOpen(!isLangOpen)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-900 rounded-full border border-slate-100 dark:border-slate-800 hover:bg-slate-200 transition-all"
+                className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-100 dark:bg-slate-900 rounded-full border border-slate-100 dark:border-slate-800 hover:bg-slate-200 transition-all"
               >
-                <Globe size={18} className="text-slate-400" />
-                <span className="text-sm font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">SW</span>
+                <Globe size={16} className="text-slate-400 sm:w-[18px] sm:h-[18px]" />
+                <span className="text-[10px] sm:text-sm font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">SW</span>
               </button>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {!user ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2">
                   <button 
                     onClick={() => setIsVendorRegModalOpen(true)}
-                    className="flex items-center gap-2 px-5 py-3 bg-[#FEF3C7] text-[#92400E] rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-200 shadow-sm"
+                    className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-5 py-2 sm:py-3 bg-[#FEF3C7] text-[#92400E] rounded-full text-[8px] sm:text-[10px] font-black uppercase tracking-widest border border-amber-200 shadow-sm"
                   >
-                    <Home size={16} />
-                    SAJILI
+                    <Home size={12} className="sm:w-4 sm:h-4" />
+                    <span className="hidden xs:inline">SAJILI</span>
+                    <span className="xs:hidden">JOIN</span>
                   </button>
                   <button 
                     onClick={() => setIsAuthModalOpen(true)}
-                    className="px-8 py-3 bg-[#D97706] text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl shadow-amber-200 hover:bg-amber-700 transition-all active:scale-95"
+                    className="px-3 sm:px-8 py-2 sm:py-3 bg-[#D97706] text-white rounded-full text-[8px] sm:text-[10px] font-black uppercase tracking-widest shadow-xl shadow-amber-200 hover:bg-amber-700 transition-all active:scale-95"
                   >
                     INGIA
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <button 
                     onClick={() => setIsProfileModalOpen(true)}
-                    className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm active:scale-95 transition-all"
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-slate-800 overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm active:scale-95 transition-all"
                   >
-                    {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xl">👤</div>}
+                    {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg">👤</div>}
                   </button>
                 </div>
               )}
@@ -1313,7 +1314,7 @@ export const ShopPage: React.FC = () => {
             </div>
 
             {/* Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-8">
+            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
               {filteredProducts.map((p, idx) => {
                 const productReviews = reviews.filter(r => r.productId === p.id);
                 const avgRating = productReviews.length > 0 

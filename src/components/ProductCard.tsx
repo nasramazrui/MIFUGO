@@ -22,11 +22,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
     <motion.div
       whileHover={{ y: -4 }}
       whileTap={{ scale: 0.98 }}
-      className="group bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800/50 overflow-hidden cursor-pointer shadow-sm hover:shadow-2xl hover:shadow-amber-900/5 transition-all duration-500 flex flex-col h-full"
+      className="group bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] border border-slate-100 dark:border-slate-800/50 overflow-hidden cursor-pointer shadow-sm hover:shadow-2xl hover:shadow-amber-900/5 transition-all duration-500 flex flex-col h-full"
     >
       <div 
         onClick={onClick}
-        className="aspect-[4/5] bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center relative overflow-hidden"
+        className="aspect-square sm:aspect-[4/5] bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center relative overflow-hidden"
       >
         {product.image ? (
           <img 
@@ -99,28 +99,28 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
         </div>
       </div>
 
-      <div className="p-5 flex-1 flex flex-col" onClick={onClick}>
-        <div className="mb-3">
-          <span className="text-[10px] font-black text-amber-600/60 dark:text-amber-500/60 uppercase tracking-[0.2em] mb-1 block">
+      <div className="p-3 sm:p-5 flex-1 flex flex-col" onClick={onClick}>
+        <div className="mb-2 sm:mb-3">
+          <span className="text-[8px] sm:text-[10px] font-black text-amber-600/60 dark:text-amber-500/60 uppercase tracking-[0.2em] mb-0.5 sm:mb-1 block">
             {t(product.category)}
           </span>
-          <h3 className="font-black text-slate-900 dark:text-white text-base leading-tight group-hover:text-amber-600 transition-colors duration-300">
+          <h3 className="font-black text-slate-900 dark:text-white text-sm sm:text-base leading-tight group-hover:text-amber-600 transition-colors duration-300 line-clamp-2">
             {product.name}
           </h3>
         </div>
         
-        <div className="flex items-center justify-between mt-auto">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-400">
+        <div className="flex items-center justify-between mt-auto gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <div className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[8px] sm:text-[10px] font-black text-slate-400">
               {product.vendorName[0]}
             </div>
-            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 truncate max-w-[100px]">
+            <p className="text-[8px] sm:text-[10px] font-bold text-slate-400 dark:text-slate-500 truncate">
               {product.vendorName}
             </p>
           </div>
-          <p className="text-xs font-black text-slate-900 dark:text-slate-100">
+          <p className="text-[10px] sm:text-xs font-black text-slate-900 dark:text-slate-100 whitespace-nowrap">
             {formatCurrency(product.price, currency)}
-            <span className="text-[10px] font-medium text-slate-400 ml-1">/{product.unit}</span>
+            <span className="text-[8px] sm:text-[10px] font-medium text-slate-400 ml-0.5">/{product.unit}</span>
           </p>
         </div>
       </div>

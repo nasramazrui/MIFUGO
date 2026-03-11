@@ -247,26 +247,26 @@ export const AuctionPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
-      <div className="max-w-7xl mx-auto px-4 py-4">
+    <div className="pb-20">
+      <div className="w-full">
         {/* Section Title */}
-        <div className="flex items-center gap-4 mb-8 bg-white p-4 rounded-[32px] border border-slate-50">
-          <div className="w-14 h-14 bg-[#F59E0B] rounded-2xl flex items-center justify-center text-white shadow-xl shadow-amber-200">
-            <Gavel size={28} />
+        <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-[24px] sm:rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="w-10 h-10 sm:w-14 h-14 bg-[#F59E0B] rounded-xl sm:rounded-2xl flex items-center justify-center text-white shadow-lg shadow-amber-200 dark:shadow-none">
+            <Gavel size={20} className="sm:w-7 sm:h-7" />
           </div>
-          <h2 className="text-3xl font-black text-[#0F172A] tracking-tight">Minada ya Mifugo</h2>
+          <h2 className="text-xl sm:text-3xl font-black text-[#0F172A] dark:text-white tracking-tight">Minada ya Mifugo</h2>
         </div>
 
         {auctions.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100 shadow-sm">
-            <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Gavel size={40} className="text-slate-200" />
+          <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm">
+            <div className="w-24 h-24 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Gavel size={40} className="text-slate-200 dark:text-slate-700" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900 mb-2">{t('no_auctions')}</h2>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">{t('no_auctions')}</h2>
             <p className="text-slate-400 font-bold">Angalia tena baadae kwa minada mipya ya mifugo.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-8">
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-8">
             {auctions.map((auction) => (
               <motion.div 
                 key={auction.id}
@@ -300,38 +300,38 @@ export const AuctionPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="p-6">
-                  <h3 className="text-xl font-black text-[#0F172A] mb-1">{auction.productName}</h3>
-                  <p className="text-slate-400 text-[11px] font-bold mb-6 line-clamp-1">{auction.description || 'Ninyamabomba kinoma noma'}</p>
+                <div className="p-4 sm:p-6">
+                  <h3 className="text-lg sm:text-xl font-black text-[#0F172A] dark:text-white mb-1">{auction.productName}</h3>
+                  <p className="text-slate-400 text-[10px] sm:text-[11px] font-bold mb-4 sm:mb-6 line-clamp-1">{auction.description || 'Ninyamabomba kinoma noma'}</p>
 
-                  <div className="grid grid-cols-2 gap-3 mb-6">
-                    <div className="bg-[#F8FAFC] p-5 rounded-[28px] border border-slate-100 flex flex-col justify-center min-h-[100px]">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">BEI YA KUANZIA</p>
-                      <p className="text-[10px] font-black text-slate-400 uppercase mb-0.5">{currency}</p>
-                      <p className="text-lg font-black text-[#0F172A] leading-none">{formatCurrency(auction.startingPrice, currency).replace(currency, '').trim()}</p>
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-4 sm:mb-6">
+                    <div className="bg-[#F8FAFC] dark:bg-slate-800/50 p-3 sm:p-5 rounded-[20px] sm:rounded-[28px] border border-slate-100 dark:border-slate-800 flex flex-col justify-center min-h-[80px] sm:min-h-[100px]">
+                      <p className="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">BEI YA KUANZIA</p>
+                      <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase mb-0.5">{currency}</p>
+                      <p className="text-base sm:text-lg font-black text-[#0F172A] dark:text-white leading-none">{formatCurrency(auction.startingPrice, currency).replace(currency, '').trim()}</p>
                     </div>
-                    <div className="bg-[#FFFBEB] p-5 rounded-[28px] border border-amber-100 flex flex-col justify-center min-h-[100px]">
-                      <p className="text-[8px] font-black text-[#D97706] uppercase tracking-widest mb-2">DAU LA SASA</p>
-                      <p className="text-[10px] font-black text-[#D97706] uppercase mb-0.5">{currency}</p>
-                      <p className="text-lg font-black text-[#92400E] leading-none">{formatCurrency(auction.currentBid, currency).replace(currency, '').trim()}</p>
+                    <div className="bg-[#FFFBEB] dark:bg-amber-900/10 p-3 sm:p-5 rounded-[20px] sm:rounded-[28px] border border-amber-100 dark:border-amber-900/20 flex flex-col justify-center min-h-[80px] sm:min-h-[100px]">
+                      <p className="text-[7px] sm:text-[8px] font-black text-[#D97706] uppercase tracking-widest mb-1 sm:mb-2">DAU LA SASA</p>
+                      <p className="text-[9px] sm:text-[10px] font-black text-[#D97706] uppercase mb-0.5">{currency}</p>
+                      <p className="text-base sm:text-lg font-black text-[#92400E] dark:text-amber-500 leading-none">{formatCurrency(auction.currentBid, currency).replace(currency, '').trim()}</p>
                     </div>
                   </div>
 
                   {auction.highestBidderName ? (
-                    <div className="flex items-center gap-3 bg-[#E6F9F0] p-3.5 rounded-[24px] border border-emerald-100 mb-6">
-                      <div className="w-10 h-10 bg-[#10B981] rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-100">
-                        <Trophy size={18} />
+                    <div className="flex items-center gap-2 sm:gap-3 bg-[#E6F9F0] dark:bg-emerald-900/10 p-2.5 sm:p-3.5 rounded-[20px] sm:rounded-[24px] border border-emerald-100 dark:border-emerald-900/20 mb-4 sm:mb-6">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#10B981] rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-100 dark:shadow-none">
+                        <Trophy size={14} className="sm:w-[18px] sm:h-[18px]" />
                       </div>
-                      <div className="flex-1">
-                        <p className="text-[8px] font-black text-[#059669] uppercase tracking-widest mb-0.5">MWENYE DAU LA JUU</p>
-                        <p className="text-xs font-black text-[#064E3B]">{auction.highestBidderName}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[7px] sm:text-[8px] font-black text-[#059669] uppercase tracking-widest mb-0.5">MWENYE DAU LA JUU</p>
+                        <p className="text-[10px] sm:text-xs font-black text-[#064E3B] dark:text-emerald-500 truncate">{auction.highestBidderName}</p>
                       </div>
                     </div>
                   ) : (
-                    <div className="h-[72px] mb-6" /> // Spacer to maintain card height
+                    <div className="h-[60px] sm:h-[72px] mb-4 sm:mb-6" /> // Spacer to maintain card height
                   )}
 
-                  <button className="w-full bg-[#0F172A] text-white py-5 rounded-[28px] font-black text-xs uppercase tracking-[0.2em] hover:bg-amber-600 transition-all shadow-xl shadow-slate-200 active:scale-95">
+                  <button className="w-full bg-[#0F172A] dark:bg-slate-800 text-white py-4 sm:py-5 rounded-[20px] sm:rounded-[28px] font-black text-[10px] sm:text-xs uppercase tracking-[0.2em] hover:bg-amber-600 transition-all shadow-xl shadow-slate-200 dark:shadow-none active:scale-95">
                     WEKA DAU
                   </button>
                 </div>
@@ -354,9 +354,9 @@ export const AuctionPage: React.FC = () => {
             />
             <motion.div 
               layoutId={selectedAuction.id}
-              className="relative w-full max-w-4xl bg-white rounded-[40px] overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[90vh]"
+              className="relative w-full max-w-4xl bg-white dark:bg-slate-950 rounded-[32px] sm:rounded-[40px] overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[95vh] sm:max-h-[90vh]"
             >
-              <div className="md:w-1/2 relative">
+              <div className="md:w-1/2 relative h-64 md:h-auto">
                 <img 
                   src={selectedAuction.image || 'https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?auto=format&fit=crop&q=80&w=800'} 
                   alt="" 
@@ -364,43 +364,43 @@ export const AuctionPage: React.FC = () => {
                 />
                 <button 
                   onClick={() => setSelectedAuction(null)}
-                  className="absolute top-6 left-6 w-12 h-12 bg-white/90 backdrop-blur-md rounded-2xl flex items-center justify-center text-slate-900 shadow-xl"
+                  className="absolute top-4 left-4 w-10 h-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-xl flex items-center justify-center text-slate-900 dark:text-white shadow-xl"
                 >
-                  <X size={24} />
+                  <X size={20} />
                 </button>
               </div>
 
-              <div className="md:w-1/2 p-10 overflow-y-auto scrollbar-hide">
+              <div className="md:w-1/2 p-6 sm:p-10 overflow-y-auto scrollbar-hide">
                 <div className="flex items-center justify-between mb-6">
-                  <div className="bg-amber-500 text-white px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest">
+                  <div className="bg-amber-500 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest">
                     {selectedAuction.vendorName}
                   </div>
                   <div className="flex items-center gap-2 text-amber-500">
-                    <Clock size={16} className="animate-pulse" />
-                    <span className="text-sm font-black uppercase tracking-widest">{timers[selectedAuction.id]}</span>
+                    <Clock size={14} className="animate-pulse sm:w-4 sm:h-4" />
+                    <span className="text-xs sm:text-sm font-black uppercase tracking-widest">{timers[selectedAuction.id]}</span>
                   </div>
                 </div>
 
-                <h2 className="text-3xl font-black text-slate-900 mb-4">{selectedAuction.productName}</h2>
-                <p className="text-slate-500 font-bold leading-relaxed mb-8">{selectedAuction.description}</p>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-4">{selectedAuction.productName}</h2>
+                <p className="text-slate-500 dark:text-slate-400 font-bold leading-relaxed mb-6 sm:mb-8 text-sm sm:text-base">{selectedAuction.description}</p>
 
                 {/* Winner Status */}
                 {selectedAuction.status === 'ended' && (
                   <div className={cn(
-                    "p-6 rounded-[32px] border mb-8 flex items-center gap-4",
-                    isWinner ? "bg-emerald-50 border-emerald-100" : "bg-slate-50 border-slate-100"
+                    "p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] border mb-6 sm:mb-8 flex items-center gap-3 sm:gap-4",
+                    isWinner ? "bg-emerald-50 border-emerald-100 dark:bg-emerald-900/10 dark:border-emerald-900/20" : "bg-slate-50 border-slate-100 dark:bg-slate-900 dark:border-slate-800"
                   )}>
                     <div className={cn(
-                      "w-12 h-12 rounded-2xl flex items-center justify-center text-2xl",
-                      isWinner ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"
+                      "w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-2xl",
+                      isWinner ? "bg-emerald-500 text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-500"
                     )}>
                       {isWinner ? '🏆' : '🏁'}
                     </div>
                     <div>
-                      <h4 className={cn("font-black", isWinner ? "text-emerald-900" : "text-slate-900")}>
+                      <h4 className={cn("font-black text-sm sm:text-base", isWinner ? "text-emerald-900 dark:text-emerald-500" : "text-slate-900 dark:text-white")}>
                         {isWinner ? 'Hongera! Wewe ndiye mshindi!' : 'Mnada Umekwisha'}
                       </h4>
-                      <p className="text-xs font-bold text-slate-500">
+                      <p className="text-[10px] sm:text-xs font-bold text-slate-500">
                         {isWinner ? 'Tafadhali kamilisha malipo ili kupata bidhaa yako.' : `Mshindi ni ${selectedAuction.winnerName || 'hakuna'}`}
                       </p>
                     </div>
@@ -409,17 +409,17 @@ export const AuctionPage: React.FC = () => {
 
                 {/* Payment Section for Winner */}
                 {isWinner && !isPaid && (
-                  <div className="bg-white rounded-[32px] border-2 border-amber-400 p-8 mb-10 shadow-xl shadow-amber-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                  <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] border-2 border-amber-400 p-5 sm:p-8 mb-6 sm:mb-10 shadow-xl shadow-amber-100 dark:shadow-none animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mb-4 sm:mb-6 flex items-center gap-2">
                       <CreditCard className="text-amber-500" /> Kamilisha Malipo
                     </h3>
                     
                     {paymentStep === 'options' && (
                       <div className="space-y-4">
-                        <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 space-y-3 mb-6">
+                        <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-6 rounded-[20px] sm:rounded-[32px] border border-slate-100 dark:border-slate-800 space-y-2 sm:space-y-3 mb-4 sm:mb-6">
                           <div className="flex justify-between items-center">
-                            <span className="font-black text-slate-900">Jumla ya Malipo:</span>
-                            <span className="text-xl font-black text-emerald-600">
+                            <span className="font-black text-xs sm:text-base text-slate-900 dark:text-white">Jumla ya Malipo:</span>
+                            <span className="text-lg sm:text-xl font-black text-emerald-600">
                               {formatCurrency(selectedAuction.currentBid, currency)}
                             </span>
                           </div>
