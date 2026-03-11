@@ -9,6 +9,7 @@ import {
   createUserWithEmailAndPassword,
   updateProfile
 } from 'firebase/auth';
+import { getAuthEmail, isEmail } from '../utils/authUtils';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { AlertCircle } from 'lucide-react';
 
@@ -31,7 +32,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   }, []);
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
+    identifier: '', // Combined email or phone
     password: '',
     confirmPassword: '',
     contact: '',
@@ -43,8 +44,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     setLoading(true);
     
     try {
-      await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      if (formData.email === ADMIN_EMAIL) {
+      const email = getAuthEmail(formData.identifier);
+      await signInWithEmailAndPassword(auth, email, formData.password);
+      if (email === ADMIN_EMAIL) {
         addActivity('⚙️', 'Admin ameingia kwenye mfumo');
       }
       toast.success('Karibu tena!');
@@ -66,16 +68,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const email = getAuthEmail(formData.identifier);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, formData.password);
       const fbUser = userCredential.user;
       
       await updateProfile(fbUser, { displayName: formData.name });
       
       const userData = {
         name: formData.name,
-        email: formData.email,
+        email: isEmail(formData.identifier) ? formData.identifier : '',
         role: 'user',
-        contact: formData.contact,
+        contact: isEmail(formData.identifier) ? formData.contact : formData.identifier,
         hasWhatsApp: formData.hasWhatsApp,
         theme,
         language,
@@ -150,14 +153,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t('email')}</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Barua Pepe au Namba ya Simu</label>
               <input 
                 type="text" 
                 required
                 className="input-field"
-                placeholder="amina@mfano.com"
-                value={formData.email}
-                onChange={e => setFormData({...formData, email: e.target.value})}
+                placeholder="amina@mfano.com au 0712..."
+                value={formData.identifier}
+                onChange={e => setFormData({...formData, identifier: e.target.value})}
               />
             </div>
             <div>
@@ -202,27 +205,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t('email')}</label>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Barua Pepe au Namba ya Simu</label>
               <input 
-                type="email" 
+                type="text" 
                 required
                 className="input-field"
-                placeholder="amina@mfano.com"
-                value={formData.email}
-                onChange={e => setFormData({...formData, email: e.target.value})}
+                placeholder="amina@mfano.com au 0712..."
+                value={formData.identifier}
+                onChange={e => setFormData({...formData, identifier: e.target.value})}
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t('whatsapp')}</label>
-              <input 
-                type="tel" 
-                required
-                className="input-field"
-                placeholder="0712345678"
-                value={formData.contact}
-                onChange={e => setFormData({...formData, contact: e.target.value})}
-              />
-            </div>
+            {isEmail(formData.identifier) && (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t('whatsapp')}</label>
+                <input 
+                  type="tel" 
+                  required
+                  className="input-field"
+                  placeholder="0712345678"
+                  value={formData.contact}
+                  onChange={e => setFormData({...formData, contact: e.target.value})}
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t('password')}</label>

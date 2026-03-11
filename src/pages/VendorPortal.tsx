@@ -30,11 +30,13 @@ import {
   MessageSquare,
   Star,
   Gavel,
-  Settings
+  Settings,
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from '../utils';
 
-import { db } from '../services/firebase';
+import { db, auth } from '../services/firebase';
+import { updatePassword } from 'firebase/auth';
 import { 
   collection, 
   addDoc, 
@@ -130,6 +132,42 @@ export const VendorPortal: React.FC = () => {
       fetchWallet();
     }
   }, [activeTab, user]);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('Nywila hazilingani!');
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      toast.error('Nywila lazima iwe na angalau herufi 6!');
+      return;
+    }
+
+    setIsPasswordLoading(true);
+    try {
+      const fbUser = auth.currentUser;
+      if (fbUser) {
+        await updatePassword(fbUser, passwordForm.newPassword);
+        toast.success('Nywila imebadilishwa kikamilifu!');
+        setIsPasswordModalOpen(false);
+        setPasswordForm({ newPassword: '', confirmPassword: '' });
+      }
+    } catch (error: any) {
+      console.error(error);
+      if (error.code === 'auth/requires-recent-login') {
+        toast.error('Tafadhali toka na uingie tena ili kubadilisha nywila kwa usalama.');
+      } else {
+        toast.error(error.message || 'Imeshindwa kubadilisha nywila');
+      }
+    } finally {
+      setIsPasswordLoading(false);
+    }
+  };
+
   const [shopSettings, setShopSettings] = useState({
     openTime: user.openTime || "08:00",
     closeTime: user.closeTime || "18:00",
@@ -1358,7 +1396,13 @@ export const VendorPortal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-6">
+              <div className="pt-6 space-y-4">
+                <button 
+                  onClick={() => setIsPasswordModalOpen(true)}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-black py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <ShieldCheck size={20} /> BADILISHA NYWILA (PASSWORD)
+                </button>
                 <button 
                   onClick={() => updateShopSettings(shopSettings)}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 transition-all active:scale-95"
@@ -2361,6 +2405,45 @@ export const VendorPortal: React.FC = () => {
             {loading ? 'INAHIFADHI...' : 'HIFADHI MABADILIKO'}
           </button>
         </div>
+      </Modal>
+
+      {/* Password Modal */}
+      <Modal 
+        isOpen={isPasswordModalOpen} 
+        onClose={() => setIsPasswordModalOpen(false)}
+        title="Badilisha Nywila"
+      >
+        <form onSubmit={handleUpdatePassword} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nywila Mpya</label>
+            <input 
+              type="password" 
+              required
+              className="input-field"
+              placeholder="••••••••"
+              value={passwordForm.newPassword}
+              onChange={e => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Rudia Nywila Mpya</label>
+            <input 
+              type="password" 
+              required
+              className="input-field"
+              placeholder="••••••••"
+              value={passwordForm.confirmPassword}
+              onChange={e => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+            />
+          </div>
+          <button 
+            type="submit"
+            disabled={isPasswordLoading}
+            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black transition-all active:scale-95 flex items-center justify-center gap-2"
+          >
+            {isPasswordLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'HIFADHI NYWILA MPYA'}
+          </button>
+        </form>
       </Modal>
 
       {/* Mobile Bottom Nav */}

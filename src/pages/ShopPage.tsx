@@ -8,11 +8,12 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel } from 'lucide-react';
+import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
+import { getAuthEmail, isEmail } from '../utils/authUtils';
 import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, updateProfile, deleteUser } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, deleteUser, updatePassword } from 'firebase/auth';
 import { AuctionPage } from './AuctionPage';
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
@@ -40,6 +41,41 @@ export const ShopPage: React.FC = () => {
   const [isWalletLoading, setIsWalletLoading] = useState(false);
   const [lastWalletTxId, setLastWalletTxId] = useState('');
   const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('Nywila hazilingani!');
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      toast.error('Nywila lazima iwe na angalau herufi 6!');
+      return;
+    }
+
+    setIsPasswordLoading(true);
+    try {
+      const fbUser = auth.currentUser;
+      if (fbUser) {
+        await updatePassword(fbUser, passwordForm.newPassword);
+        toast.success('Nywila imebadilishwa kikamilifu!');
+        setIsPasswordModalOpen(false);
+        setPasswordForm({ newPassword: '', confirmPassword: '' });
+      }
+    } catch (error: any) {
+      console.error(error);
+      if (error.code === 'auth/requires-recent-login') {
+        toast.error('Tafadhali toka na uingie tena ili kubadilisha nywila kwa usalama.');
+      } else {
+        toast.error(error.message || 'Imeshindwa kubadilisha nywila');
+      }
+    } finally {
+      setIsPasswordLoading(false);
+    }
+  };
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -199,7 +235,7 @@ export const ShopPage: React.FC = () => {
   const [vendorFormData, setVendorFormData] = useState({
     shopName: '',
     ownerName: '',
-    email: '',
+    identifier: '', // Combined email or phone
     password: '',
     location: '',
     phone: '',
@@ -238,7 +274,8 @@ export const ShopPage: React.FC = () => {
         toast.success('Ombi lako limetumwa! Subiri idhini ya Admin.');
       } else {
         // Create new account
-        const userCredential = await createUserWithEmailAndPassword(auth, vendorFormData.email, vendorFormData.password);
+        const email = getAuthEmail(vendorFormData.identifier);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, vendorFormData.password);
         const fbUser = userCredential.user;
         
         await updateProfile(fbUser, { displayName: vendorFormData.ownerName });
@@ -246,11 +283,11 @@ export const ShopPage: React.FC = () => {
         const vendorData = {
           name: vendorFormData.ownerName,
           shopName: vendorFormData.shopName,
-          email: vendorFormData.email,
+          email: isEmail(vendorFormData.identifier) ? vendorFormData.identifier : '',
           role: 'vendor',
           status: 'pending',
           location: vendorFormData.location,
-          phone: vendorFormData.phone,
+          phone: isEmail(vendorFormData.identifier) ? vendorFormData.phone : vendorFormData.identifier,
           tin: vendorFormData.tin,
           nida: vendorFormData.nida,
           license: vendorFormData.license,
@@ -268,7 +305,8 @@ export const ShopPage: React.FC = () => {
         toast.success('Usajili umekamilika! Subiri idhini ya Admin.');
       }
       
-      const msg = `*Maombi ya Muuzaji — ${systemSettings?.app_name || 'FarmConnect'}*\n\nJina la Duka: ${vendorFormData.shopName}\nMmiliki: ${user?.name || vendorFormData.ownerName}\nSimu: ${vendorFormData.phone}\n\nTafadhali nihakikie.`;
+      const phoneForMsg = user ? vendorFormData.phone : (isEmail(vendorFormData.identifier) ? vendorFormData.phone : vendorFormData.identifier);
+      const msg = `*Maombi ya Muuzaji — ${systemSettings?.app_name || 'FarmConnect'}*\n\nJina la Duka: ${vendorFormData.shopName}\nMmiliki: ${user?.name || vendorFormData.ownerName}\nSimu: ${phoneForMsg}\n\nTafadhali nihakikie.`;
       window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
       
       setIsVendorRegModalOpen(false);
@@ -1500,6 +1538,14 @@ export const ShopPage: React.FC = () => {
                   <p className="font-bold text-slate-700 dark:text-slate-300">{user.email}</p>
                 </div>
 
+                <button 
+                  onClick={() => setIsPasswordModalOpen(true)}
+                  className="w-full flex items-center justify-center gap-2 p-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-black text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700"
+                >
+                  <ShieldCheck size={18} />
+                  BADILISHA NYWILA (PASSWORD)
+                </button>
+
                 {/* Management Section */}
                 {(user.role === 'admin' || user.role === 'vendor') && (
                   <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
@@ -1633,14 +1679,14 @@ export const ShopPage: React.FC = () => {
           </div>
           {!user && (
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email ya Biashara *</label>
+              <div className="col-span-2">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Barua Pepe au Namba ya Simu *</label>
                 <input 
-                  type="email" required className="input-field" placeholder="duka@email.com" 
-                  value={vendorFormData.email} onChange={e => setVendorFormData({...vendorFormData, email: e.target.value})}
+                  type="text" required className="input-field" placeholder="duka@email.com au 0712..." 
+                  value={vendorFormData.identifier} onChange={e => setVendorFormData({...vendorFormData, identifier: e.target.value})}
                 />
               </div>
-              <div>
+              <div className="col-span-2">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nywila *</label>
                 <input 
                   type="password" required className="input-field" placeholder="••••••••" 
@@ -1673,13 +1719,15 @@ export const ShopPage: React.FC = () => {
                 value={vendorFormData.location} onChange={e => setVendorFormData({...vendorFormData, location: e.target.value})}
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Simu ya Duka *</label>
-              <input 
-                type="tel" required className="input-field" placeholder="0712345678" 
-                value={vendorFormData.phone} onChange={e => setVendorFormData({...vendorFormData, phone: e.target.value})}
-              />
-            </div>
+            {(!user && isEmail(vendorFormData.identifier)) || user ? (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Simu ya Duka *</label>
+                <input 
+                  type="tel" required className="input-field" placeholder="0712345678" 
+                  value={vendorFormData.phone} onChange={e => setVendorFormData({...vendorFormData, phone: e.target.value})}
+                />
+              </div>
+            ) : null}
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Namba ya TIN</label>
               <input 
@@ -3128,6 +3176,44 @@ export const ShopPage: React.FC = () => {
             </>
           )}
         </div>
+      </Modal>
+
+      <Modal 
+        isOpen={isPasswordModalOpen} 
+        onClose={() => setIsPasswordModalOpen(false)}
+        title="Badilisha Nywila"
+      >
+        <form onSubmit={handleUpdatePassword} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Nywila Mpya</label>
+            <input 
+              type="password" 
+              required
+              className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold dark:text-white"
+              placeholder="••••••••"
+              value={passwordForm.newPassword}
+              onChange={e => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Rudia Nywila Mpya</label>
+            <input 
+              type="password" 
+              required
+              className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold dark:text-white"
+              placeholder="••••••••"
+              value={passwordForm.confirmPassword}
+              onChange={e => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+            />
+          </div>
+          <button 
+            type="submit"
+            disabled={isPasswordLoading}
+            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black transition-all active:scale-95 flex items-center justify-center gap-2"
+          >
+            {isPasswordLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'HIFADHI NYWILA MPYA'}
+          </button>
+        </form>
       </Modal>
 
       <AuthModal 
