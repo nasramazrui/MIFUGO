@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Auction, Bid } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Gavel, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2, Wallet, Send, CreditCard, Smartphone } from 'lucide-react';
+import { Gavel, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2, Wallet, Send, CreditCard, Smartphone, Search, Globe } from 'lucide-react';
 import { formatCurrency, cn } from '../utils';
 import { db } from '../services/firebase';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, query, where, orderBy, onSnapshot, increment, getDoc } from 'firebase/firestore';
@@ -16,9 +16,7 @@ export const AuctionPage: React.FC = () => {
   const [isBidding, setIsBidding] = useState(false);
   const [auctionBids, setAuctionBids] = useState<Bid[]>([]);
   const [isPaying, setIsPaying] = useState(false);
-  const [paymentStep, setPaymentStep] = useState<'shipping' | 'options' | 'details' | 'success'>('shipping');
-  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'city' | 'out'>('pickup');
-  const [slaughterRequested, setSlaughterRequested] = useState(false);
+  const [paymentStep, setPaymentStep] = useState<'options' | 'details' | 'success'>('options');
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'tigo' | 'mpesa' | 'airtel' | 'halopesa' | 'cash'>('tigo');
   const [paymentForm, setPaymentForm] = useState({
     transactionId: '',
@@ -147,10 +145,7 @@ export const AuctionPage: React.FC = () => {
     if (!selectedAuction || !user) return;
     setIsPaying(true);
     
-    const deliveryFee = deliveryMethod === 'city' ? (selectedAuction.deliveryCity || 0) : 
-                       deliveryMethod === 'out' ? (selectedAuction.deliveryOut || 0) : 0;
-    const slaughterFee = slaughterRequested ? (selectedAuction.slaughterFee || 0) : 0;
-    const totalAmount = selectedAuction.currentBid + deliveryFee + slaughterFee;
+    const totalAmount = selectedAuction.currentBid;
 
     try {
       if (paymentMethod === 'wallet') {
@@ -185,10 +180,6 @@ export const AuctionPage: React.FC = () => {
         transactionId: paymentForm.transactionId || (paymentMethod === 'wallet' ? `WALLET-${Date.now()}` : `CASH-${Date.now()}`),
         senderPhone: paymentForm.senderPhone,
         senderName: paymentForm.senderName,
-        deliveryMethod,
-        deliveryFee,
-        slaughterRequested,
-        slaughterFee,
         totalAmount,
         paidAt: serverTimestamp()
       });
@@ -205,10 +196,6 @@ export const AuctionPage: React.FC = () => {
         productId: selectedAuction.id, // Use auction ID as product ID for reference
         productPrice: selectedAuction.currentBid,
         qty: 1,
-        deliveryFee,
-        deliveryMethod,
-        slaughterRequested,
-        slaughterFee,
         total: totalAmount,
         payMethod: paymentMethod,
         senderName: paymentForm.senderName,
@@ -216,7 +203,7 @@ export const AuctionPage: React.FC = () => {
         sentAmount: totalAmount.toString(),
         status: 'pending',
         items: [{
-          name: `MNADA: ${selectedAuction.productName}${slaughterRequested ? ' (Aliyechinjwa)' : ''}`,
+          name: `MNADA: ${selectedAuction.productName}`,
           qty: 1,
           price: selectedAuction.currentBid,
           emoji: '🏆',
@@ -248,25 +235,15 @@ export const AuctionPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-100 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-amber-200">
-              <Gavel size={20} />
-            </div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">{t('auction_title')}</h1>
+      <div className="max-w-7xl mx-auto px-4 py-4">
+        {/* Section Title */}
+        <div className="flex items-center gap-4 mb-8 bg-white p-4 rounded-[32px] border border-slate-50">
+          <div className="w-14 h-14 bg-[#F59E0B] rounded-2xl flex items-center justify-center text-white shadow-xl shadow-amber-200">
+            <Gavel size={28} />
           </div>
-          {user && (
-            <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
-              <Wallet size={16} className="text-amber-500" />
-              <span className="text-xs font-black text-slate-700">{formatCurrency(user.walletBalance || 0, currency)}</span>
-            </div>
-          )}
+          <h2 className="text-3xl font-black text-[#0F172A] tracking-tight">Minada ya Mifugo</h2>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
         {auctions.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100 shadow-sm">
             <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -282,54 +259,58 @@ export const AuctionPage: React.FC = () => {
                 key={auction.id}
                 layoutId={auction.id}
                 onClick={() => setSelectedAuction(auction)}
-                className="bg-white rounded-[40px] border border-slate-100 overflow-hidden shadow-sm hover:shadow-2xl transition-all cursor-pointer group"
+                className="bg-white rounded-[48px] border border-slate-100 overflow-hidden shadow-sm hover:shadow-2xl transition-all cursor-pointer group p-2"
               >
-                <div className="aspect-[4/3] relative overflow-hidden">
+                <div className="aspect-square relative rounded-[40px] overflow-hidden">
                   <img 
-                    src={auction.image || 'https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?auto=format&fit=crop&q=80&w=800'} 
+                    src={auction.image || 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=800'} 
                     alt={auction.productName}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                   />
-                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl flex items-center gap-2 shadow-xl border border-white/20">
-                    <Clock size={14} className="text-amber-500 animate-pulse" />
+                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 shadow-lg border border-white/20">
+                    <Clock size={14} className="text-[#F59E0B]" />
                     <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">
-                      {timers[auction.id] || '...'}
+                      {timers[auction.id] || 'ENDED'}
                     </span>
                   </div>
-                  <div className="absolute bottom-4 right-4 bg-amber-500 text-white px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">
-                    {auction.vendorName}
+                  <div className="absolute bottom-6 right-6 bg-[#F59E0B] text-white px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                    {auction.vendorName || 'MIKUDE'}
                   </div>
                 </div>
 
-                <div className="p-8">
-                  <h3 className="text-xl font-black text-slate-900 mb-2">{auction.productName}</h3>
-                  <p className="text-slate-400 text-sm font-bold mb-6 line-clamp-2">{auction.description}</p>
+                <div className="p-6">
+                  <h3 className="text-xl font-black text-[#0F172A] mb-1">{auction.productName}</h3>
+                  <p className="text-slate-400 text-[11px] font-bold mb-6 line-clamp-1">{auction.description || 'Ninyamabomba kinoma noma'}</p>
 
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{t('starting_price')}</p>
-                      <p className="text-sm font-black text-slate-900">{formatCurrency(auction.startingPrice, currency)}</p>
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                    <div className="bg-[#F8FAFC] p-5 rounded-[28px] border border-slate-100 flex flex-col justify-center min-h-[100px]">
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">BEI YA KUANZIA</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase mb-0.5">{currency}</p>
+                      <p className="text-lg font-black text-[#0F172A] leading-none">{formatCurrency(auction.startingPrice, currency).replace(currency, '').trim()}</p>
                     </div>
-                    <div className="bg-amber-50 p-4 rounded-3xl border border-amber-100">
-                      <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest mb-1">{t('current_bid')}</p>
-                      <p className="text-sm font-black text-amber-900">{formatCurrency(auction.currentBid, currency)}</p>
+                    <div className="bg-[#FFFBEB] p-5 rounded-[28px] border border-amber-100 flex flex-col justify-center min-h-[100px]">
+                      <p className="text-[8px] font-black text-[#D97706] uppercase tracking-widest mb-2">DAU LA SASA</p>
+                      <p className="text-[10px] font-black text-[#D97706] uppercase mb-0.5">{currency}</p>
+                      <p className="text-lg font-black text-[#92400E] leading-none">{formatCurrency(auction.currentBid, currency).replace(currency, '').trim()}</p>
                     </div>
                   </div>
 
-                  {auction.highestBidderName && (
-                    <div className="flex items-center gap-3 bg-emerald-50 p-3 rounded-2xl border border-emerald-100 mb-6">
-                      <div className="w-8 h-8 bg-emerald-500 rounded-xl flex items-center justify-center text-white">
-                        <Trophy size={14} />
+                  {auction.highestBidderName ? (
+                    <div className="flex items-center gap-3 bg-[#E6F9F0] p-3.5 rounded-[24px] border border-emerald-100 mb-6">
+                      <div className="w-10 h-10 bg-[#10B981] rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-100">
+                        <Trophy size={18} />
                       </div>
-                      <div>
-                        <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">{t('highest_bidder')}</p>
-                        <p className="text-xs font-black text-emerald-900">{auction.highestBidderName}</p>
+                      <div className="flex-1">
+                        <p className="text-[8px] font-black text-[#059669] uppercase tracking-widest mb-0.5">MWENYE DAU LA JUU</p>
+                        <p className="text-xs font-black text-[#064E3B]">{auction.highestBidderName}</p>
                       </div>
                     </div>
+                  ) : (
+                    <div className="h-[72px] mb-6" /> // Spacer to maintain card height
                   )}
 
-                  <button className="w-full bg-slate-900 text-white py-4 rounded-3xl font-black text-sm uppercase tracking-widest hover:bg-amber-500 transition-all shadow-xl shadow-slate-200 active:scale-95">
-                    {t('place_bid')}
+                  <button className="w-full bg-[#0F172A] text-white py-5 rounded-[28px] font-black text-xs uppercase tracking-[0.2em] hover:bg-amber-600 transition-all shadow-xl shadow-slate-200 active:scale-95">
+                    WEKA DAU
                   </button>
                 </div>
               </motion.div>
@@ -411,131 +392,13 @@ export const AuctionPage: React.FC = () => {
                       <CreditCard className="text-amber-500" /> Kamilisha Malipo
                     </h3>
                     
-                    {paymentStep === 'shipping' && (
-                      <div className="space-y-6">
-                        <div>
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Chagua Njia ya Kupokea</label>
-                          <div className="grid grid-cols-1 gap-3">
-                            <button 
-                              onClick={() => setDeliveryMethod('pickup')}
-                              className={cn(
-                                "flex items-center justify-between p-4 rounded-2xl border-2 transition-all",
-                                deliveryMethod === 'pickup' ? "border-amber-500 bg-amber-50" : "border-slate-100"
-                              )}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600">🏠</div>
-                                <div className="text-left">
-                                  <p className="font-bold text-sm">Nitakuja Kuchukua</p>
-                                  <p className="text-[10px] text-slate-400">Bure (Self-pickup)</p>
-                                </div>
-                              </div>
-                              {deliveryMethod === 'pickup' && <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>}
-                            </button>
-
-                            <button 
-                              onClick={() => setDeliveryMethod('city')}
-                              className={cn(
-                                "flex items-center justify-between p-4 rounded-2xl border-2 transition-all",
-                                deliveryMethod === 'city' ? "border-amber-500 bg-amber-50" : "border-slate-100"
-                              )}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">🛵</div>
-                                <div className="text-left">
-                                  <p className="font-bold text-sm">Niletee (Ndani ya Mji)</p>
-                                  <p className="text-[10px] text-slate-400">Gharama: {formatCurrency(selectedAuction.deliveryCity || 0, currency)}</p>
-                                </div>
-                              </div>
-                              {deliveryMethod === 'city' && <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>}
-                            </button>
-
-                            <button 
-                              onClick={() => setDeliveryMethod('out')}
-                              className={cn(
-                                "flex items-center justify-between p-4 rounded-2xl border-2 transition-all",
-                                deliveryMethod === 'out' ? "border-amber-500 bg-amber-50" : "border-slate-100"
-                              )}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600">🚚</div>
-                                <div className="text-left">
-                                  <p className="font-bold text-sm">Niletee (Nje ya Mji)</p>
-                                  <p className="text-[10px] text-slate-400">Gharama: {formatCurrency(selectedAuction.deliveryOut || 0, currency)}</p>
-                                </div>
-                              </div>
-                              {deliveryMethod === 'out' && <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>}
-                            </button>
-                          </div>
-                        </div>
-
-                        {selectedAuction.canSlaughter && (
-                          <div className="p-6 bg-slate-50 rounded-[32px] border border-slate-100">
-                            <div className="flex items-center justify-between mb-2">
-                              <div>
-                                <h4 className="font-black text-slate-900 text-sm">Je, unataka achinjwe?</h4>
-                                <p className="text-[10px] text-slate-400">Gharama ya kuchinja: {formatCurrency(selectedAuction.slaughterFee || 0, currency)}</p>
-                              </div>
-                              <button 
-                                onClick={() => setSlaughterRequested(!slaughterRequested)}
-                                className={cn(
-                                  "w-12 h-6 rounded-full transition-all relative",
-                                  slaughterRequested ? "bg-emerald-500" : "bg-slate-300"
-                                )}
-                              >
-                                <div className={cn(
-                                  "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
-                                  slaughterRequested ? "right-1" : "left-1"
-                                )} />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="pt-4">
-                          <button 
-                            onClick={() => setPaymentStep('options')}
-                            className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-sm uppercase tracking-widest shadow-xl shadow-slate-200"
-                          >
-                            ENDELEA KWENYE MALIPO
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    
                     {paymentStep === 'options' && (
                       <div className="space-y-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Muhtasari wa Malipo</p>
-                          <button onClick={() => setPaymentStep('shipping')} className="text-[10px] font-black text-amber-600 uppercase">Badili</button>
-                        </div>
-                        
                         <div className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 space-y-3 mb-6">
-                          <div className="flex justify-between text-sm font-bold">
-                            <span className="text-slate-500">Bei ya Mnada:</span>
-                            <span className="text-slate-900">{formatCurrency(selectedAuction.currentBid, currency)}</span>
-                          </div>
-                          {deliveryMethod !== 'pickup' && (
-                            <div className="flex justify-between text-sm font-bold">
-                              <span className="text-slate-500">Usafiri ({deliveryMethod === 'city' ? 'Ndani' : 'Nje'}):</span>
-                              <span className="text-slate-900">{formatCurrency(deliveryMethod === 'city' ? (selectedAuction.deliveryCity || 0) : (selectedAuction.deliveryOut || 0), currency)}</span>
-                            </div>
-                          )}
-                          {slaughterRequested && (
-                            <div className="flex justify-between text-sm font-bold">
-                              <span className="text-slate-500">Gharama ya Kuchinja:</span>
-                              <span className="text-slate-900">{formatCurrency(selectedAuction.slaughterFee || 0, currency)}</span>
-                            </div>
-                          )}
-                          <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
-                            <span className="font-black text-slate-900">Jumla Kuu:</span>
+                          <div className="flex justify-between items-center">
+                            <span className="font-black text-slate-900">Jumla ya Malipo:</span>
                             <span className="text-xl font-black text-emerald-600">
-                              {formatCurrency(
-                                selectedAuction.currentBid + 
-                                (deliveryMethod === 'city' ? (selectedAuction.deliveryCity || 0) : deliveryMethod === 'out' ? (selectedAuction.deliveryOut || 0) : 0) +
-                                (slaughterRequested ? (selectedAuction.slaughterFee || 0) : 0),
-                                currency
-                              )}
+                              {formatCurrency(selectedAuction.currentBid, currency)}
                             </span>
                           </div>
                         </div>
@@ -550,9 +413,7 @@ export const AuctionPage: React.FC = () => {
                             { id: 'halopesa', label: 'HaloPesa', icon: <Smartphone size={20} />, color: 'bg-orange-50 text-orange-600' },
                             { id: 'cash', label: 'Pesa Taslimu (Cash)', icon: <CreditCard size={20} />, color: 'bg-emerald-50 text-emerald-600' }
                           ].map((m) => {
-                            const total = selectedAuction.currentBid + 
-                                         (deliveryMethod === 'city' ? (selectedAuction.deliveryCity || 0) : deliveryMethod === 'out' ? (selectedAuction.deliveryOut || 0) : 0) +
-                                         (slaughterRequested ? (selectedAuction.slaughterFee || 0) : 0);
+                            const total = selectedAuction.currentBid;
                             const hasEnough = m.id === 'wallet' ? (user?.walletBalance || 0) >= total : true;
                             
                             return (
@@ -621,12 +482,7 @@ export const AuctionPage: React.FC = () => {
                           <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center">
                             <p className="text-sm font-bold text-emerald-800 mb-2">Salio lako la Wallet litatumika kulipia mnada huu.</p>
                             <p className="text-2xl font-black text-emerald-600">
-                              {formatCurrency(
-                                selectedAuction.currentBid + 
-                                (deliveryMethod === 'city' ? (selectedAuction.deliveryCity || 0) : deliveryMethod === 'out' ? (selectedAuction.deliveryOut || 0) : 0) +
-                                (slaughterRequested ? (selectedAuction.slaughterFee || 0) : 0), 
-                                currency
-                              )}
+                              {formatCurrency(selectedAuction.currentBid, currency)}
                             </p>
                             <p className="text-xs text-emerald-600 mt-2">Salio la sasa: {formatCurrency(user?.walletBalance || 0, currency)}</p>
                           </div>

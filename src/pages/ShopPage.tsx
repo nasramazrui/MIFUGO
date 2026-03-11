@@ -8,7 +8,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck } from 'lucide-react';
+import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { getAuthEmail, isEmail } from '../utils/authUtils';
@@ -966,81 +966,40 @@ export const ShopPage: React.FC = () => {
 
       <div className="lg:pl-72 min-h-screen flex flex-col">
         {/* Header */}
-        <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800/50">
+        <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800/50">
           <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between gap-4">
-            <div className="flex-1 max-w-2xl relative group">
-              <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-amber-500 transition-colors" size={20} />
-              <input 
-                type="text" 
-                placeholder={t('search_placeholder')}
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-900/50 border-2 border-transparent focus:border-amber-500/20 focus:bg-white dark:focus:bg-slate-900 rounded-[20px] pl-14 pr-6 py-3.5 text-sm font-bold outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700"
-              />
+            <div className="flex items-center gap-3">
+              <button className="w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all">
+                <Search size={24} />
+              </button>
+              <button 
+                onClick={() => setIsLangOpen(!isLangOpen)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-900 rounded-full border border-slate-100 dark:border-slate-800 hover:bg-slate-200 transition-all"
+              >
+                <Globe size={18} className="text-slate-400" />
+                <span className="text-sm font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">SW</span>
+              </button>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-4">
-              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <div className="relative" ref={langRef}>
+            <div className="flex items-center gap-3">
+              {!user ? (
+                <div className="flex items-center gap-2">
                   <button 
-                    onClick={() => setIsLangOpen(!isLangOpen)}
-                    className="flex items-center gap-2 p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-800 text-slate-400 hover:text-amber-600 transition-all font-black text-[10px] uppercase tracking-widest"
+                    onClick={() => setIsVendorRegModalOpen(true)}
+                    className="flex items-center gap-2 px-5 py-3 bg-[#FEF3C7] text-[#92400E] rounded-full text-[10px] font-black uppercase tracking-widest border border-amber-200 shadow-sm"
                   >
-                    <Globe size={18} /> {language}
+                    <Home size={16} />
+                    SAJILI
                   </button>
-                  <AnimatePresence>
-                    {isLangOpen && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute right-0 mt-3 w-40 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 p-2 overflow-hidden z-50"
-                      >
-                        {['sw', 'en', 'ar', 'hi'].map(l => (
-                          <button
-                            key={l}
-                            onClick={() => { setLanguage(l as any); setIsLangOpen(false); }}
-                            className={cn(
-                              "w-full text-left px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                              language === l ? "bg-amber-600 text-white" : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                            )}
-                          >
-                            {l === 'sw' ? 'Kiswahili' : l === 'en' ? 'English' : l === 'ar' ? 'العربية' : 'हिन्दी'}
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <button 
+                    onClick={() => setIsAuthModalOpen(true)}
+                    className="px-8 py-3 bg-[#D97706] text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl shadow-amber-200 hover:bg-amber-700 transition-all active:scale-95"
+                  >
+                    INGIA
+                  </button>
                 </div>
-              </div>
-
-              <button 
-                onClick={() => setIsVendorRegModalOpen(true)}
-                className="flex bg-amber-600/10 dark:bg-amber-600/20 text-amber-600 dark:text-amber-400 px-3 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest hover:bg-amber-600 hover:text-white transition-all active:scale-95 border border-amber-600/20 whitespace-nowrap"
-              >
-                <Store size={14} className="sm:hidden" />
-                <span className="hidden sm:inline">{t('register_store')}</span>
-                <span className="sm:hidden ml-1">SAJILI</span>
-              </button>
-
-              {user ? (
+              ) : (
                 <div className="flex items-center gap-3">
-                  {user.role === 'admin' && (
-                    <button 
-                      onClick={() => setView('dashboard')}
-                      className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20"
-                    >
-                      <LayoutDashboard size={20} />
-                    </button>
-                  )}
-                  {user.role === 'vendor' && (
-                    <button 
-                      onClick={() => setView('dashboard')}
-                      className="p-3 bg-amber-600 text-white rounded-2xl hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20"
-                    >
-                      <Store size={20} />
-                    </button>
-                  )}
                   <button 
                     onClick={() => setIsProfileModalOpen(true)}
                     className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm active:scale-95 transition-all"
@@ -1048,13 +1007,6 @@ export const ShopPage: React.FC = () => {
                     {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xl">👤</div>}
                   </button>
                 </div>
-              ) : (
-                <button 
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="bg-amber-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-600/20 active:scale-95 transition-all"
-                >
-                  {t('login')}
-                </button>
               )}
             </div>
           </div>
@@ -1394,46 +1346,46 @@ export const ShopPage: React.FC = () => {
       </div> {/* End of lg:pl-72 */}
 
       {/* Bottom Nav (Mobile Only) */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#050A18] border-t border-white/5 px-4 py-3 z-40 pb-safe">
-        <div className="max-w-md mx-auto flex justify-between items-end">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#050A18] border-t border-white/5 px-4 py-4 z-40 pb-safe">
+        <div className="max-w-md mx-auto flex justify-between items-center">
           <button 
             onClick={() => setActiveTab('browse')}
-            className={cn("flex flex-col items-center gap-1 transition-all flex-1", activeTab === 'browse' ? "text-amber-500" : "text-slate-500")}
+            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'browse' ? "text-amber-500" : "text-slate-500")}
           >
-            <ShoppingBag size={20} strokeWidth={2} />
-            <span className="text-[8px] font-black uppercase tracking-widest">{t('market')}</span>
+            <ShoppingBag size={22} strokeWidth={2.5} />
+            <span className="text-[9px] font-black uppercase tracking-[0.15em]">SOKO</span>
           </button>
           
           <button 
             onClick={() => setActiveTab('auctions')}
-            className={cn("flex flex-col items-center gap-1 transition-all flex-1", activeTab === 'auctions' ? "text-amber-500" : "text-slate-500")}
+            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'auctions' ? "text-amber-500" : "text-slate-500")}
           >
-            <Gavel size={20} strokeWidth={2} />
-            <span className="text-[8px] font-black uppercase tracking-widest">{t('auctions')}</span>
+            <Gavel size={22} strokeWidth={2.5} />
+            <span className="text-[9px] font-black uppercase tracking-[0.15em]">MINADA</span>
           </button>
 
           <button 
             onClick={() => setActiveTab('stores')}
-            className={cn("flex flex-col items-center gap-1 transition-all flex-1", activeTab === 'stores' ? "text-amber-500" : "text-slate-500")}
+            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'stores' ? "text-amber-500" : "text-slate-500")}
           >
-            <Store size={20} strokeWidth={2} />
-            <span className="text-[8px] font-black uppercase tracking-widest">{t('stores')}</span>
+            <Store size={22} strokeWidth={2.5} />
+            <span className="text-[9px] font-black uppercase tracking-[0.15em]">MADUKA</span>
           </button>
 
           <button 
             onClick={() => setActiveTab('orders')}
-            className={cn("flex flex-col items-center gap-1 transition-all flex-1", activeTab === 'orders' ? "text-amber-500" : "text-slate-500")}
+            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'orders' ? "text-amber-500" : "text-slate-500")}
           >
-            <Package size={20} strokeWidth={2} />
-            <span className="text-[8px] font-black uppercase tracking-widest">{t('orders')}</span>
+            <Package size={22} strokeWidth={2.5} />
+            <span className="text-[9px] font-black uppercase tracking-[0.15em]">ODA</span>
           </button>
           
           <button 
             onClick={() => setIsProfileModalOpen(true)}
-            className={cn("flex flex-col items-center gap-1 transition-all flex-1 text-slate-500")}
+            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1 text-slate-500")}
           >
-            <UserIcon size={20} strokeWidth={2} />
-            <span className="text-[8px] font-black uppercase tracking-widest">{t('profile')}</span>
+            <UserIcon size={22} strokeWidth={2.5} />
+            <span className="text-[9px] font-black uppercase tracking-[0.15em]">WASIFU</span>
           </button>
         </div>
       </nav>

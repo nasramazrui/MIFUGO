@@ -69,7 +69,7 @@ export const TRANSLATIONS: any = {
     light_mode: 'Light Mode',
     welcome: 'Karibu',
     login: 'Ingia',
-    register: 'Jisajili',
+    register: 'Sajili',
     email: 'Barua Pepe',
     password: 'Nywila',
     name: 'Jina Kamili',

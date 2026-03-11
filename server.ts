@@ -411,8 +411,7 @@ app.post('/api/auctions', async (req, res) => {
     const { 
       vendorId, vendorName, productName, description, 
       startingPrice, minIncrement, durationHours, 
-      location, image, canSlaughter, slaughterFee,
-      deliveryCity, deliveryOut
+      location, image
     } = req.body;
     
     if (!vendorId || !productName || !startingPrice) {
@@ -434,10 +433,6 @@ app.post('/api/auctions', async (req, res) => {
       location,
       image,
       status: 'active',
-      canSlaughter: !!canSlaughter,
-      slaughterFee: Number(slaughterFee || 0),
-      deliveryCity: Number(deliveryCity || 0),
-      deliveryOut: Number(deliveryOut || 0),
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
 

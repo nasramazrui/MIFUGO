@@ -218,13 +218,6 @@ export interface Auction {
   transactionId?: string;
   senderPhone?: string;
   senderName?: string;
-  slaughterFee?: number;
-  canSlaughter?: boolean;
-  slaughterRequested?: boolean;
-  deliveryMethod?: 'delivery' | 'pickup';
-  deliveryFee?: number;
-  deliveryCity?: number;
-  deliveryOut?: number;
   totalAmount?: number;
   createdAt: any;
 }

@@ -95,9 +95,7 @@ export const VendorPortal: React.FC = () => {
     minIncrement: '20000',
     durationHours: '24',
     location: user.location || '',
-    image: '',
-    canSlaughter: false,
-    slaughterFee: ''
+    image: ''
   });
 
   // Fetch Wallet Data
@@ -342,9 +340,7 @@ export const VendorPortal: React.FC = () => {
         minIncrement: Number(auctionForm.minIncrement),
         location: auctionForm.location,
         image: auctionForm.image,
-        endTime: endTime,
-        canSlaughter: auctionForm.canSlaughter,
-        slaughterFee: Number(auctionForm.slaughterFee || 0)
+        endTime: endTime
       });
       toast.success('Mnada umesasishwa!');
       setIsAuctionEditModalOpen(false);
@@ -379,16 +375,10 @@ export const VendorPortal: React.FC = () => {
         location: auctionForm.location,
         image: auctionForm.image,
         status: 'active' as const,
-        deliveryCity: user.deliveryCity || 0,
-        deliveryOut: user.deliveryOut || 0,
         createdAt: serverTimestamp()
       };
       
-      await addDoc(collection(db, 'kuku_auctions'), {
-        ...auctionData,
-        canSlaughter: auctionForm.canSlaughter,
-        slaughterFee: Number(auctionForm.slaughterFee || 0)
-      });
+      await addDoc(collection(db, 'kuku_auctions'), auctionData);
       
       toast.success('Mnada umeanza rasmi!');
       setIsAuctionModalOpen(false);
@@ -399,9 +389,7 @@ export const VendorPortal: React.FC = () => {
         minIncrement: '20000',
         durationHours: '24',
         location: user.location || '',
-        image: '',
-        canSlaughter: false,
-        slaughterFee: ''
+        image: ''
       });
       addActivity('🐄', `Umeanzisha mnada wa ${auctionForm.productName}`);
     } catch (err: any) {
@@ -1146,9 +1134,7 @@ export const VendorPortal: React.FC = () => {
                             minIncrement: a.minIncrement.toString(),
                             durationHours: '24',
                             location: a.location,
-                            image: a.image || '',
-                            canSlaughter: a.canSlaughter || false,
-                            slaughterFee: a.slaughterFee?.toString() || ''
+                            image: a.image || ''
                           });
                           setIsAuctionEditModalOpen(true);
                         }}
@@ -2219,40 +2205,6 @@ export const VendorPortal: React.FC = () => {
             />
           </div>
 
-          <div className="p-4 bg-slate-50 rounded-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-black text-slate-900 text-sm">Huduma ya Kuchinja</h4>
-                <p className="text-[10px] text-slate-400">Ruhusu mteja aombe kuchinjiwa mnyama</p>
-              </div>
-              <button 
-                onClick={() => setAuctionForm({...auctionForm, canSlaughter: !auctionForm.canSlaughter})}
-                className={cn(
-                  "w-12 h-6 rounded-full transition-all relative",
-                  auctionForm.canSlaughter ? "bg-emerald-500" : "bg-slate-300"
-                )}
-              >
-                <div className={cn(
-                  "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
-                  auctionForm.canSlaughter ? "right-1" : "left-1"
-                )} />
-              </button>
-            </div>
-
-            {auctionForm.canSlaughter && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Gharama ya Kuchinja (TZS)</label>
-                <input 
-                  type="number" 
-                  className="input-field"
-                  placeholder="Mf. 10000"
-                  value={auctionForm.slaughterFee}
-                  onChange={e => setAuctionForm({...auctionForm, slaughterFee: e.target.value})}
-                />
-              </motion.div>
-            )}
-          </div>
-
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Picha ya Mfugo</label>
             <div className="flex gap-2 mb-4">
@@ -2425,40 +2377,6 @@ export const VendorPortal: React.FC = () => {
               value={auctionForm.description}
               onChange={e => setAuctionForm({...auctionForm, description: e.target.value})}
             />
-          </div>
-
-          <div className="p-4 bg-slate-50 rounded-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-black text-slate-900 text-sm">Huduma ya Kuchinja</h4>
-                <p className="text-[10px] text-slate-400">Ruhusu mteja aombe kuchinjiwa mnyama</p>
-              </div>
-              <button 
-                onClick={() => setAuctionForm({...auctionForm, canSlaughter: !auctionForm.canSlaughter})}
-                className={cn(
-                  "w-12 h-6 rounded-full transition-all relative",
-                  auctionForm.canSlaughter ? "bg-emerald-500" : "bg-slate-300"
-                )}
-              >
-                <div className={cn(
-                  "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
-                  auctionForm.canSlaughter ? "right-1" : "left-1"
-                )} />
-              </button>
-            </div>
-
-            {auctionForm.canSlaughter && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Gharama ya Kuchinja (TZS)</label>
-                <input 
-                  type="number" 
-                  className="input-field"
-                  placeholder="Mf. 10000"
-                  value={auctionForm.slaughterFee}
-                  onChange={e => setAuctionForm({...auctionForm, slaughterFee: e.target.value})}
-                />
-              </motion.div>
-            )}
           </div>
 
           <div>
