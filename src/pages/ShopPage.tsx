@@ -8,7 +8,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home } from 'lucide-react';
+import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { getAuthEmail, isEmail } from '../utils/authUtils';
@@ -44,6 +44,7 @@ export const ShopPage: React.FC = () => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -878,6 +879,125 @@ export const ShopPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#fafaf8] dark:bg-slate-950 transition-colors duration-300">
+      {/* Mobile Sidebar */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] lg:hidden"
+            />
+            <motion.div 
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              className="fixed left-0 top-0 bottom-0 w-72 bg-white dark:bg-slate-950 z-[70] lg:hidden flex flex-col shadow-2xl"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-amber-600 rounded-xl flex items-center justify-center text-white text-xl font-black shadow-lg shadow-amber-600/20">
+                      {systemSettings?.app_name?.[0] || 'K'}
+                    </div>
+                    <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                      {systemSettings?.app_name || 'Kuku Market'}
+                    </h1>
+                  </div>
+                  <button onClick={() => setIsMobileMenuOpen(false)} className="w-10 h-10 flex items-center justify-center text-slate-400">
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <nav className="space-y-2">
+                  {[
+                    { id: 'browse', label: t('market'), icon: ShoppingBag },
+                    { id: 'auctions', label: t('auctions'), icon: Gavel },
+                    { id: 'cart', label: t('cart_title'), icon: ShoppingCart },
+                    { id: 'stores', label: t('stores'), icon: Store },
+                    { id: 'orders', label: t('orders'), icon: Package },
+                    { id: 'profile', label: t('profile'), icon: UserIcon },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        if (item.id === 'cart') {
+                          setIsCartModalOpen(true);
+                        } else if (item.id === 'profile') {
+                          setIsProfileModalOpen(true);
+                        } else {
+                          setActiveTab(item.id as any);
+                        }
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-black text-sm transition-all group",
+                        activeTab === item.id 
+                          ? "bg-amber-600 text-white shadow-xl shadow-amber-600/20" 
+                          : "text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-slate-600 dark:hover:text-slate-200"
+                      )}
+                    >
+                      <item.icon size={20} className={cn("transition-transform group-hover:scale-110", activeTab === item.id ? "text-white" : "text-slate-300")} />
+                      {item.label}
+                      {item.id === 'cart' && cart.length > 0 && (
+                        <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">
+                          {cart.reduce((sum, i) => sum + i.qty, 0)}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </nav>
+
+                <div className="mt-8">
+                  <button 
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setIsVendorRegModalOpen(true);
+                    }}
+                    className="w-full bg-gradient-to-br from-amber-500 to-amber-600 text-white p-5 rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-600/20 hover:shadow-amber-600/40 transition-all active:scale-95 group flex items-center justify-center gap-3"
+                  >
+                    <Store size={18} className="group-hover:rotate-12 transition-transform" />
+                    {t('register_store')}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-auto p-8 border-t border-slate-50 dark:border-slate-900">
+                {user ? (
+                  <button 
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setIsProfileModalOpen(true);
+                    }}
+                    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:border-amber-200 transition-all group"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-amber-100 overflow-hidden border-2 border-white dark:border-slate-800">
+                      {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg">👤</div>}
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-black text-slate-900 dark:text-white truncate max-w-[120px]">{user.name}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{user.role}</p>
+                    </div>
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setIsAuthModalOpen(true);
+                    }}
+                    className="w-full btn-primary py-4"
+                  >
+                    {t('login')}
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-72 bg-white dark:bg-slate-950 border-r border-slate-100 dark:border-slate-800/50 flex-col z-50">
         <div className="p-8">
@@ -969,6 +1089,12 @@ export const ShopPage: React.FC = () => {
         <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800/50">
           <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="lg:hidden w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all"
+              >
+                <Menu size={24} />
+              </button>
               <button className="w-12 h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all">
                 <Search size={24} />
               </button>

@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Auction, Bid } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Gavel, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2, Wallet, Send, CreditCard, Smartphone, Search, Globe } from 'lucide-react';
+import { Gavel, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2, Wallet, Send, CreditCard, Smartphone, Search, Globe, Trash2 } from 'lucide-react';
 import { formatCurrency, cn } from '../utils';
 import { db } from '../services/firebase';
-import { collection, addDoc, updateDoc, doc, serverTimestamp, query, where, orderBy, onSnapshot, increment, getDoc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, serverTimestamp, query, where, orderBy, onSnapshot, increment, getDoc, deleteDoc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 
 export const AuctionPage: React.FC = () => {
@@ -233,6 +233,19 @@ export const AuctionPage: React.FC = () => {
   const isWinner = selectedAuction?.status === 'ended' && selectedAuction?.winnerId === user?.id;
   const isPaid = selectedAuction?.paymentStatus === 'paid';
 
+  const handleDeleteAuction = async (e: React.MouseEvent, auctionId: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Je, una uhakika unataka kufuta mnada huu?')) return;
+
+    try {
+      await deleteDoc(doc(db, 'kuku_auctions', auctionId));
+      toast.success('Mnada umefutwa kikamilifu!');
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      toast.error('Imeshindwa kufuta mnada');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       <div className="max-w-7xl mx-auto px-4 py-4">
@@ -253,7 +266,7 @@ export const AuctionPage: React.FC = () => {
             <p className="text-slate-400 font-bold">Angalia tena baadae kwa minada mipya ya mifugo.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-8">
             {auctions.map((auction) => (
               <motion.div 
                 key={auction.id}
@@ -276,6 +289,15 @@ export const AuctionPage: React.FC = () => {
                   <div className="absolute bottom-6 right-6 bg-[#F59E0B] text-white px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
                     {auction.vendorName || 'MIKUDE'}
                   </div>
+
+                  {(user?.role === 'admin' || user?.id === auction.vendorId) && (timers[auction.id] === 'ENDED' || auction.status === 'ended') && (
+                    <button 
+                      onClick={(e) => handleDeleteAuction(e, auction.id)}
+                      className="absolute top-4 right-4 w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-all z-10"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  )}
                 </div>
 
                 <div className="p-6">
