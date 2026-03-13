@@ -266,72 +266,70 @@ export const AuctionPage: React.FC = () => {
             <p className="text-slate-400 font-bold">Angalia tena baadae kwa minada mipya ya mifugo.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-8">
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 items-start">
             {auctions.map((auction) => (
               <motion.div 
                 key={auction.id}
                 layoutId={auction.id}
                 onClick={() => setSelectedAuction(auction)}
-                className="bg-white rounded-[48px] border border-slate-100 overflow-hidden shadow-sm hover:shadow-2xl transition-all cursor-pointer group p-2"
+                className="bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[40px] border border-slate-100 dark:border-slate-800/50 overflow-hidden shadow-sm hover:shadow-xl transition-all cursor-pointer group flex flex-col"
               >
-                <div className="aspect-square relative rounded-[40px] overflow-hidden">
+                <div className="aspect-[4/3] relative overflow-hidden">
                   <img 
                     src={auction.image || 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=800'} 
                     alt={auction.productName}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                   />
-                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 shadow-lg border border-white/20">
-                    <Clock size={14} className="text-[#F59E0B]" />
-                    <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">
+                  <div className="absolute top-4 left-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
+                    <Clock size={12} className="text-[#F59E0B]" />
+                    <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">
                       {timers[auction.id] || 'ENDED'}
                     </span>
                   </div>
-                  <div className="absolute bottom-6 right-6 bg-[#F59E0B] text-white px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                  <div className="absolute bottom-4 right-4 bg-[#F59E0B] text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">
                     {auction.vendorName || 'MIKUDE'}
                   </div>
 
                   {(user?.role === 'admin' || user?.id === auction.vendorId) && (timers[auction.id] === 'ENDED' || auction.status === 'ended') && (
                     <button 
                       onClick={(e) => handleDeleteAuction(e, auction.id)}
-                      className="absolute top-4 right-4 w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-all z-10"
+                      className="absolute top-4 right-4 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-all z-10"
                     >
-                      <Trash2 size={18} />
+                      <Trash2 size={14} />
                     </button>
                   )}
                 </div>
 
-                <div className="p-4 sm:p-6">
-                  <h3 className="text-lg sm:text-xl font-black text-[#0F172A] dark:text-white mb-1">{auction.productName}</h3>
-                  <p className="text-slate-400 text-[10px] sm:text-[11px] font-bold mb-4 sm:mb-6 line-clamp-1">{auction.description || 'Ninyamabomba kinoma noma'}</p>
+                <div className="p-5 sm:p-6 flex flex-col">
+                  <h3 className="text-lg sm:text-xl font-black text-[#0F172A] dark:text-white mb-1 line-clamp-1">{auction.productName}</h3>
+                  <p className="text-slate-400 dark:text-slate-500 text-[11px] font-bold mb-5 line-clamp-1">{auction.description || 'Ninyamabomba kinoma noma'}</p>
 
-                  <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-4 sm:mb-6">
-                    <div className="bg-[#F8FAFC] dark:bg-slate-800/50 p-3 sm:p-5 rounded-[20px] sm:rounded-[28px] border border-slate-100 dark:border-slate-800 flex flex-col justify-center min-h-[80px] sm:min-h-[100px]">
-                      <p className="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">BEI YA KUANZIA</p>
-                      <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase mb-0.5">{currency}</p>
-                      <p className="text-base sm:text-lg font-black text-[#0F172A] dark:text-white leading-none">{formatCurrency(auction.startingPrice, currency).replace(currency, '').trim()}</p>
+                  <div className="grid grid-cols-2 gap-3 mb-5">
+                    <div className="bg-[#F8FAFC] dark:bg-slate-800/50 p-4 rounded-[24px] border border-slate-100 dark:border-slate-800 flex flex-col justify-center">
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5">BEI YA KUANZIA</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase mb-0.5">{currency}</p>
+                      <p className="text-base font-black text-[#0F172A] dark:text-white leading-none">{formatCurrency(auction.startingPrice, currency).replace(currency, '').trim()}</p>
                     </div>
-                    <div className="bg-[#FFFBEB] dark:bg-amber-900/10 p-3 sm:p-5 rounded-[20px] sm:rounded-[28px] border border-amber-100 dark:border-amber-900/20 flex flex-col justify-center min-h-[80px] sm:min-h-[100px]">
-                      <p className="text-[7px] sm:text-[8px] font-black text-[#D97706] uppercase tracking-widest mb-1 sm:mb-2">DAU LA SASA</p>
-                      <p className="text-[9px] sm:text-[10px] font-black text-[#D97706] uppercase mb-0.5">{currency}</p>
-                      <p className="text-base sm:text-lg font-black text-[#92400E] dark:text-amber-500 leading-none">{formatCurrency(auction.currentBid, currency).replace(currency, '').trim()}</p>
+                    <div className="bg-[#FFFBEB] dark:bg-amber-900/10 p-4 rounded-[24px] border border-amber-100 dark:border-amber-900/20 flex flex-col justify-center">
+                      <p className="text-[8px] font-black text-[#D97706] uppercase tracking-widest mb-1.5">DAU LA SASA</p>
+                      <p className="text-[10px] font-black text-[#D97706] uppercase mb-0.5">{currency}</p>
+                      <p className="text-base font-black text-[#92400E] dark:text-amber-500 leading-none">{formatCurrency(auction.currentBid, currency).replace(currency, '').trim()}</p>
                     </div>
                   </div>
 
-                  {auction.highestBidderName ? (
-                    <div className="flex items-center gap-2 sm:gap-3 bg-[#E6F9F0] dark:bg-emerald-900/10 p-2.5 sm:p-3.5 rounded-[20px] sm:rounded-[24px] border border-emerald-100 dark:border-emerald-900/20 mb-4 sm:mb-6">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#10B981] rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-100 dark:shadow-none">
-                        <Trophy size={14} className="sm:w-[18px] sm:h-[18px]" />
+                  {auction.highestBidderName && (
+                    <div className="flex items-center gap-3 bg-[#E6F9F0] dark:bg-emerald-900/10 p-3 rounded-[20px] border border-emerald-100 dark:border-emerald-900/20 mb-5">
+                      <div className="w-8 h-8 bg-[#10B981] rounded-full flex items-center justify-center text-white shadow-sm">
+                        <Trophy size={14} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[7px] sm:text-[8px] font-black text-[#059669] uppercase tracking-widest mb-0.5">MWENYE DAU LA JUU</p>
-                        <p className="text-[10px] sm:text-xs font-black text-[#064E3B] dark:text-emerald-500 truncate">{auction.highestBidderName}</p>
+                        <p className="text-[8px] font-black text-[#059669] uppercase tracking-widest mb-0.5">MWENYE DAU LA JUU</p>
+                        <p className="text-[11px] font-black text-[#064E3B] dark:text-emerald-500 truncate">{auction.highestBidderName}</p>
                       </div>
                     </div>
-                  ) : (
-                    <div className="h-[60px] sm:h-[72px] mb-4 sm:mb-6" /> // Spacer to maintain card height
                   )}
 
-                  <button className="w-full bg-[#0F172A] dark:bg-slate-800 text-white py-4 sm:py-5 rounded-[20px] sm:rounded-[28px] font-black text-[10px] sm:text-xs uppercase tracking-[0.2em] hover:bg-amber-600 transition-all shadow-xl shadow-slate-200 dark:shadow-none active:scale-95">
+                  <button className="w-full bg-[#0F172A] dark:bg-slate-800 text-white py-4 rounded-full font-black text-[11px] uppercase tracking-widest hover:bg-amber-600 transition-all shadow-md active:scale-95 mt-auto">
                     WEKA DAU
                   </button>
                 </div>
