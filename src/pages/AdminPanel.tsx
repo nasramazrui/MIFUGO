@@ -11,7 +11,12 @@ import {
   doc, 
   deleteDoc, 
   serverTimestamp,
-  increment
+  increment,
+  getDocs,
+  getDoc,
+  query,
+  where,
+  limit
 } from 'firebase/firestore';
 import { WalletTransaction } from '../types';
 import { 
@@ -283,13 +288,15 @@ export const AdminPanel: React.FC = () => {
 
   const approveWithdrawal = async (id: string) => {
     try {
-      const res = await fetch(`/api/admin/withdrawals/${id}/update`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'Completed' })
+      await updateDoc(doc(db, 'kuku_withdrawals', id), {
+        status: 'Completed',
+        updatedAt: serverTimestamp()
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+
+      const transSnapshot = await getDocs(query(collection(db, 'kuku_wallet'), where('withdrawalId', '==', id), limit(1)));
+      if (!transSnapshot.empty) {
+        await updateDoc(doc(db, 'kuku_wallet', transSnapshot.docs[0].id), { status: 'Completed' });
+      }
 
       addActivity('💸', `Malipo yameidhinishwa (Completed)`);
       toast.success('Malipo yameidhinishwa');
@@ -300,13 +307,23 @@ export const AdminPanel: React.FC = () => {
 
   const rejectWithdrawal = async (id: string) => {
     try {
-      const res = await fetch(`/api/admin/withdrawals/${id}/update`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'Rejected' })
+      const withdrawDoc = await getDoc(doc(db, 'kuku_withdrawals', id));
+      if (!withdrawDoc.exists()) throw new Error('Request not found');
+      const data = withdrawDoc.data();
+
+      await updateDoc(doc(db, 'kuku_withdrawals', id), {
+        status: 'Rejected',
+        updatedAt: serverTimestamp()
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+
+      const transSnapshot = await getDocs(query(collection(db, 'kuku_wallet'), where('withdrawalId', '==', id), limit(1)));
+      if (!transSnapshot.empty) {
+        await updateDoc(doc(db, 'kuku_wallet', transSnapshot.docs[0].id), { status: 'Rejected' });
+      }
+
+      await updateDoc(doc(db, 'kuku_users', data.vendorId), {
+        walletBalance: increment(data.amount)
+      });
 
       addActivity('✕', `Maombi ya malipo yamekataliwa (Rejected)`);
       toast.success('Maombi yamekataliwa');

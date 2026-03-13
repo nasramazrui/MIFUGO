@@ -43,12 +43,13 @@ import {
   updateDoc, 
   deleteDoc, 
   doc, 
-  serverTimestamp 
+  serverTimestamp,
+  increment
 } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 
 export const VendorPortal: React.FC = () => {
-  const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t } = useApp();
+  const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t, walletTransactions } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status' | 'reviews' | 'auctions'>('dash');
   const [isLangOpen, setIsLangOpen] = useState(false);
@@ -74,8 +75,7 @@ export const VendorPortal: React.FC = () => {
   const [editProductImageSource, setEditProductImageSource] = useState<'upload' | 'link'>('link');
   const [withdrawStep, setWithdrawStep] = useState<'form' | 'summary' | 'whatsapp'>('form');
   const [lastWithdrawalId, setLastWithdrawalId] = useState<string | null>(null);
-  const [walletData, setWalletData] = useState<{ balance: number, transactions: any[] }>({ balance: 0, transactions: [] });
-  const [isWalletLoading, setIsWalletLoading] = useState(true);
+  const [isWalletLoading, setIsWalletLoading] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
   const [withdrawForm, setWithdrawForm] = useState({
@@ -98,39 +98,35 @@ export const VendorPortal: React.FC = () => {
     image: ''
   });
 
-  // Fetch Wallet Data
+  // Compute wallet data directly from context
+  const walletData = React.useMemo(() => {
+    if (!user) return { balance: 0, pendingBalance: 0, transactions: [] };
+    const vendorTransactions = walletTransactions
+      .filter(t => t.userId === user.id)
+      .sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+        return dateB - dateA;
+      })
+      .slice(0, 50);
+      
+    const pendingBalance = orders
+      .filter(o => o.vendorId === user.id && o.payMethod === 'wallet' && o.status !== 'completed')
+      .reduce((sum, order) => sum + (order.vendorNet || (order.total - (order.deliveryFee || 0)) * 0.94), 0);
+
+    return {
+      balance: user.walletBalance || 0,
+      pendingBalance,
+      transactions: vendorTransactions
+    };
+  }, [user, walletTransactions, orders]);
+
   const fetchWallet = async () => {
-    if (!user) return;
-    try {
-      setIsWalletLoading(true);
-      const res = await fetch(`/api/wallet/${user.id}`);
-      
-      if (!res.ok) {
-        const text = await res.text();
-        console.error('Wallet API Error Response:', text);
-        throw new Error(`Server returned ${res.status}: ${text.substring(0, 100)}`);
-      }
-      
-      const data = await res.json();
-      setWalletData({
-        balance: data.balance,
-        transactions: data.transactions
-      });
-    } catch (err: any) {
-      console.error('Fetch Wallet Error:', err);
-      // Only show toast if it's a real error, not just a cancelation
-      if (err.name !== 'AbortError') {
-        toast.error(`Hitilafu ya Wallet: ${err.message}`);
-      }
-    } finally {
-      setIsWalletLoading(false);
-    }
+    // No-op since we compute it directly
   };
 
   useEffect(() => {
-    if (activeTab === 'wallet') {
-      fetchWallet();
-    }
+    // No-op
   }, [activeTab, user]);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
@@ -482,21 +478,40 @@ export const VendorPortal: React.FC = () => {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/withdraw', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          vendorId: user.id,
-          amount: amountNum,
-          method: withdrawForm.method === 'mobile' ? withdrawForm.network : 'Visa / Mastercard',
-          phone: withdrawForm.method === 'mobile' ? withdrawForm.phoneNumber : `${withdrawForm.bankName} - ${withdrawForm.accountNumber}`
-        })
+      const method = withdrawForm.method === 'mobile' ? withdrawForm.network : 'Visa / Mastercard';
+      const phone = withdrawForm.method === 'mobile' ? withdrawForm.phoneNumber : `${withdrawForm.bankName} - ${withdrawForm.accountNumber}`;
+      const fee = calculateFee(amountNum);
+      const netAmount = amountNum - fee;
+      const vendorName = user.shopName || user.name || 'Vendor';
+
+      const withdrawRef = await addDoc(collection(db, 'kuku_withdrawals'), {
+        vendorId: user.id,
+        vendorName,
+        amount: amountNum,
+        fee,
+        netAmount,
+        method,
+        phoneNumber: phone,
+        status: 'Pending',
+        createdAt: serverTimestamp()
       });
 
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      await addDoc(collection(db, 'kuku_wallet'), {
+        userId: user.id,
+        userName: vendorName,
+        type: 'withdrawal',
+        amount: -amountNum,
+        status: 'Pending',
+        description: `Withdrawal to ${method} (${phone})`,
+        createdAt: serverTimestamp(),
+        withdrawalId: withdrawRef.id
+      });
 
-      setLastWithdrawalId(data.id);
+      await updateDoc(doc(db, 'kuku_users', user.id), {
+        walletBalance: increment(-amountNum)
+      });
+
+      setLastWithdrawalId(withdrawRef.id);
       setWithdrawStep('whatsapp');
       fetchWallet(); // Refresh
       addActivity('💸', `Umeomba kutoa ${formatCurrency(amountNum, currency)}`);
@@ -1000,6 +1015,12 @@ export const VendorPortal: React.FC = () => {
               <div className="relative z-10">
                 <p className="text-emerald-200 text-xs font-black uppercase tracking-[0.2em] mb-2">Salio la Wallet (Available)</p>
                 <h3 className="text-5xl font-black mb-6">{formatCurrency(walletData.balance, currency)}</h3>
+                {walletData.pendingBalance > 0 && (
+                  <div className="mb-6 bg-emerald-700/50 rounded-xl p-4 inline-block">
+                    <p className="text-emerald-200 text-[10px] font-black uppercase tracking-widest mb-1">Salio Linalosubiri (Pending)</p>
+                    <p className="text-xl font-bold">{formatCurrency(walletData.pendingBalance, currency)}</p>
+                  </div>
+                )}
                 <div className="flex gap-4">
                   <button 
                     onClick={() => setIsWithdrawModalOpen(true)}
@@ -2451,7 +2472,7 @@ export const VendorPortal: React.FC = () => {
       {/* Mobile Bottom Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 px-6 py-3 flex items-center justify-between z-40">
         {[
-          { id: 'over', icon: LayoutDashboard, label: 'Dash' },
+          { id: 'dash', icon: LayoutDashboard, label: 'Dash' },
           { id: 'orders', icon: ClipboardList, label: 'Oda' },
           { id: 'products', icon: Package, label: 'Bidhaa' },
           { id: 'wallet', icon: Wallet, label: 'Wallet' },
