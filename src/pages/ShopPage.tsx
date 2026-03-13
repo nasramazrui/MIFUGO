@@ -1314,7 +1314,7 @@ export const ShopPage: React.FC = () => {
             </div>
 
             {/* Grid */}
-            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
               {filteredProducts.map((p, idx) => {
                 const productReviews = reviews.filter(r => r.productId === p.id);
                 const avgRating = productReviews.length > 0 
