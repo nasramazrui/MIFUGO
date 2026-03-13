@@ -847,7 +847,7 @@ export const AdminPanel: React.FC = () => {
                 </div>
               ) : (
                 vendors.map(v => (
-                  <div key={v.id} className="bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 p-6 flex items-center justify-between shadow-sm">
+                  <div key={v.id} className="bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
                     <div className="flex items-center gap-4">
                       <div className="w-14 h-14 bg-amber-50 dark:bg-amber-900/20 rounded-2xl flex items-center justify-center text-2xl font-black text-amber-800 dark:text-amber-500">
                         {(v.shopName || v.name)[0].toUpperCase()}
@@ -904,7 +904,7 @@ export const AdminPanel: React.FC = () => {
                 </div>
               ) : (
                 products.map(p => (
-                  <div key={p.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex items-center justify-between shadow-sm">
+                  <div key={p.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
                     <div className="flex items-center gap-4">
                       <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-2xl">
                         {p.emoji}
@@ -975,7 +975,7 @@ export const AdminPanel: React.FC = () => {
               ) : (
                 orders.map(o => (
                   <div key={o.id} className="bg-white rounded-[28px] border border-slate-100 p-6 shadow-sm">
-                    <div className="flex items-start justify-between mb-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-xl">
                           {o.items[0].emoji}
@@ -985,9 +985,9 @@ export const AdminPanel: React.FC = () => {
                           <p className="text-xs text-slate-400">#{o.id.substring(0,8)} · {o.date}</p>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-left sm:text-right">
                         <p className="font-black text-amber-700">{formatCurrency(o.total, currency)}</p>
-                        <div className="flex flex-col items-end gap-1 mt-1">
+                        <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 mt-1">
                           <span className={cn(
                             "badge px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider",
                             o.status === 'delivered' ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
@@ -1089,7 +1089,7 @@ export const AdminPanel: React.FC = () => {
             <h2 className="text-3xl font-black text-slate-900 mb-8">Watumiaji Wote</h2>
             <div className="grid gap-4">
               {users.map(u => (
-                <div key={u.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex items-center justify-between shadow-sm">
+                <div key={u.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-2xl font-black text-blue-800">
                       {u.name[0].toUpperCase()}
@@ -1126,7 +1126,7 @@ export const AdminPanel: React.FC = () => {
             <h2 className="text-3xl font-black text-slate-900 mb-8">Admins Wote</h2>
             <div className="grid gap-4">
               {admins.map(a => (
-                <div key={a.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex items-center justify-between shadow-sm">
+                <div key={a.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-purple-50 rounded-2xl flex items-center justify-center text-2xl font-black text-purple-800">
                       {a.name[0].toUpperCase()}
@@ -1353,8 +1353,8 @@ export const AdminPanel: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-[32px] border border-slate-100 overflow-hidden">
-              <table className="w-full text-left">
+            <div className="bg-white rounded-[32px] border border-slate-100 overflow-x-auto scrollbar-hide">
+              <table className="w-full text-left min-w-[600px]">
                 <thead>
                   <tr className="border-b border-slate-50">
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Vendor</th>
@@ -1416,7 +1416,7 @@ export const AdminPanel: React.FC = () => {
               ) : (
                 reviews.map(review => (
                   <div key={review.id} className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm">
-                    <div className="flex items-start justify-between mb-6">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-xl overflow-hidden">
                           {review.userAvatar ? (
@@ -1492,7 +1492,7 @@ export const AdminPanel: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {categories.map(cat => (
-                <div key={cat.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-6 flex items-center justify-between shadow-sm">
+                <div key={cat.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-2xl overflow-hidden">
                       {cat.image ? (
@@ -1852,39 +1852,6 @@ export const AdminPanel: React.FC = () => {
         )}
       </main>
 
-      {/* Mobile Bottom Nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-amber-950 border-t border-white/5 px-4 py-3 z-40 flex justify-between items-center overflow-x-auto scrollbar-hide">
-        {[
-          { id: 'over', icon: LayoutDashboard, label: 'Dash' },
-          { id: 'analytics', icon: TrendingUp, label: 'Stats' },
-          { id: 'vendors', icon: Store, label: 'Wauzaji', badge: pendingVendors.length },
-          { id: 'prods', icon: Package, label: 'Bidhaa' },
-          { id: 'orders', icon: ClipboardList, label: 'Oda' },
-          { id: 'users', icon: Users, label: 'Watu' },
-          { id: 'admins', icon: ShieldCheck, label: 'Admin' },
-          { id: 'wallet', icon: Wallet, label: 'Pesa' },
-          { id: 'settings', icon: Settings, label: 'Setti' },
-        ].map(item => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id as any)}
-            className={cn(
-              "flex flex-col items-center gap-1 transition-all flex-shrink-0 min-w-[50px]",
-              activeTab === item.id ? "text-amber-500 scale-110" : "text-amber-400/40"
-            )}
-          >
-            <div className="relative">
-              <item.icon size={18} />
-              {item.badge ? (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-3 h-3 flex items-center justify-center rounded-full">
-                  {item.badge}
-                </span>
-              ) : null}
-            </div>
-            <span className="text-[8px] font-black uppercase">{item.label}</span>
-          </button>
-        ))}
-      </nav>
       {/* Edit Modal */}
       {editingItem && (
         <Modal 
@@ -2131,24 +2098,36 @@ export const AdminPanel: React.FC = () => {
       </Modal>
 
       {/* Mobile Bottom Nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-amber-950 border-t border-white/5 px-6 py-3 flex items-center justify-between z-40">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-amber-950 border-t border-white/5 px-4 py-3 flex items-center gap-6 overflow-x-auto scrollbar-hide z-40">
         {[
-          { id: 'over', icon: BarChart3, label: 'Dash' },
-          { id: 'orders', icon: ClipboardList, label: 'Oda' },
-          { id: 'vendors', icon: Store, label: 'Wauuzaji' },
-          { id: 'users', icon: Users, label: 'Watu' },
-          { id: 'settings', icon: Settings, label: 'Seti' }
+          { id: 'over', label: 'Dash', icon: LayoutDashboard },
+          { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+          { id: 'vendors', label: 'Wauuzaji', icon: Store, badge: pendingVendors.length },
+          { id: 'prods', label: 'Bidhaa', icon: Package },
+          { id: 'orders', label: 'Maagizo', icon: ClipboardList },
+          { id: 'users', label: 'Watumiaji', icon: Users },
+          { id: 'admins', label: 'Admins', icon: ShieldCheck },
+          { id: 'wallet', label: 'Wallet', icon: Wallet },
+          { id: 'reviews', label: 'Maoni', icon: MessageSquare },
+          { id: 'cats', label: 'Kategoria', icon: Grid },
+          { id: 'status', label: t('status'), icon: Camera },
+          { id: 'settings', label: 'Seti', icon: Settings },
         ].map(item => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id as any)}
             className={cn(
-              "flex flex-col items-center gap-1 transition-all",
-              activeTab === item.id ? "text-amber-400" : "text-amber-100/40"
+              "flex flex-col items-center gap-1 transition-all min-w-[60px]",
+              activeTab === item.id ? "text-amber-400 scale-110" : "text-amber-100/40"
             )}
           >
-            <item.icon size={20} />
-            <span className="text-[8px] font-black uppercase tracking-widest">{item.label}</span>
+            <div className="relative">
+              <item.icon size={20} />
+              {item.badge ? (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-full">{item.badge}</span>
+              ) : null}
+            </div>
+            <span className="text-[8px] font-black uppercase tracking-widest whitespace-nowrap">{item.label}</span>
           </button>
         ))}
       </nav>
