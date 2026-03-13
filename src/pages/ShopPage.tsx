@@ -2148,6 +2148,60 @@ export const ShopPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Minada ya Duka Hili */}
+            {auctions.filter(a => a.vendorId === selectedVendor.id).length > 0 && (
+              <div>
+                <h3 className="font-black text-slate-900 mb-4 flex items-center gap-2">
+                  <Gavel size={18} className="text-amber-600" /> Minada ya Duka Hili
+                </h3>
+                <div className="grid grid-cols-1 gap-3">
+                  {auctions.filter(a => a.vendorId === selectedVendor.id).map(auction => {
+                    const isEnded = auction.status === 'ended' || (auction.endTime && (auction.endTime.toDate ? auction.endTime.toDate().getTime() : new Date(auction.endTime).getTime()) <= new Date().getTime());
+                    return (
+                      <div 
+                        key={auction.id}
+                        className="bg-white border border-slate-100 rounded-[24px] p-2 shadow-sm hover:shadow-md transition-all cursor-pointer flex gap-3 items-center group"
+                        onClick={() => {
+                          setActiveTab('auctions');
+                          setSelectedVendor(null);
+                        }}
+                      >
+                        <div className="w-24 h-24 rounded-[20px] overflow-hidden flex-shrink-0 bg-slate-50 relative">
+                          <img 
+                            src={auction.image || 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=800'} 
+                            alt={auction.productName}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          />
+                          <div className={cn(
+                            "absolute top-2 left-2 px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest shadow-sm backdrop-blur-md",
+                            isEnded ? "bg-red-500/90 text-white" : "bg-white/90 text-amber-600"
+                          )}>
+                            {isEnded ? 'ENDED' : 'ACTIVE'}
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0 py-1 pr-2">
+                          <h4 className="text-sm font-black text-slate-900 truncate mb-1">{auction.productName}</h4>
+                          <p className="text-[10px] text-slate-400 font-bold line-clamp-1 mb-2">{auction.description}</p>
+                          <div className="flex items-center justify-between">
+                            <div className="bg-amber-50 px-2 py-1 rounded-lg">
+                              <p className="text-[8px] font-black text-amber-600 uppercase">DAU LA SASA</p>
+                              <p className="text-[11px] font-black text-amber-700">{formatCurrency(auction.currentBid, currency)}</p>
+                            </div>
+                            {auction.highestBidderName && (
+                              <div className="bg-emerald-50 px-2 py-1 rounded-lg text-right">
+                                <p className="text-[8px] font-black text-emerald-600 uppercase">MSHINDI</p>
+                                <p className="text-[10px] font-black text-emerald-700 truncate max-w-[60px]">{auction.highestBidderName}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <button 
               onClick={() => {
                 const msg = `Habari ${selectedVendor.shopName || selectedVendor.name}, nimeona duka lenu ${systemSettings?.app_name || 'FarmConnect'} na ningependa kuuliza kuhusu bidhaa zenu.`;
