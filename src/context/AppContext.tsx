@@ -27,6 +27,19 @@ export interface Notification {
   link?: string;
   date: string;
   readBy: string[];
+  deletedBy?: string[];
+  createdAt: any;
+}
+
+export interface Offer {
+  id: string;
+  vendorId: string;
+  title: string;
+  message: string;
+  image?: string;
+  link?: string;
+  expiryDate?: string;
+  productIds: string[]; // 'all' or specific product IDs
   createdAt: any;
 }
 
@@ -59,6 +72,8 @@ interface AppContextType {
   setAuctions: React.Dispatch<React.SetStateAction<Auction[]>>;
   notifications: Notification[];
   setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
+  offers: Offer[];
+  setOffers: React.Dispatch<React.SetStateAction<Offer[]>>;
   systemSettings: any;
   updateSystemSettings: (settings: any) => Promise<void>;
   logout: () => void;
@@ -94,6 +109,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [categories, setCategories] = useState<Category[]>([]);
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [offers, setOffers] = useState<Offer[]>([]);
   const [systemSettings, setSystemSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [theme, setThemeState] = useState<'light' | 'dark'>((localStorage.getItem('theme') as 'light' | 'dark') || 'light');
@@ -336,6 +352,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setNotifications(snap.docs.filter(d => d.data().title).map(d => ({ id: d.id, ...d.data() } as Notification)));
     });
 
+    // Offers
+    const qOffers = query(collection(db, 'kuku_offers'), orderBy('createdAt', 'desc'));
+    const unsubOffers = onSnapshot(qOffers, (snap) => {
+      setOffers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Offer)));
+    });
+
     return () => {
       unsubProducts();
       unsubOrders();
@@ -349,6 +371,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubWallet();
       unsubAuctions();
       unsubNotifications();
+      unsubOffers();
     };
   }, []);
 
@@ -402,6 +425,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       categories, setCategories,
       auctions, setAuctions,
       notifications, setNotifications,
+      offers, setOffers,
       systemSettings, updateSystemSettings,
       logout,
       t,

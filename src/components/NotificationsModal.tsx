@@ -1,8 +1,8 @@
 import React from 'react';
 import { Modal } from './Modal';
 import { useApp } from '../context/AppContext';
-import { Bell, CheckCircle2 } from 'lucide-react';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { Bell, CheckCircle2, Trash2 } from 'lucide-react';
+import { doc, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
 interface Props {
@@ -13,7 +13,10 @@ interface Props {
 export const NotificationsModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const { notifications, user } = useApp();
 
-  const myNotifications = notifications.filter(n => n.userId === 'all' || n.userId === user?.id);
+  const myNotifications = notifications.filter(n => 
+    (n.userId === 'all' || n.userId === user?.id) && 
+    !(n.deletedBy || []).includes(user?.id || '')
+  );
 
   const markAsRead = async (id: string) => {
     if (!user) return;
@@ -21,6 +24,21 @@ export const NotificationsModal: React.FC<Props> = ({ isOpen, onClose }) => {
       await updateDoc(doc(db, 'kuku_activity', id), { 
         readBy: arrayUnion(user.id) 
       });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const deleteNotification = async (n: any) => {
+    if (!user) return;
+    try {
+      if (n.userId === user.id) {
+        await deleteDoc(doc(db, 'kuku_activity', n.id));
+      } else {
+        await updateDoc(doc(db, 'kuku_activity', n.id), { 
+          deletedBy: arrayUnion(user.id) 
+        });
+      }
     } catch (error) {
       console.error(error);
     }
@@ -45,9 +63,9 @@ export const NotificationsModal: React.FC<Props> = ({ isOpen, onClose }) => {
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
-                  <h4 className={`font-black ${isRead ? 'text-slate-700 dark:text-slate-300' : 'text-amber-900 dark:text-amber-500'} mb-1`}>
+                  <p className={`font-black ${isRead ? 'text-slate-700 dark:text-slate-300' : 'text-amber-900 dark:text-amber-500'} mb-1`}>
                     {n.title}
-                  </h4>
+                  </p>
                   <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{n.message}</p>
                   {n.image && (
                     <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
@@ -68,9 +86,21 @@ export const NotificationsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     {new Date(n.date).toLocaleDateString()}
                   </p>
                 </div>
-                {!isRead && (
-                  <div className="w-2 h-2 bg-amber-500 rounded-full mt-1 shrink-0" />
-                )}
+                <div className="flex flex-col items-end gap-2">
+                  {!isRead && (
+                    <div className="w-2 h-2 bg-amber-500 rounded-full mt-1 shrink-0" />
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteNotification(n);
+                    }}
+                    className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                    title="Futa"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
             </div>
           )})

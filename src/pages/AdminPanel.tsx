@@ -48,7 +48,9 @@ import {
   Grid,
   MessageSquare,
   RefreshCw,
-  Send
+  Send,
+  Tag,
+  Menu
 } from 'lucide-react';
 import { cn } from '../utils';
 import { CATEGORIES } from '../constants';
@@ -81,6 +83,7 @@ export const AdminPanel: React.FC = () => {
     categories,
     reviews,
     systemSettings,
+    offers,
     updateSystemSettings,
     logout, 
     addActivity,
@@ -92,8 +95,9 @@ export const AdminPanel: React.FC = () => {
     t
   } = useApp();
   const currency = systemSettings?.currency || 'TZS';
-  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'admins' | 'wallet' | 'settings' | 'status' | 'cats' | 'reviews' | 'announcements'>('over');
+  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'admins' | 'wallet' | 'settings' | 'status' | 'cats' | 'reviews' | 'announcements' | 'offers'>('over');
   const [isLangOpen, setIsLangOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -128,6 +132,16 @@ export const AdminPanel: React.FC = () => {
     type: 'in-app' // 'in-app' or 'whatsapp'
   });
   const [isSendingAnnouncement, setIsSendingAnnouncement] = useState(false);
+  const [offerForm, setOfferForm] = useState({
+    title: '',
+    message: '',
+    image: '',
+    link: '',
+    expiryDate: '',
+    productIds: [] as string[],
+    target: 'all' as 'all' | string
+  });
+  const [isSendingOffer, setIsSendingOffer] = useState(false);
   const [catForm, setCatForm] = useState({
     id: '',
     label: '',
@@ -290,6 +304,59 @@ export const AdminPanel: React.FC = () => {
       toast.error('Kosa: ' + (error as Error).message);
     } finally {
       setIsSendingAnnouncement(false);
+    }
+  };
+
+  const handleSendOffer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!offerForm.title || !offerForm.message) {
+      toast.error('Tafadhali jaza kichwa na ujumbe');
+      return;
+    }
+
+    setIsSendingOffer(true);
+    try {
+      const payload: any = {
+        vendorId: user?.id || 'admin',
+        title: offerForm.title,
+        message: offerForm.message,
+        image: offerForm.image || '',
+        link: offerForm.link || '',
+        expiryDate: offerForm.expiryDate || null,
+        productIds: offerForm.productIds,
+        createdAt: serverTimestamp()
+      };
+
+      await addDoc(collection(db, 'kuku_offers'), payload);
+      
+      // Also send a notification to everyone
+      await addDoc(collection(db, 'kuku_activity'), {
+        title: `OFA MPYA: ${offerForm.title}`,
+        message: offerForm.message,
+        userId: 'all',
+        readBy: [],
+        date: new Date().toISOString(),
+        icon: '🎁',
+        text: `Ofa Mpya: ${offerForm.title}`,
+        time: new Date().toISOString(),
+        createdAt: serverTimestamp()
+      });
+
+      toast.success('Ofa imetumwa kikamilifu!');
+      setOfferForm({
+        title: '',
+        message: '',
+        image: '',
+        link: '',
+        expiryDate: '',
+        productIds: [],
+        target: 'all'
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error('Kosa: ' + (error as Error).message);
+    } finally {
+      setIsSendingOffer(false);
     }
   };
 
@@ -519,51 +586,124 @@ export const AdminPanel: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col lg:flex-row pb-20 lg:pb-0 transition-colors duration-300">
       {/* Mobile Header */}
-      <header className="lg:hidden bg-amber-950 text-amber-100 px-6 py-4 sticky top-0 z-30 flex items-center justify-between border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setView('shop')}
-            className="p-2 bg-white/5 rounded-xl text-amber-400"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <h1 className="font-serif italic text-lg font-bold">Admin</h1>
+      <header className="lg:hidden bg-amber-950 text-amber-100 px-4 py-3 sticky top-0 z-30 flex items-center justify-between border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center text-amber-950 shadow-lg">
+            <BarChart3 size={16} />
+          </div>
+          <h1 className="font-serif italic text-base font-bold">Admin</h1>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl">
-            <div className="relative" ref={langRef}>
-              <button 
-                onClick={() => setIsLangOpen(!isLangOpen)}
-                className="p-1.5 text-amber-400"
-              >
-                <Globe size={16} />
-              </button>
-              {isLangOpen && (
-                <div className="absolute top-full right-0 mt-2 bg-slate-900 shadow-2xl border border-white/10 rounded-xl p-1 z-50 min-w-[100px] animate-in fade-in zoom-in duration-200">
-                  {['sw', 'en', 'ar', 'hi'].map(lang => (
-                    <button 
-                      key={lang}
-                      onClick={() => {
-                        setLanguage(lang as any);
-                        setIsLangOpen(false);
-                      }}
-                      className={cn(
-                        "w-full text-left px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase",
-                        language === lang ? "bg-amber-500 text-amber-950" : "text-amber-400/60 hover:bg-white/5"
-                      )}
-                    >
-                      {lang}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+          <div className="relative" ref={langRef}>
+            <button 
+              onClick={() => setIsLangOpen(!isLangOpen)}
+              className="p-2 text-amber-400 bg-white/5 rounded-xl"
+            >
+              <Globe size={16} />
+            </button>
+            {isLangOpen && (
+              <div className="absolute top-full right-0 mt-2 bg-slate-900 shadow-2xl border border-white/10 rounded-xl p-1 z-50 min-w-[100px] animate-in fade-in zoom-in duration-200">
+                {['sw', 'en', 'ar', 'hi'].map(lang => (
+                  <button 
+                    key={lang}
+                    onClick={() => {
+                      setLanguage(lang as any);
+                      setIsLangOpen(false);
+                    }}
+                    className={cn(
+                      "w-full text-left px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase",
+                      language === lang ? "bg-amber-500 text-amber-950" : "text-amber-400/60 hover:bg-white/5"
+                    )}
+                  >
+                    {lang}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <button onClick={logout} className="text-amber-400/60 p-2">
-            <LogOut size={20} />
+          <button onClick={logout} className="text-amber-400/60 p-2 bg-white/5 rounded-xl">
+            <LogOut size={18} />
           </button>
         </div>
       </header>
+
+      {/* Mobile Drawer Overlay */}
+      {isDrawerOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity"
+          onClick={() => setIsDrawerOpen(false)}
+        />
+      )}
+
+      {/* Mobile Drawer */}
+      <aside className={cn(
+        "lg:hidden fixed top-0 left-0 bottom-0 w-[280px] bg-amber-950 text-amber-100 z-[60] transition-transform duration-300 ease-out flex flex-col shadow-2xl",
+        isDrawerOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <div className="p-6 border-b border-white/5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-amber-500 rounded-xl flex items-center justify-center text-amber-950 shadow-lg">
+              <BarChart3 size={18} />
+            </div>
+            <h1 className="font-serif italic text-lg font-bold">Admin Menu</h1>
+          </div>
+          <button onClick={() => setIsDrawerOpen(false)} className="p-2 bg-white/5 rounded-xl text-amber-400">
+            <X size={20} />
+          </button>
+        </div>
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          {[
+            { id: 'over', label: 'Muhtasari', icon: LayoutDashboard },
+            { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+            { id: 'vendors', label: 'Wauuzaji', icon: Store, badge: pendingVendors.length },
+            { id: 'prods', label: 'Bidhaa', icon: Package },
+            { id: 'orders', label: 'Maagizo', icon: ClipboardList },
+            { id: 'users', label: 'Watumiaji', icon: Users },
+            { id: 'admins', label: 'Admins', icon: ShieldCheck },
+            { id: 'wallet', label: 'Wallet', icon: Wallet },
+            { id: 'reviews', label: 'Maoni', icon: MessageSquare },
+            { id: 'cats', label: 'Kategoria', icon: Grid },
+            { id: 'status', label: t('status'), icon: Camera },
+            { id: 'announcements', label: 'Matangazo', icon: Bell },
+            { id: 'offers', label: 'Ofa & Coupons', icon: Tag },
+            { id: 'settings', label: 'Mipangilio', icon: Settings },
+          ].map(item => (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveTab(item.id as any);
+                setIsDrawerOpen(false);
+              }}
+              className={cn(
+                "w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-sm font-bold transition-all",
+                activeTab === item.id 
+                  ? "bg-amber-500 text-amber-950 shadow-lg" 
+                  : "text-amber-100/60 hover:bg-white/5 hover:text-amber-400"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <item.icon size={18} />
+                {item.label}
+              </div>
+              {item.badge ? (
+                <span className={cn(
+                  "px-2 py-0.5 rounded-full text-[10px] font-black",
+                  activeTab === item.id ? "bg-amber-950 text-amber-500" : "bg-red-500 text-white"
+                )}>{item.badge}</span>
+              ) : null}
+            </button>
+          ))}
+        </nav>
+        <div className="p-4 border-t border-white/5">
+          <button 
+            onClick={() => setView('shop')}
+            className="w-full flex items-center justify-center gap-2 py-4 bg-white/5 hover:bg-white/10 rounded-2xl text-sm font-black text-amber-400 transition-all border border-white/5"
+          >
+            <ArrowLeft size={16} />
+            {t('go_to_market')}
+          </button>
+        </div>
+      </aside>
 
       {/* Sidebar (Desktop) */}
       <aside className="hidden lg:flex w-72 bg-amber-950 text-amber-100 flex-col sticky top-0 h-screen z-20">
@@ -628,6 +768,7 @@ export const AdminPanel: React.FC = () => {
             { id: 'cats', label: 'Kategoria', icon: Grid },
             { id: 'status', label: t('status'), icon: Camera },
             { id: 'announcements', label: 'Matangazo', icon: Bell },
+            { id: 'offers', label: 'Ofa & Coupons', icon: Tag },
             { id: 'settings', label: 'Mipangilio', icon: Settings },
           ].map(item => (
             <button
@@ -678,61 +819,72 @@ export const AdminPanel: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 lg:p-12 overflow-y-auto">
+      <main className="flex-1 p-4 md:p-10 overflow-y-auto">
         {activeTab === 'over' && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-10">
-            <div className="flex items-center justify-between">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 md:space-y-10">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h2 className="text-3xl font-black text-slate-900">Muhtasari wa Mfumo</h2>
-                <p className="text-slate-500">Hali ya sasa ya {systemSettings?.app_name || 'FarmConnect'} Tanzania</p>
+                <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">Muhtasari wa Mfumo</h2>
+                <p className="text-sm text-slate-500">Hali ya sasa ya {systemSettings?.app_name || 'FarmConnect'} Tanzania</p>
               </div>
-              <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-4 py-2 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-4 py-2 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm self-start">
                 <Bell size={18} className="text-amber-500" />
                 <span className="text-xs font-black text-slate-900 dark:text-white">{activities.length} Notifications</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
               {[
                 { label: 'Watumiaji', value: users.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
                 { label: 'Wauuzaji', value: vendors.length, icon: Store, color: 'text-emerald-600', bg: 'bg-emerald-50', sub: `${pendingVendors.length} wanasubiri` },
                 { label: 'Bidhaa', value: products.length, icon: Package, color: 'text-amber-600', bg: 'bg-amber-50' },
                 { label: 'Maagizo', value: orders.length, icon: ClipboardList, color: 'text-red-600', bg: 'bg-red-50' },
-                { label: `Mapato Admin (6% - ${currency})`, value: formatCurrency(totalAdminEarnings, currency), icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
+                { label: `Mapato Admin`, value: formatCurrency(totalAdminEarnings, currency), icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
               ].map((stat, i) => (
-                <div key={i} className="bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all group">
-                  <div className={cn("w-14 h-14 rounded-[20px] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform", stat.bg, stat.bg.includes('blue') && 'dark:bg-blue-900/20', stat.bg.includes('emerald') && 'dark:bg-emerald-900/20', stat.bg.includes('amber') && 'dark:bg-amber-900/20', stat.bg.includes('red') && 'dark:bg-red-900/20', stat.bg.includes('purple') && 'dark:bg-purple-900/20')}>
-                    <stat.icon className={stat.color} size={28} />
+                <div key={i} className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all group">
+                  <div className={cn("w-12 h-12 md:w-14 md:h-14 rounded-[16px] md:rounded-[20px] flex items-center justify-center mb-4 md:mb-6 group-hover:scale-110 transition-transform", stat.bg, stat.bg.includes('blue') && 'dark:bg-blue-900/20', stat.bg.includes('emerald') && 'dark:bg-emerald-900/20', stat.bg.includes('amber') && 'dark:bg-amber-900/20', stat.bg.includes('red') && 'dark:bg-red-900/20', stat.bg.includes('purple') && 'dark:bg-purple-900/20')}>
+                    <stat.icon className={stat.color} size={24} />
                   </div>
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                  <p className="text-4xl font-black text-slate-900 dark:text-white mb-1">{stat.value}</p>
+                  <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
+                  <p className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white mb-1">{stat.value}</p>
                   {stat.sub && <p className="text-[10px] font-bold text-amber-600 dark:text-amber-500">{stat.sub}</p>}
                 </div>
               ))}
             </div>
 
-            <div className="grid lg:grid-cols-2 gap-10">
-              <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 p-10 shadow-sm">
-                <h3 className="font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
+              <div className="bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800 p-6 md:p-10 shadow-sm">
+                <h3 className="font-black text-slate-900 dark:text-white mb-6 md:mb-8 flex items-center gap-3">
                   <Bell size={24} className="text-amber-500" /> Shughuli za Hivi Karibuni
                 </h3>
-                <div className="space-y-6">
+                <div className="space-y-5 md:space-y-6">
                   {activities.slice(0, 6).map(act => (
-                    <div key={act.id} className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-lg flex-shrink-0">
+                    <div key={act.id} className="flex items-start gap-3 md:gap-4">
+                      <div className="w-9 h-9 md:w-10 md:h-10 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-base md:text-lg flex-shrink-0">
                         {act.icon}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-bold text-slate-700 dark:text-slate-300 leading-snug">{act.text}</p>
+                        <p className="text-xs md:text-sm font-bold text-slate-700 dark:text-slate-300 leading-snug">{act.text}</p>
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{act.time}</p>
                       </div>
+                      <button 
+                        onClick={async () => {
+                          if (confirm('Futa shughuli hii?')) {
+                            await deleteDoc(doc(db, 'kuku_activity', act.id));
+                            toast.success('Imefutwa');
+                          }
+                        }}
+                        className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 p-10 shadow-sm">
-                <h3 className="font-black text-slate-900 dark:text-white mb-8 flex items-center gap-3">
+              <div className="bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800 p-6 md:p-10 shadow-sm">
+                <h3 className="font-black text-slate-900 dark:text-white mb-6 md:mb-8 flex items-center gap-3">
                   <Store size={24} className="text-emerald-500" /> Wauuzaji Wanasubiri
                 </h3>
                 <div className="space-y-4">
@@ -740,28 +892,28 @@ export const AdminPanel: React.FC = () => {
                     <p className="text-center py-10 text-slate-400 text-sm">Hakuna maombi mapya.</p>
                   ) : (
                     pendingVendors.map(v => (
-                      <div key={v.id} className="bg-slate-50 rounded-[24px] p-5 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center font-black text-slate-900 shadow-sm">
+                      <div key={v.id} className="bg-slate-50 dark:bg-slate-800/50 rounded-[20px] md:rounded-[24px] p-4 md:p-5 flex items-center justify-between">
+                        <div className="flex items-center gap-3 md:gap-4">
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-white dark:bg-slate-800 rounded-xl md:rounded-2xl flex items-center justify-center font-black text-slate-900 dark:text-white shadow-sm">
                             {(v.shopName || v.name)[0].toUpperCase()}
                           </div>
                           <div>
-                            <p className="text-sm font-black text-slate-900">{v.shopName || v.name}</p>
+                            <p className="text-xs md:text-sm font-black text-slate-900 dark:text-white">{v.shopName || v.name}</p>
                             <p className="text-[10px] text-slate-400">📍 {v.location}</p>
                           </div>
                         </div>
                         <div className="flex gap-2">
                           <button 
                             onClick={() => approveVendor(v.id)}
-                            className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center hover:bg-emerald-600 transition-colors"
+                            className="w-9 h-9 md:w-10 md:h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center hover:bg-emerald-600 transition-colors"
                           >
-                            <Check size={20} />
+                            <Check size={18} />
                           </button>
                           <button 
                             onClick={() => rejectVendor(v.id)}
-                            className="w-10 h-10 bg-red-500 text-white rounded-xl flex items-center justify-center hover:bg-red-600 transition-colors"
+                            className="w-9 h-9 md:w-10 md:h-10 bg-red-500 text-white rounded-xl flex items-center justify-center hover:bg-red-600 transition-colors"
                           >
-                            <X size={20} />
+                            <X size={18} />
                           </button>
                         </div>
                       </div>
@@ -914,7 +1066,7 @@ export const AdminPanel: React.FC = () => {
                 </div>
               ) : (
                 vendors.map(v => (
-                  <div key={v.id} className="bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                  <div key={v.id} className="bg-white dark:bg-slate-900 rounded-[24px] md:rounded-[28px] border border-slate-100 dark:border-slate-800 p-5 md:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
                     <div className="flex items-center gap-4">
                       <div className="w-14 h-14 bg-amber-50 dark:bg-amber-900/20 rounded-2xl flex items-center justify-center text-2xl font-black text-amber-800 dark:text-amber-500">
                         {(v.shopName || v.name)[0].toUpperCase()}
@@ -964,14 +1116,14 @@ export const AdminPanel: React.FC = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <h2 className="text-3xl font-black text-slate-900 mb-8">Bidhaa Zote</h2>
             <div className="grid gap-4">
-              {products.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100">
+              {products.filter(p => user?.role === 'admin' || p.vendorId === user?.id).length === 0 ? (
+                <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800">
                   <Package size={48} className="mx-auto text-slate-200 mb-4" />
                   <p className="text-slate-400">Hakuna bidhaa bado.</p>
                 </div>
               ) : (
-                products.map(p => (
-                  <div key={p.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                products.filter(p => user?.role === 'admin' || p.vendorId === user?.id).map(p => (
+                  <div key={p.id} className="bg-white dark:bg-slate-900 rounded-[24px] md:rounded-[28px] border border-slate-100 dark:border-slate-800 p-5 md:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
                     <div className="flex items-center gap-4">
                       <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-2xl">
                         {p.emoji}
@@ -1034,14 +1186,14 @@ export const AdminPanel: React.FC = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <h2 className="text-3xl font-black text-slate-900 mb-8">Maagizo Yote</h2>
             <div className="grid gap-4">
-              {orders.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100">
+              {orders.filter(o => user?.role === 'admin' || o.vendorId === user?.id).length === 0 ? (
+                <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800">
                   <ClipboardList size={48} className="mx-auto text-slate-200 mb-4" />
                   <p className="text-slate-400">Hakuna maagizo bado.</p>
                 </div>
               ) : (
-                orders.map(o => (
-                  <div key={o.id} className="bg-white rounded-[28px] border border-slate-100 p-6 shadow-sm">
+                orders.filter(o => user?.role === 'admin' || o.vendorId === user?.id).map(o => (
+                  <div key={o.id} className="bg-white dark:bg-slate-900 rounded-[24px] md:rounded-[28px] border border-slate-100 dark:border-slate-800 p-5 md:p-6 shadow-sm">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-xl">
@@ -1285,7 +1437,7 @@ export const AdminPanel: React.FC = () => {
                   </div>
                 ) : (
                   walletTransactions.filter(t => t.type === 'deposit').map(tx => (
-                    <div key={tx.id} className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm">
+                    <div key={tx.id} className="bg-white dark:bg-slate-900 rounded-[24px] md:rounded-[32px] border border-slate-100 dark:border-slate-800 p-5 md:p-8 shadow-sm">
                       <div className="flex flex-wrap items-start justify-between gap-6 mb-6">
                         <div className="flex items-center gap-4">
                           <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-2xl">💰</div>
@@ -1357,7 +1509,7 @@ export const AdminPanel: React.FC = () => {
                   </div>
                 ) : (
                   withdrawals.map(w => (
-                    <div key={w.id} className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm">
+                    <div key={w.id} className="bg-white dark:bg-slate-900 rounded-[24px] md:rounded-[32px] border border-slate-100 dark:border-slate-800 p-5 md:p-8 shadow-sm">
                       <div className="flex flex-wrap items-start justify-between gap-6 mb-6">
                         <div className="flex items-center gap-4">
                           <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-2xl">💸</div>
@@ -1624,7 +1776,7 @@ export const AdminPanel: React.FC = () => {
             <h2 className="text-3xl font-black text-slate-900 mb-2">Matangazo & Ujumbe</h2>
             <p className="text-slate-500 mb-10">Tuma ujumbe, promo codes, au taarifa muhimu kwa watumiaji wako.</p>
 
-            <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+            <div className="bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800 p-6 md:p-10 shadow-sm">
               <form onSubmit={handleSendAnnouncement} className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
@@ -1635,7 +1787,7 @@ export const AdminPanel: React.FC = () => {
                       className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
                     >
                       <option value="in-app">Ndani ya App (In-App Notification)</option>
-                      <option value="whatsapp">WhatsApp (Mtu Mmoja Tu)</option>
+                      {user?.role === 'admin' && <option value="whatsapp">WhatsApp (Mtu Mmoja Tu)</option>}
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -1646,16 +1798,20 @@ export const AdminPanel: React.FC = () => {
                       className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
                     >
                       <option value="all">Watumiaji Wote</option>
-                      <optgroup label="Wauzaji">
-                        {vendors.map(v => (
-                          <option key={v.id} value={v.id}>{v.shopName || v.name}</option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Wateja">
-                        {users.filter(u => u.role !== 'vendor' && u.role !== 'admin').map(u => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
-                        ))}
-                      </optgroup>
+                      {user?.role === 'admin' && (
+                        <>
+                          <optgroup label="Wauzaji">
+                            {vendors.map(v => (
+                              <option key={v.id} value={v.id}>{v.shopName || v.name}</option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="Wateja">
+                            {users.filter(u => u.role !== 'vendor' && u.role !== 'admin').map(u => (
+                              <option key={u.id} value={u.id}>{u.name}</option>
+                            ))}
+                          </optgroup>
+                        </>
+                      )}
                     </select>
                   </div>
                 </div>
@@ -1729,15 +1885,161 @@ export const AdminPanel: React.FC = () => {
           </motion.div>
         )}
 
+        {activeTab === 'offers' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <h2 className="text-3xl font-black text-slate-900 mb-2">Ofa & Coupons</h2>
+            <p className="text-slate-500 mb-10">Tengeneza ofa maalum kwa ajili ya bidhaa zako.</p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
+              <div className="lg:col-span-2 space-y-6 md:space-y-8">
+                <div className="bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800 p-6 md:p-10 shadow-sm">
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white mb-6 md:mb-8">Tengeneza Ofa Mpya</h3>
+                  <form onSubmit={handleSendOffer} className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Kichwa cha Ofa</label>
+                      <input 
+                        type="text"
+                        value={offerForm.title}
+                        onChange={(e) => setOfferForm(prev => ({ ...prev, title: e.target.value }))}
+                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                        placeholder="Mfn: Punguzo la Sikukuu!"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Ujumbe wa Ofa</label>
+                      <textarea 
+                        value={offerForm.message}
+                        onChange={(e) => setOfferForm(prev => ({ ...prev, message: e.target.value }))}
+                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm min-h-[120px] resize-none"
+                        placeholder="Elezea ofa yako hapa..."
+                        required
+                      />
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Picha (URL)</label>
+                        <input 
+                          type="url"
+                          value={offerForm.image}
+                          onChange={(e) => setOfferForm(prev => ({ ...prev, image: e.target.value }))}
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                          placeholder="https://..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Tarehe ya Kuisha (Sio Lazima)</label>
+                        <input 
+                          type="datetime-local"
+                          value={offerForm.expiryDate}
+                          onChange={(e) => setOfferForm(prev => ({ ...prev, expiryDate: e.target.value }))}
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Chagua Bidhaa (Zote kama hujaweka)</label>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[200px] overflow-y-auto p-4 bg-slate-50 rounded-2xl border-2 border-slate-100">
+                        {products.filter(p => user?.role === 'admin' || p.vendorId === user?.id).map(p => (
+                          <label key={p.id} className="flex items-center gap-2 cursor-pointer group">
+                            <input 
+                              type="checkbox"
+                              checked={offerForm.productIds.includes(p.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setOfferForm(prev => ({ ...prev, productIds: [...prev.productIds, p.id] }));
+                                } else {
+                                  setOfferForm(prev => ({ ...prev, productIds: prev.productIds.filter(id => id !== p.id) }));
+                                }
+                              }}
+                              className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                            />
+                            <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900 truncate">{p.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit"
+                      disabled={isSendingOffer}
+                      className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black transition-all active:scale-95 flex items-center justify-center gap-2 hover:bg-amber-700"
+                    >
+                      {isSendingOffer ? (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <Tag size={20} />
+                          TUMA OFA
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <h3 className="text-xl font-black text-slate-900">Ofa Zinazoendelea</h3>
+                <div className="space-y-4">
+                  {offers.filter(o => user?.role === 'admin' || o.vendorId === user?.id).length === 0 ? (
+                    <div className="bg-white rounded-3xl p-10 text-center border border-dashed border-slate-200">
+                      <p className="text-slate-400 font-bold">Hakuna ofa kwa sasa</p>
+                    </div>
+                  ) : (
+                    offers.filter(o => user?.role === 'admin' || o.vendorId === user?.id).map(offer => (
+                      <div key={offer.id} className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm relative group overflow-hidden">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600">
+                              <Tag size={16} />
+                            </div>
+                            <h4 className="font-black text-slate-900">{offer.title}</h4>
+                          </div>
+                          <button 
+                            onClick={async () => {
+                              if (confirm('Futa ofa hii?')) {
+                                await deleteDoc(doc(db, 'kuku_offers', offer.id));
+                                toast.success('Ofa imefutwa');
+                              }
+                            }}
+                            className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                        <p className="text-sm text-slate-500 mb-4 line-clamp-2">{offer.message}</p>
+                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+                          <span className="text-slate-400">Bidhaa: {offer.productIds.length === 0 ? 'Zote' : offer.productIds.length}</span>
+                          {offer.expiryDate && (
+                            <span className={cn(
+                              "px-2 py-1 rounded-lg",
+                              new Date(offer.expiryDate) < new Date() ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-500"
+                            )}>
+                              {new Date(offer.expiryDate) < new Date() ? 'Imeisha' : `Mwisho: ${new Date(offer.expiryDate).toLocaleDateString()}`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'settings' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl">
-            <h2 className="text-3xl font-black text-slate-900 mb-2">Mipangilio ya Mfumo</h2>
-            <p className="text-slate-500 mb-10">Weka funguo za ImageKit na Firebase hapa. Mabadiliko yataathiri mfumo mzima.</p>
+            <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mb-2">Mipangilio ya Mfumo</h2>
+            <p className="text-sm text-slate-500 mb-6 md:mb-10">Weka funguo za ImageKit na Firebase hapa. Mabadiliko yataathiri mfumo mzima.</p>
 
-            <div className="space-y-8">
+            <div className="space-y-6 md:space-y-8">
               {/* Branding Section */}
-              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
-                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+              <div className="bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800 p-6 md:p-10 shadow-sm">
+                <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                   <div className="w-8 h-8 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
                     <Star size={18} />
                   </div>
@@ -2340,36 +2642,36 @@ export const AdminPanel: React.FC = () => {
       </Modal>
 
       {/* Mobile Bottom Nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-amber-950 border-t border-white/5 px-4 py-3 flex items-center gap-6 overflow-x-auto scrollbar-hide z-40">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-amber-950 border-t border-white/5 px-6 py-3 flex items-center justify-between z-40">
         {[
           { id: 'over', label: 'Dash', icon: LayoutDashboard },
-          { id: 'analytics', label: 'Analytics', icon: TrendingUp },
-          { id: 'vendors', label: 'Wauuzaji', icon: Store, badge: pendingVendors.length },
-          { id: 'prods', label: 'Bidhaa', icon: Package },
-          { id: 'orders', label: 'Maagizo', icon: ClipboardList },
-          { id: 'users', label: 'Watumiaji', icon: Users },
-          { id: 'admins', label: 'Admins', icon: ShieldCheck },
+          { id: 'orders', label: 'Oda', icon: ClipboardList },
           { id: 'wallet', label: 'Wallet', icon: Wallet },
-          { id: 'reviews', label: 'Maoni', icon: MessageSquare },
-          { id: 'cats', label: 'Kategoria', icon: Grid },
-          { id: 'status', label: t('status'), icon: Camera },
-          { id: 'settings', label: 'Seti', icon: Settings },
+          { id: 'more', label: 'Zaidi', icon: Menu },
         ].map(item => (
           <button
             key={item.id}
-            onClick={() => setActiveTab(item.id as any)}
+            onClick={() => {
+              if (item.id === 'more') {
+                setIsDrawerOpen(true);
+              } else {
+                setActiveTab(item.id as any);
+              }
+            }}
             className={cn(
-              "flex flex-col items-center gap-1 transition-all min-w-[60px]",
+              "flex flex-col items-center gap-1 transition-all",
               activeTab === item.id ? "text-amber-400 scale-110" : "text-amber-100/40"
             )}
           >
             <div className="relative">
-              <item.icon size={20} />
-              {item.badge ? (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-full">{item.badge}</span>
-              ) : null}
+              <item.icon size={22} />
+              {item.id === 'orders' && orders.filter(o => o.status === 'pending').length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-full">
+                  {orders.filter(o => o.status === 'pending').length}
+                </span>
+              )}
             </div>
-            <span className="text-[8px] font-black uppercase tracking-widest whitespace-nowrap">{item.label}</span>
+            <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
           </button>
         ))}
       </nav>
