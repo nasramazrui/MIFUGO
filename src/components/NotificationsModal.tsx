@@ -18,7 +18,7 @@ export const NotificationsModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const markAsRead = async (id: string) => {
     if (!user) return;
     try {
-      await updateDoc(doc(db, 'kuku_notifications', id), { 
+      await updateDoc(doc(db, 'kuku_activity', id), { 
         readBy: arrayUnion(user.id) 
       });
     } catch (error) {

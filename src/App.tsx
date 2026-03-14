@@ -1,14 +1,16 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { ShopPage } from './pages/ShopPage';
 import { VendorPortal } from './pages/VendorPortal';
 import { AdminPanel } from './pages/AdminPanel';
 import { Toaster } from 'react-hot-toast';
 import { applyThemeColor } from './utils/theme';
-import { Wrench } from 'lucide-react';
+import { Wrench, LogIn } from 'lucide-react';
+import { AuthModal } from './components/AuthModal';
 
 const AppContent: React.FC = () => {
   const { user, loading, systemSettings, view } = useApp();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
     if (systemSettings?.themeColor) {
@@ -87,7 +89,7 @@ const AppContent: React.FC = () => {
           <p className="text-slate-500 mb-8 leading-relaxed">
             Tunaomba radhi, {systemSettings?.app_name || 'FarmConnect'} iko kwenye matengenezo kwa sasa ili kuboresha huduma zetu. Tafadhali rudi baadae.
           </p>
-          <div className="flex gap-2 justify-center">
+          <div className="flex gap-2 justify-center mb-8">
             {[0, 1, 2].map((i) => (
               <div 
                 key={i} 
@@ -96,7 +98,22 @@ const AppContent: React.FC = () => {
               />
             ))}
           </div>
+          
+          <div className="pt-6 border-t border-slate-100">
+            <button 
+              onClick={() => setIsAuthModalOpen(true)}
+              className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl font-bold transition-colors"
+            >
+              <LogIn size={18} />
+              Ingia kama Admin
+            </button>
+          </div>
         </div>
+
+        <AuthModal 
+          isOpen={isAuthModalOpen} 
+          onClose={() => setIsAuthModalOpen(false)} 
+        />
       </div>
     );
   }

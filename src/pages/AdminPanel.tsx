@@ -265,12 +265,15 @@ export const AdminPanel: React.FC = () => {
         }
       } else {
         // In-App Notification
-        await addDoc(collection(db, 'kuku_notifications'), {
+        await addDoc(collection(db, 'kuku_activity'), {
           title: announcementForm.title,
           message: announcementForm.message,
           userId: announcementForm.target,
           readBy: [],
           date: new Date().toISOString(),
+          icon: '📢',
+          text: `Tangazo: ${announcementForm.title}`,
+          time: new Date().toISOString(),
           createdAt: serverTimestamp()
         });
         toast.success('Tangazo limetumwa kikamilifu!');
@@ -278,7 +281,7 @@ export const AdminPanel: React.FC = () => {
       }
     } catch (error) {
       console.error(error);
-      toast.error('Imeshindwa kutuma tangazo');
+      toast.error('Kosa: ' + (error as Error).message);
     } finally {
       setIsSendingAnnouncement(false);
     }

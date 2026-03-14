@@ -328,10 +328,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setWalletTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction)));
     });
 
-    // Notifications
-    const qNotifications = query(collection(db, 'kuku_notifications'), orderBy('createdAt', 'desc'));
+    // Notifications (stored in kuku_activity)
+    const qNotifications = query(collection(db, 'kuku_activity'), orderBy('createdAt', 'desc'));
     const unsubNotifications = onSnapshot(qNotifications, (snap) => {
-      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
+      setNotifications(snap.docs.filter(d => d.data().title).map(d => ({ id: d.id, ...d.data() } as Notification)));
     });
 
     return () => {
