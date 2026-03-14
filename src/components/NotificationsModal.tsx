@@ -49,6 +49,21 @@ export const NotificationsModal: React.FC<Props> = ({ isOpen, onClose }) => {
                     {n.title}
                   </h4>
                   <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{n.message}</p>
+                  {n.image && (
+                    <div className="mt-3 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+                      <img src={n.image} alt="Tangazo" className="w-full h-auto max-h-48 object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                  )}
+                  {n.link && (
+                    <a 
+                      href={n.link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-block mt-3 text-sm font-bold text-amber-600 dark:text-amber-500 hover:underline"
+                    >
+                      Fungua Link &rarr;
+                    </a>
+                  )}
                   <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-widest">
                     {new Date(n.date).toLocaleDateString()}
                   </p>

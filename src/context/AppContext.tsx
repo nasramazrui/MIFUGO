@@ -23,6 +23,8 @@ export interface Notification {
   userId: string; // 'all' or specific user id
   title: string;
   message: string;
+  image?: string;
+  link?: string;
   date: string;
   readBy: string[];
   createdAt: any;

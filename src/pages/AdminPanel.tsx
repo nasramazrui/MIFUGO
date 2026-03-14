@@ -122,6 +122,8 @@ export const AdminPanel: React.FC = () => {
   const [announcementForm, setAnnouncementForm] = useState({
     title: '',
     message: '',
+    image: '',
+    link: '',
     target: 'all', // 'all' or specific user ID
     type: 'in-app' // 'in-app' or 'whatsapp'
   });
@@ -265,7 +267,7 @@ export const AdminPanel: React.FC = () => {
         }
       } else {
         // In-App Notification
-        await addDoc(collection(db, 'kuku_activity'), {
+        const payload: any = {
           title: announcementForm.title,
           message: announcementForm.message,
           userId: announcementForm.target,
@@ -275,9 +277,13 @@ export const AdminPanel: React.FC = () => {
           text: `Tangazo: ${announcementForm.title}`,
           time: new Date().toISOString(),
           createdAt: serverTimestamp()
-        });
+        };
+        if (announcementForm.image) payload.image = announcementForm.image;
+        if (announcementForm.link) payload.link = announcementForm.link;
+
+        await addDoc(collection(db, 'kuku_activity'), payload);
         toast.success('Tangazo limetumwa kikamilifu!');
-        setAnnouncementForm({ ...announcementForm, title: '', message: '' });
+        setAnnouncementForm({ ...announcementForm, title: '', message: '', image: '', link: '' });
       }
     } catch (error) {
       console.error(error);
@@ -1147,7 +1153,19 @@ export const AdminPanel: React.FC = () => {
 
         {activeTab === 'users' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <h2 className="text-3xl font-black text-slate-900 mb-8">Watumiaji Wote</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+              <h2 className="text-3xl font-black text-slate-900">Watumiaji Wote</h2>
+              <button
+                onClick={() => {
+                  setAnnouncementForm(prev => ({ ...prev, target: 'all' }));
+                  setActiveTab('announcements');
+                }}
+                className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-2xl font-black transition-all flex items-center gap-2 shadow-sm"
+              >
+                <MessageSquare size={18} />
+                Tuma Ujumbe kwa Wote
+              </button>
+            </div>
             <div className="grid gap-4">
               {users.map(u => (
                 <div key={u.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
@@ -1161,6 +1179,16 @@ export const AdminPanel: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        setAnnouncementForm(prev => ({ ...prev, target: u.id }));
+                        setActiveTab('announcements');
+                      }}
+                      className="w-10 h-10 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center hover:bg-amber-100 transition-all"
+                      title="Tuma Ujumbe"
+                    >
+                      <MessageSquare size={18} />
+                    </button>
                     <button 
                       onClick={() => setEditingItem({ type: 'user', data: u })}
                       className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:bg-blue-50 hover:text-blue-500 transition-all"
@@ -1633,16 +1661,41 @@ export const AdminPanel: React.FC = () => {
                 </div>
 
                 {announcementForm.type === 'in-app' && (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Kichwa cha Habari</label>
-                    <input 
-                      type="text"
-                      value={announcementForm.title}
-                      onChange={(e) => setAnnouncementForm(prev => ({ ...prev, title: e.target.value }))}
-                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
-                      placeholder="Mfn: Punguzo la 20% Leo!"
-                      required={announcementForm.type === 'in-app'}
-                    />
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Kichwa cha Habari</label>
+                      <input 
+                        type="text"
+                        value={announcementForm.title}
+                        onChange={(e) => setAnnouncementForm(prev => ({ ...prev, title: e.target.value }))}
+                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                        placeholder="Mfn: Punguzo la 20% Leo!"
+                        required={announcementForm.type === 'in-app'}
+                      />
+                    </div>
+                    
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Picha (Link) - Sio Lazima</label>
+                        <input 
+                          type="url"
+                          value={announcementForm.image}
+                          onChange={(e) => setAnnouncementForm(prev => ({ ...prev, image: e.target.value }))}
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                          placeholder="Mfn: https://example.com/picha.jpg"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Link (URL) - Sio Lazima</label>
+                        <input 
+                          type="url"
+                          value={announcementForm.link}
+                          onChange={(e) => setAnnouncementForm(prev => ({ ...prev, link: e.target.value }))}
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                          placeholder="Mfn: https://example.com"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
 
