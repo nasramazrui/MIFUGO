@@ -47,7 +47,8 @@ import {
   ArrowLeft,
   Grid,
   MessageSquare,
-  RefreshCw
+  RefreshCw,
+  Send
 } from 'lucide-react';
 import { cn } from '../utils';
 import { CATEGORIES } from '../constants';
@@ -91,7 +92,7 @@ export const AdminPanel: React.FC = () => {
     t
   } = useApp();
   const currency = systemSettings?.currency || 'TZS';
-  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'admins' | 'wallet' | 'settings' | 'status' | 'cats' | 'reviews'>('over');
+  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'admins' | 'wallet' | 'settings' | 'status' | 'cats' | 'reviews' | 'announcements'>('over');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -118,6 +119,13 @@ export const AdminPanel: React.FC = () => {
   const [editingItem, setEditingItem] = useState<{ type: string, data: any } | null>(null);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState({
+    title: '',
+    message: '',
+    target: 'all', // 'all' or specific user ID
+    type: 'in-app' // 'in-app' or 'whatsapp'
+  });
+  const [isSendingAnnouncement, setIsSendingAnnouncement] = useState(false);
   const [catForm, setCatForm] = useState({
     id: '',
     label: '',
@@ -199,7 +207,9 @@ export const AdminPanel: React.FC = () => {
     adminWhatsApp: '255764225358',
     paymentNumber: '0687225353',
     paymentName: 'Amour',
-    firebase_service_account: ''
+    firebase_service_account: '',
+    maintenanceMode: false,
+    themeColor: 'amber'
   });
 
   useEffect(() => {
@@ -222,10 +232,57 @@ export const AdminPanel: React.FC = () => {
         adminWhatsApp: systemSettings.adminWhatsApp || '255764225358',
         paymentNumber: systemSettings.paymentNumber || '0687225353',
         paymentName: systemSettings.paymentName || 'Amour',
-        firebase_service_account: systemSettings.firebase_service_account || ''
+        firebase_service_account: systemSettings.firebase_service_account || '',
+        maintenanceMode: systemSettings.maintenanceMode || false,
+        themeColor: systemSettings.themeColor || 'amber'
       });
     }
   }, [systemSettings]);
+
+  const handleSendAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!announcementForm.message) {
+      toast.error('Tafadhali andika ujumbe');
+      return;
+    }
+
+    setIsSendingAnnouncement(true);
+    try {
+      if (announcementForm.type === 'whatsapp') {
+        if (announcementForm.target === 'all') {
+          toast.error('WhatsApp haiwezi kutuma kwa wote kwa pamoja bila API. Chagua mtumiaji mmoja.');
+          setIsSendingAnnouncement(false);
+          return;
+        }
+        const targetUser = users.find(u => u.id === announcementForm.target) || vendors.find(v => v.id === announcementForm.target);
+        if (targetUser && targetUser.contact) {
+          let phone = targetUser.contact.replace(/\D/g, '');
+          if (phone.startsWith('0')) phone = '255' + phone.substring(1);
+          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(announcementForm.message)}`);
+          toast.success('WhatsApp imefunguliwa');
+        } else {
+          toast.error('Mtumiaji huyu hana namba ya simu');
+        }
+      } else {
+        // In-App Notification
+        await addDoc(collection(db, 'kuku_notifications'), {
+          title: announcementForm.title,
+          message: announcementForm.message,
+          userId: announcementForm.target,
+          readBy: [],
+          date: new Date().toISOString(),
+          createdAt: serverTimestamp()
+        });
+        toast.success('Tangazo limetumwa kikamilifu!');
+        setAnnouncementForm({ ...announcementForm, title: '', message: '' });
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Imeshindwa kutuma tangazo');
+    } finally {
+      setIsSendingAnnouncement(false);
+    }
+  };
 
   const handleSaveSettings = async () => {
     setIsSavingSettings(true);
@@ -561,6 +618,7 @@ export const AdminPanel: React.FC = () => {
             { id: 'reviews', label: 'Maoni (Reviews)', icon: MessageSquare },
             { id: 'cats', label: 'Kategoria', icon: Grid },
             { id: 'status', label: t('status'), icon: Camera },
+            { id: 'announcements', label: 'Matangazo', icon: Bell },
             { id: 'settings', label: 'Mipangilio', icon: Settings },
           ].map(item => (
             <button
@@ -1530,6 +1588,91 @@ export const AdminPanel: React.FC = () => {
           </motion.div>
         )}
 
+        {activeTab === 'announcements' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl">
+            <h2 className="text-3xl font-black text-slate-900 mb-2">Matangazo & Ujumbe</h2>
+            <p className="text-slate-500 mb-10">Tuma ujumbe, promo codes, au taarifa muhimu kwa watumiaji wako.</p>
+
+            <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+              <form onSubmit={handleSendAnnouncement} className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Aina ya Ujumbe</label>
+                    <select
+                      value={announcementForm.type}
+                      onChange={(e) => setAnnouncementForm(prev => ({ ...prev, type: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    >
+                      <option value="in-app">Ndani ya App (In-App Notification)</option>
+                      <option value="whatsapp">WhatsApp (Mtu Mmoja Tu)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Mpokeaji</label>
+                    <select
+                      value={announcementForm.target}
+                      onChange={(e) => setAnnouncementForm(prev => ({ ...prev, target: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    >
+                      <option value="all">Watumiaji Wote</option>
+                      <optgroup label="Wauzaji">
+                        {vendors.map(v => (
+                          <option key={v.id} value={v.id}>{v.shopName || v.name}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Wateja">
+                        {users.filter(u => u.role !== 'vendor' && u.role !== 'admin').map(u => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </div>
+                </div>
+
+                {announcementForm.type === 'in-app' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Kichwa cha Habari</label>
+                    <input 
+                      type="text"
+                      value={announcementForm.title}
+                      onChange={(e) => setAnnouncementForm(prev => ({ ...prev, title: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="Mfn: Punguzo la 20% Leo!"
+                      required={announcementForm.type === 'in-app'}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Ujumbe</label>
+                  <textarea 
+                    value={announcementForm.message}
+                    onChange={(e) => setAnnouncementForm(prev => ({ ...prev, message: e.target.value }))}
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm min-h-[150px] resize-none"
+                    placeholder="Andika ujumbe wako hapa..."
+                    required
+                  />
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={isSendingAnnouncement}
+                  className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black transition-all active:scale-95 flex items-center justify-center gap-2 hover:bg-amber-700"
+                >
+                  {isSendingAnnouncement ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Send size={20} />
+                      TUMA UJUMBE
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'settings' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl">
             <h2 className="text-3xl font-black text-slate-900 mb-2">Mipangilio ya Mfumo</h2>
@@ -1604,6 +1747,49 @@ export const AdminPanel: React.FC = () => {
                         <img src={localSettings.loading_url} alt="Preview" className="w-full h-full object-contain" />
                       </div>
                     )}
+                  </div>
+                  <div className="md:col-span-2 space-y-4 pt-4 border-t border-slate-100">
+                    <h4 className="font-black text-slate-900">Theme Color</h4>
+                    <div className="flex flex-wrap gap-4">
+                      {[
+                        { id: 'amber', class: 'bg-amber-500' },
+                        { id: 'blue', class: 'bg-blue-500' },
+                        { id: 'emerald', class: 'bg-emerald-500' },
+                        { id: 'purple', class: 'bg-purple-500' },
+                        { id: 'rose', class: 'bg-rose-500' },
+                        { id: 'slate', class: 'bg-slate-500' }
+                      ].map(color => (
+                        <button
+                          key={color.id}
+                          onClick={() => setLocalSettings(prev => ({ ...prev, themeColor: color.id }))}
+                          className={cn(
+                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all",
+                            localSettings.themeColor === color.id ? "ring-4 ring-offset-2 ring-slate-900 scale-110" : "hover:scale-105",
+                            color.class
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="md:col-span-2 space-y-4 pt-4 border-t border-slate-100">
+                    <div className="flex items-center justify-between bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                      <div>
+                        <h4 className="font-black text-slate-900">Maintenance Mode</h4>
+                        <p className="text-sm text-slate-500 mt-1">Washa hii kuzuia watumiaji na wauzaji kuingia kwenye mfumo (Admin pekee ndio wataweza kuingia).</p>
+                      </div>
+                      <button
+                        onClick={() => setLocalSettings(prev => ({ ...prev, maintenanceMode: !prev.maintenanceMode }))}
+                        className={cn(
+                          "relative w-16 h-8 rounded-full transition-colors",
+                          localSettings.maintenanceMode ? "bg-red-500" : "bg-slate-300"
+                        )}
+                      >
+                        <div className={cn(
+                          "absolute top-1 left-1 w-6 h-6 rounded-full bg-white transition-transform",
+                          localSettings.maintenanceMode ? "translate-x-8" : "translate-x-0"
+                        )} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

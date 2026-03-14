@@ -4,6 +4,7 @@ import { User, Product, Order, Activity, Withdrawal, ProductUnit, WithdrawalStat
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
 import { Modal } from '../components/Modal';
+import { NotificationsModal } from '../components/NotificationsModal';
 import { DAYS, ADMIN_WA } from '../constants';
 import { formatCurrency, generateId } from '../utils';
 import { motion } from 'motion/react';
@@ -31,7 +32,8 @@ import {
   Star,
   Gavel,
   Settings,
-  ShieldCheck
+  ShieldCheck,
+  Bell
 } from 'lucide-react';
 import { cn } from '../utils';
 
@@ -49,8 +51,10 @@ import {
 import { toast } from 'react-hot-toast';
 
 export const VendorPortal: React.FC = () => {
-  const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t, walletTransactions } = useApp();
+  const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t, walletTransactions, notifications } = useApp();
   const currency = systemSettings?.currency || 'TZS';
+  const unreadNotifications = notifications.filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status' | 'reviews' | 'auctions'>('dash');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
@@ -596,6 +600,7 @@ export const VendorPortal: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col md:flex-row pb-20 md:pb-0 transition-colors duration-300">
+      <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
       {/* Mobile Header */}
       <header className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-6 py-4 sticky top-0 z-30 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -608,6 +613,15 @@ export const VendorPortal: React.FC = () => {
           <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor</h1>
         </div>
         <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setIsNotificationsOpen(true)}
+            className="relative p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+          >
+            <Bell size={18} />
+            {unreadNotifications > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-slate-900"></span>
+            )}
+          </button>
           <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-900 p-1 rounded-xl">
             <div className="relative" ref={langRef}>
               <button 
@@ -651,7 +665,17 @@ export const VendorPortal: React.FC = () => {
               <span className="text-2xl">🏪</span>
               <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor</h1>
             </div>
-            <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 p-1 rounded-xl">
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setIsNotificationsOpen(true)}
+                className="relative p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all text-slate-600 dark:text-slate-400"
+              >
+                <Bell size={16} />
+                {unreadNotifications > 0 && (
+                  <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full border border-white dark:border-slate-900"></span>
+                )}
+              </button>
+              <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 p-1 rounded-xl">
               <div className="relative" ref={langRef}>
                 <button 
                   onClick={() => setIsLangOpen(!isLangOpen)}
@@ -678,6 +702,7 @@ export const VendorPortal: React.FC = () => {
                     ))}
                   </div>
                 )}
+              </div>
               </div>
             </div>
           </div>

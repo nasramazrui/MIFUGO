@@ -18,6 +18,16 @@ import {
   where
 } from 'firebase/firestore';
 
+export interface Notification {
+  id: string;
+  userId: string; // 'all' or specific user id
+  title: string;
+  message: string;
+  date: string;
+  readBy: string[];
+  createdAt: any;
+}
+
 interface AppContextType {
   user: User | null;
   setUser: (user: User | null) => void;
@@ -45,6 +55,8 @@ interface AppContextType {
   setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
   auctions: Auction[];
   setAuctions: React.Dispatch<React.SetStateAction<Auction[]>>;
+  notifications: Notification[];
+  setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
   systemSettings: any;
   updateSystemSettings: (settings: any) => Promise<void>;
   logout: () => void;
@@ -79,6 +91,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [auctions, setAuctions] = useState<Auction[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [systemSettings, setSystemSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [theme, setThemeState] = useState<'light' | 'dark'>((localStorage.getItem('theme') as 'light' | 'dark') || 'light');
@@ -315,6 +328,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setWalletTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction)));
     });
 
+    // Notifications
+    const qNotifications = query(collection(db, 'kuku_notifications'), orderBy('createdAt', 'desc'));
+    const unsubNotifications = onSnapshot(qNotifications, (snap) => {
+      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
+    });
+
     return () => {
       unsubProducts();
       unsubOrders();
@@ -327,6 +346,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubCats();
       unsubWallet();
       unsubAuctions();
+      unsubNotifications();
     };
   }, []);
 
@@ -379,6 +399,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       walletTransactions, setWalletTransactions,
       categories, setCategories,
       auctions, setAuctions,
+      notifications, setNotifications,
       systemSettings, updateSystemSettings,
       logout,
       t,

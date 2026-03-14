@@ -8,7 +8,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu } from 'lucide-react';
+import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { getAuthEmail, isEmail } from '../utils/authUtils';
@@ -18,9 +18,13 @@ import { AuctionPage } from './AuctionPage';
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
 
+import { RecentPurchases } from '../components/RecentPurchases';
+import { NotificationsModal } from '../components/NotificationsModal';
+
 export const ShopPage: React.FC = () => {
-  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty } = useApp();
+  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty, notifications } = useApp();
   const currency = systemSettings?.currency || 'TZS';
+  const unreadNotifications = notifications.filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
   const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'auctions'>('browse');
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
   const [viewedStatuses, setViewedStatuses] = useState<string[]>(() => {
@@ -31,6 +35,7 @@ export const ShopPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
@@ -1105,6 +1110,17 @@ export const ShopPage: React.FC = () => {
                 <Globe size={16} className="text-slate-400 sm:w-[18px] sm:h-[18px]" />
                 <span className="text-[10px] sm:text-sm font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">SW</span>
               </button>
+              {user && (
+                <button 
+                  onClick={() => setIsNotificationsOpen(true)}
+                  className="relative w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all"
+                >
+                  <Bell size={20} className="sm:w-6 sm:h-6" />
+                  {unreadNotifications > 0 && (
+                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-950"></span>
+                  )}
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
@@ -3348,6 +3364,9 @@ export const ShopPage: React.FC = () => {
           </button>
         </form>
       </Modal>
+
+      <RecentPurchases />
+      <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
 
       <AuthModal 
         isOpen={isAuthModalOpen} 
