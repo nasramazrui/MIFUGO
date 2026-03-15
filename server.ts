@@ -378,29 +378,11 @@ app.get("/api/test-firebase", async (req, res) => {
   }
 });
 
-async function setupVite() {
-  const isProd = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
-  const distExists = fs.existsSync(path.join(__dirname, 'dist'));
-  
-  if (!isProd || !distExists) {
-    console.log('Initializing Vite middleware...');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    console.log('Serving static files from dist...');
-    app.use(express.static('dist'));
-    app.get('*', (req, res) => {
-      res.sendFile('dist/index.html', { root: '.' });
-    });
-  }
-}
 
-// Only setup Vite if we are not on Vercel (Vercel handles static files separately)
+
+// Only start the server if not running in a serverless environment like Vercel
 if (!process.env.VERCEL) {
-  setupVite().catch(err => console.error('Vite setup failed:', err));
+  startServer().catch(err => console.error('Server failed to start:', err));
 }
 
 // --- AUCTION SYSTEM ---
@@ -565,9 +547,6 @@ async function startServer() {
   });
 }
 
-// Only start the server if not running in a serverless environment like Vercel
-if (!process.env.VERCEL) {
-  startServer();
-}
+
 
 export default app;

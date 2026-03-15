@@ -818,10 +818,10 @@ export const ShopPage: React.FC = () => {
         userId: user?.id,
         userName: user?.name,
         productId: selectedOrder.productId,
-        productName: selectedOrder.productName,
+        productName: selectedOrder.items?.[0]?.name || 'Product',
         vendorId: selectedOrder.vendorId,
         rating: orderReviewRating || 0,
-        comment: orderReviewComment || '',
+        text: orderReviewComment || '',
         date: new Date().toISOString().split('T')[0],
         createdAt: serverTimestamp()
       });
@@ -831,6 +831,7 @@ export const ShopPage: React.FC = () => {
       setOrderReviewComment('');
       toast.success('Asante kwa maoni yako!');
     } catch (error) {
+      console.error("Submit Review Error:", error);
       toast.error('Hitilafu imetokea wakati wa kutuma maoni.');
     } finally {
       setIsOrderReviewLoading(false);
@@ -2098,15 +2099,17 @@ export const ShopPage: React.FC = () => {
               </button>
             )}
 
-            <button 
-              onClick={() => {
-                const msg = `Habari, naomba kujua hali ya agizo langu #${selectedOrder.id.substring(0,8)}.`;
-                window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
-              }}
-              className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 transition-all"
-            >
-              <Send size={18} /> WhatsApp Admin
-            </button>
+            {selectedOrder.status !== 'completed' && (
+              <button 
+                onClick={() => {
+                  const msg = `Habari, naomba kujua hali ya agizo langu #${selectedOrder.id.substring(0,8)}.`;
+                  window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
+                }}
+                className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 transition-all"
+              >
+                <Send size={18} /> WhatsApp Admin
+              </button>
+            )}
 
             <button 
               onClick={() => {

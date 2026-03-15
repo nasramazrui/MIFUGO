@@ -206,7 +206,9 @@ export const VendorPortal: React.FC = () => {
     setIsSuggestingPrice(true);
     setAiSuggestion(null);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const apiKey = process.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) throw new Error("API Key haipatikani");
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Wewe ni mtaalamu wa masoko ya kilimo Tanzania. Pendekeza bei ya wastani (kwa TZS) ya bidhaa hii: ${form.name} katika kategoria ya ${form.category}. Toa jibu katika mfumo wa JSON pekee wenye muundo huu: {"price": 5000, "reason": "Maelezo mafupi ya kwanini bei hii inafaa sokoni kwa sasa."}`,

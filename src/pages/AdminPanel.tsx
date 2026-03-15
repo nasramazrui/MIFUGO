@@ -2839,7 +2839,9 @@ export const AdminPanel: React.FC = () => {
                       onClick={async () => {
                         setIsSuggestingPrice(true);
                         try {
-                          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+                          const apiKey = process.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+                          if (!apiKey) throw new Error("API Key haipatikani");
+                          const ai = new GoogleGenAI({ apiKey });
                           const response = await ai.models.generateContent({
                             model: "gemini-3-flash-preview",
                             contents: `Wewe ni mtaalamu wa masoko ya kilimo Tanzania. Pendekeza bei ya wastani (kwa TZS) ya bidhaa hii: ${editingItem.data.name} katika kategoria ya ${editingItem.data.category}. Toa namba pekee (kama 5000), bila maelezo mengine.`,
