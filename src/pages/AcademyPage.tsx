@@ -20,15 +20,19 @@ export const AcademyPage: React.FC = () => {
     setIsAiLoading(true);
     setAiAnswer('');
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("API Key haipatikani. Tafadhali wasiliana na msimamizi.");
+      }
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Wewe ni mtaalamu wa kilimo, ufugaji na masoko nchini Tanzania. Jibu swali hili kwa Kiswahili fasaha, kwa ufupi na kwa kueleweka: ${aiQuestion}`,
       });
       setAiAnswer(response.text || 'Samahani, nimeshindwa kupata jibu kwa sasa.');
-    } catch (error) {
+    } catch (error: any) {
       console.error("AI Error:", error);
-      toast.error('Hitilafu imetokea wakati wa kuuliza AI.');
+      toast.error(`Hitilafu: ${error?.message || 'Imeshindwa kuuliza AI.'}`);
     } finally {
       setIsAiLoading(false);
     }

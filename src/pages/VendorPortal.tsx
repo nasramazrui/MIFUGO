@@ -1328,7 +1328,8 @@ export const VendorPortal: React.FC = () => {
                     <select 
                       value={order.status}
                       onChange={(e) => updateOrderStatus(order, e.target.value as any)}
-                      className="bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-2 text-xs font-bold outline-none focus:border-emerald-500 transition-all"
+                      disabled={order.status === 'completed'}
+                      className="bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-2 text-xs font-bold outline-none focus:border-emerald-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="pending">📋 Oda Imepokelewa</option>
                       <option value="processing">🔪 Inaandaliwa</option>
@@ -1336,6 +1337,7 @@ export const VendorPortal: React.FC = () => {
                       <option value="onway">🚚 Iko Njiani</option>
                       <option value="pickup">🏪 Tayari Kuchukua</option>
                       <option value="delivered">✅ Imefika!</option>
+                      <option value="completed" disabled>🎉 Imekamilika</option>
                     </select>
 
                     <button 
