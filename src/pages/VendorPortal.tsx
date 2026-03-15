@@ -7,7 +7,7 @@ import { Modal } from '../components/Modal';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { DAYS, ADMIN_WA } from '../constants';
 import { formatCurrency, generateId } from '../utils';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
 import { 
   LayoutDashboard, 
@@ -39,7 +39,8 @@ import {
   X,
   Sparkles,
   Tag,
-  FileText
+  FileText,
+  ShoppingBag
 } from 'lucide-react';
 import { cn } from '../utils';
 
@@ -57,7 +58,7 @@ import {
 import { toast } from 'react-hot-toast';
 
 export const VendorPortal: React.FC = () => {
-  const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t, walletTransactions, notifications, offers } = useApp();
+  const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, addNotification, systemSettings, theme, setTheme, language, setLanguage, setView, t, walletTransactions, notifications, offers } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const unreadNotifications = notifications.filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -142,6 +143,28 @@ export const VendorPortal: React.FC = () => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+  const [newOrderAlert, setNewOrderAlert] = useState<Order | null>(null);
+  const [lastOrderCount, setLastOrderCount] = useState(0);
+
+  useEffect(() => {
+    const vendorOrders = orders.filter(o => o.vendorId === user?.id);
+    if (vendorOrders.length > lastOrderCount && lastOrderCount !== 0) {
+      const latestOrder = vendorOrders[0];
+      // If it's paid or pending payment confirmation
+      if (latestOrder.paymentApproved || latestOrder.payMethod !== 'cash') {
+        setNewOrderAlert(latestOrder);
+        // Play a more urgent sound for new orders
+        try {
+          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+          audio.volume = 0.8;
+          audio.play().catch(e => console.log("Audio play blocked:", e));
+        } catch (e) {
+          console.error("Audio error:", e);
+        }
+      }
+    }
+    setLastOrderCount(vendorOrders.length);
+  }, [orders, user?.id]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -515,6 +538,15 @@ export const VendorPortal: React.FC = () => {
     try {
       await updateDoc(doc(db, 'kuku_orders', order.id), { status });
       addActivity('📦', `Agizo #${order.id.substring(0,8)} limebadilishwa hali kuwa ${status}`);
+      
+      // Notify User
+      await addNotification(
+        'Update ya Oda! 📦',
+        `Agizo lako #${order.id.substring(0,8)} sasa lipo katika hali ya: ${status.toUpperCase()}`,
+        order.userId,
+        'orders'
+      );
+
       toast.success('Hali ya agizo imebadilishwa');
 
       // WhatsApp Template Logic
@@ -724,7 +756,13 @@ export const VendorPortal: React.FC = () => {
           <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button 
+          <motion.button 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            animate={unreadNotifications > 0 ? {
+              rotate: [0, -10, 10, -10, 10, 0],
+              transition: { repeat: Infinity, duration: 2, repeatDelay: 1 }
+            } : {}}
             onClick={() => setIsNotificationsOpen(true)}
             className="relative p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
           >
@@ -732,7 +770,7 @@ export const VendorPortal: React.FC = () => {
             {unreadNotifications > 0 && (
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-slate-900"></span>
             )}
-          </button>
+          </motion.button>
           <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-900 p-1 rounded-xl">
             <div className="relative" ref={langRef}>
               <button 
@@ -2927,6 +2965,46 @@ export const VendorPortal: React.FC = () => {
           </button>
         ))}
       </nav>
+
+      {/* New Order Alert Modal */}
+      <AnimatePresence>
+        {newOrderAlert && (
+          <Modal 
+            isOpen={!!newOrderAlert} 
+            onClose={() => setNewOrderAlert(null)}
+            title="ODA MPYA IMEINGIA! 🔔"
+          >
+            <div className="p-6 text-center">
+              <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                <ShoppingBag size={40} className="text-emerald-600" />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 mb-2">Hongera! Una Oda Mpya</h3>
+              <p className="text-slate-500 mb-6">
+                Mteja <b>{newOrderAlert.userName}</b> ameweka oda ya <b>{newOrderAlert.items[0].name}</b>.
+                <br />
+                Thamani: <b>{formatCurrency(newOrderAlert.total, currency)}</b>
+              </p>
+              <div className="flex flex-col gap-2">
+                <button 
+                  onClick={() => {
+                    setNewOrderAlert(null);
+                    setActiveTab('orders');
+                  }}
+                  className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-emerald-200"
+                >
+                  ANGALIA ODA SASA ✅
+                </button>
+                <button 
+                  onClick={() => setNewOrderAlert(null)}
+                  className="w-full bg-slate-100 text-slate-600 py-3 rounded-2xl font-bold"
+                >
+                  BAADAE
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

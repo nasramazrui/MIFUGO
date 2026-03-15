@@ -23,7 +23,7 @@ import { NotificationsModal } from '../components/NotificationsModal';
 import { AcademyPage } from './AcademyPage';
 
 export const ShopPage: React.FC = () => {
-  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty, notifications, academyPosts, offers } = useApp();
+  const { products, user, vendors, orders, setOrders, addActivity, addNotification, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty, notifications, academyPosts, offers } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const unreadNotifications = notifications.filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
   const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'auctions' | 'academy'>('browse');
@@ -471,6 +471,17 @@ export const ShopPage: React.FC = () => {
       await updateDoc(reviewRef, {
         replies: [...(review?.replies || []), newReply]
       });
+
+      // Notify the review author if it's not the same person
+      if (review && review.userId !== user.id) {
+        await addNotification(
+          'Jibu Jipya la Maoni! 💬',
+          `${user.name} amejibu maoni yako: "${replyText.substring(0, 30)}..."`,
+          review.userId,
+          'profile'
+        );
+      }
+
       setReplyText('');
       setReplyingTo(null);
       toast.success('Jibu limetumwa');
@@ -492,6 +503,16 @@ export const ShopPage: React.FC = () => {
         ? likes.filter(id => id !== user.id)
         : [...likes, user.id];
       await updateDoc(reviewRef, { likes: newLikes });
+
+      // Notify the review author if it's a new like and not the same person
+      if (!likes.includes(user.id) && review && review.userId !== user.id) {
+        await addNotification(
+          'Pongezi! Maoni Yako Yamependwa! ❤️',
+          `${user.name} amependa maoni yako.`,
+          review.userId,
+          'profile'
+        );
+      }
     } catch (error) {
       console.error(error);
     }
@@ -682,6 +703,22 @@ export const ShopPage: React.FC = () => {
       const docRef = await addDoc(collection(db, 'kuku_orders'), orderData);
       setLastOrderId(docRef.id);
       addActivity('🛒', `${user.name} amenunua ${p.name} × ${qty} — ${formatCurrency(total, currency)}`);
+      
+      // Notify Vendor
+      await addNotification(
+        'Oda Mpya! 🛒',
+        `${user.name} ameagiza ${p.name} × ${qty}. Tafadhali kagua oda yako.`,
+        p.vendorId,
+        'dashboard'
+      );
+
+      // Notify User
+      await addNotification(
+        'Oda Imepokelewa ✅',
+        `Agizo lako la ${p.name} limepokelewa na linashughulikiwa.`,
+        user.id,
+        'orders'
+      );
       
       // Award Loyalty Points
       if (systemSettings?.pointsPerOrder && systemSettings.pointsPerOrder > 0) {
@@ -1178,7 +1215,13 @@ export const ShopPage: React.FC = () => {
                 <span className="text-[10px] sm:text-sm font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">SW</span>
               </button>
               {user && (
-                <button 
+                <motion.button 
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  animate={unreadNotifications > 0 ? {
+                    rotate: [0, -10, 10, -10, 10, 0],
+                    transition: { repeat: Infinity, duration: 2, repeatDelay: 1 }
+                  } : {}}
                   onClick={() => setIsNotificationsOpen(true)}
                   className="relative w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all"
                 >
@@ -1186,7 +1229,7 @@ export const ShopPage: React.FC = () => {
                   {unreadNotifications > 0 && (
                     <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-950"></span>
                   )}
-                </button>
+                </motion.button>
               )}
             </div>
 

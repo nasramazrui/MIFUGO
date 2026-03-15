@@ -243,6 +243,7 @@ export interface SystemSettings {
   paymentName: string;
   pointsPerOrder?: number; // How many points per 1000 TZS
   pointsValue?: number; // Value of 1 point in TZS
+  openRouterApiKey?: string;
   updatedAt: any;
 }
 

@@ -74,6 +74,7 @@ interface AppContextType {
   setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
   offers: Offer[];
   setOffers: React.Dispatch<React.SetStateAction<Offer[]>>;
+  addNotification: (title: string, message: string, userId?: string, link?: string) => Promise<void>;
   systemSettings: any;
   updateSystemSettings: (settings: any) => Promise<void>;
   logout: () => void;
@@ -125,6 +126,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [academyPosts, setAcademyPosts] = useState<AcademyPost[]>([]);
   const [loyaltyPoints, setLoyaltyPoints] = useState<LoyaltyPoint[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [lastNotificationCount, setLastNotificationCount] = useState(0);
+
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(e => console.log("Audio play blocked:", e));
+    } catch (e) {
+      console.error("Audio error:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (notifications.length > lastNotificationCount && lastNotificationCount !== 0) {
+      const latest = notifications[0];
+      // Only play if it's for this user or 'all'
+      if (latest.userId === 'all' || latest.userId === user?.id) {
+        playNotificationSound();
+      }
+    }
+    setLastNotificationCount(notifications.length);
+  }, [notifications, user?.id]);
 
   useEffect(() => {
     localStorage.setItem('kuku_cart', JSON.stringify(cart));
@@ -415,6 +438,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const addNotification = async (title: string, message: string, userId: string = 'all', link?: string) => {
+    try {
+      await addDoc(collection(db, 'kuku_activity'), {
+        title,
+        message,
+        userId,
+        link,
+        icon: '🔔',
+        text: `${title}: ${message}`,
+        date: new Date().toISOString(),
+        readBy: [],
+        createdAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.error("Error adding notification: ", e);
+    }
+  };
+
   const updateSystemSettings = async (settings: any) => {
     try {
       await setDoc(doc(db, 'kuku_config', 'settings'), {
@@ -453,6 +494,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       auctions, setAuctions,
       notifications, setNotifications,
       offers, setOffers,
+      addNotification,
       systemSettings, updateSystemSettings,
       logout,
       t,

@@ -92,9 +92,11 @@ export const AdminPanel: React.FC = () => {
     systemSettings,
     offers,
     academyPosts,
+    notifications,
     updateSystemSettings,
     logout, 
     addActivity,
+    addNotification,
     theme,
     setTheme,
     language,
@@ -341,6 +343,7 @@ export const AdminPanel: React.FC = () => {
     paymentName: 'Amour',
     pointsPerOrder: 10, // 10 points per 1000 TZS
     pointsValue: 1, // 1 point = 1 TZS
+    openRouterApiKey: '',
     firebase_service_account: '',
     maintenanceMode: false,
     themeColor: 'amber'
@@ -368,6 +371,7 @@ export const AdminPanel: React.FC = () => {
         paymentName: systemSettings.paymentName || 'Amour',
         pointsPerOrder: systemSettings.pointsPerOrder || 10,
         pointsValue: systemSettings.pointsValue || 1,
+        openRouterApiKey: systemSettings.openRouterApiKey || '',
         firebase_service_account: systemSettings.firebase_service_account || '',
         maintenanceMode: systemSettings.maintenanceMode || false,
         themeColor: systemSettings.themeColor || 'amber'
@@ -584,6 +588,10 @@ export const AdminPanel: React.FC = () => {
 
   const approveWithdrawal = async (id: string) => {
     try {
+      const withdrawDoc = await getDoc(doc(db, 'kuku_withdrawals', id));
+      if (!withdrawDoc.exists()) throw new Error('Request not found');
+      const data = withdrawDoc.data();
+
       await updateDoc(doc(db, 'kuku_withdrawals', id), {
         status: 'Completed',
         updatedAt: serverTimestamp()
@@ -595,6 +603,15 @@ export const AdminPanel: React.FC = () => {
       }
 
       addActivity('💸', `Malipo yameidhinishwa (Completed)`);
+      
+      // Notify User
+      await addNotification(
+        'Malipo Yameidhinishwa! ✅',
+        `Ombi lako la kutoa kiasi ${formatCurrency(data.amount, currency)} limeidhinishwa. Pesa imetumwa kwenye namba yako.`,
+        data.vendorId,
+        'wallet'
+      );
+
       toast.success('Malipo yameidhinishwa');
     } catch (error: any) {
       toast.error(error.message || 'Hitilafu wakati wa kuidhinisha');
@@ -634,6 +651,15 @@ export const AdminPanel: React.FC = () => {
       await updateDoc(doc(db, 'kuku_users', tx.userId), { 
         walletBalance: increment(tx.amount) 
       });
+
+      // Notify User
+      await addNotification(
+        'Deposit Imeidhinishwa! 💰',
+        `Deposit yako ya kiasi ${formatCurrency(tx.amount, currency)} imeshapokelewa na kuongezwa kwenye pochi yako.`,
+        tx.userId,
+        'wallet'
+      );
+
       toast.success('Deposit imethibitishwa na salio limeongezwa!');
       addActivity('💰', `Deposit ya ${formatCurrency(tx.amount, currency)} ya ${tx.userName} imethibitishwa`);
     } catch (err) {
@@ -710,6 +736,14 @@ export const AdminPanel: React.FC = () => {
     try {
       await updateDoc(doc(db, 'kuku_users', id), { status: 'approved' });
       addActivity('✅', `Muuzaji ameidhinishwa`);
+      // Notify User
+      await addNotification(
+        'Ombi la Muuzaji Limeidhinishwa! 🏪',
+        `Hongera! Ombi lako la kuwa muuzaji limeidhinishwa. Sasa unaweza kuanza kuuza bidhaa zako.`,
+        id,
+        'profile'
+      );
+
       toast.success('Muuzaji ameidhinishwa');
     } catch (error: any) {
       toast.error('Hitilafu wakati wa kuidhinisha');
@@ -1001,8 +1035,18 @@ export const AdminPanel: React.FC = () => {
                 <p className="text-sm text-slate-500">Hali ya sasa ya {systemSettings?.app_name || 'FarmConnect'} Tanzania</p>
               </div>
               <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-4 py-2 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm self-start">
-                <Bell size={18} className="text-amber-500" />
-                <span className="text-xs font-black text-slate-900 dark:text-white">{activities.length} Notifications</span>
+                <motion.div
+                  animate={notifications.filter(n => !n.readBy?.includes(user?.id || '')).length > 0 ? {
+                    scale: [1, 1.2, 1],
+                    rotate: [0, -10, 10, -10, 0]
+                  } : {}}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                >
+                  <Bell size={18} className="text-amber-500" />
+                </motion.div>
+                <span className="text-xs font-black text-slate-900 dark:text-white">
+                  {notifications.filter(n => !n.readBy?.includes(user?.id || '')).length} Unread
+                </span>
               </div>
             </div>
 
@@ -2634,6 +2678,31 @@ export const AdminPanel: React.FC = () => {
                   >
                     + ONGEZA BANNER MPYA
                   </button>
+                </div>
+              </div>
+
+              {/* AI & External APIs Section */}
+              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
+                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                  <div className="w-8 h-8 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
+                    <Sparkles size={18} />
+                  </div>
+                  AI & External APIs
+                </h3>
+                <div className="grid md:grid-cols-1 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">OpenRouter API Key</label>
+                    <input 
+                      type="password"
+                      value={localSettings.openRouterApiKey}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, openRouterApiKey: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="sk-or-v1-..."
+                    />
+                    <p className="text-[10px] text-slate-400 font-bold px-2 italic">
+                      * Inatumika kwa ajili ya huduma za AI kupitia OpenRouter.ai
+                    </p>
+                  </div>
                 </div>
               </div>
 
