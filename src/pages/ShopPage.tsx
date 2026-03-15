@@ -962,8 +962,12 @@ export const ShopPage: React.FC = () => {
               <div className="p-8">
                 <div className="flex items-center justify-between mb-10">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-amber-600 rounded-xl flex items-center justify-center text-white text-xl font-black shadow-lg shadow-amber-600/20">
-                      {systemSettings?.app_name?.[0] || 'K'}
+                    <div className="w-10 h-10 bg-amber-600 rounded-xl flex items-center justify-center text-white text-xl font-black shadow-lg shadow-amber-600/20 overflow-hidden">
+                      {systemSettings?.app_logo ? (
+                        <img src={systemSettings.app_logo} alt="Logo" className="w-full h-full object-cover" />
+                      ) : (
+                        systemSettings?.app_name?.[0] || 'K'
+                      )}
                     </div>
                     <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
                       {systemSettings?.app_name || 'Kuku Market'}
@@ -1065,8 +1069,12 @@ export const ShopPage: React.FC = () => {
       <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-72 bg-white dark:bg-slate-950 border-r border-slate-100 dark:border-slate-800/50 flex-col z-50">
         <div className="p-8">
           <div className="flex items-center gap-3 mb-10">
-            <div className="w-10 h-10 bg-amber-600 rounded-xl flex items-center justify-center text-white text-xl font-black shadow-lg shadow-amber-600/20">
-              {systemSettings?.app_name?.[0] || 'K'}
+            <div className="w-10 h-10 bg-amber-600 rounded-xl flex items-center justify-center text-white text-xl font-black shadow-lg shadow-amber-600/20 overflow-hidden">
+              {systemSettings?.app_logo ? (
+                <img src={systemSettings.app_logo} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                systemSettings?.app_name?.[0] || 'K'
+              )}
             </div>
             <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
               {systemSettings?.app_name || 'Kuku Market'}

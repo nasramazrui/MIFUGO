@@ -781,7 +781,13 @@ export const VendorPortal: React.FC = () => {
       )}>
         <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🏪</span>
+            {systemSettings?.app_logo ? (
+              <div className="w-8 h-8 rounded-xl overflow-hidden shadow-lg">
+                <img src={systemSettings.app_logo} alt="Logo" className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <span className="text-2xl">🏪</span>
+            )}
             <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor Menu</h1>
           </div>
           <button onClick={() => setIsDrawerOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-400">
@@ -834,7 +840,13 @@ export const VendorPortal: React.FC = () => {
         <div className="p-6 border-b border-slate-50 dark:border-slate-800">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🏪</span>
+              {systemSettings?.app_logo ? (
+                <div className="w-8 h-8 rounded-xl overflow-hidden shadow-lg">
+                  <img src={systemSettings.app_logo} alt="Logo" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <span className="text-2xl">🏪</span>
+              )}
               <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor</h1>
             </div>
             <div className="flex items-center gap-2">

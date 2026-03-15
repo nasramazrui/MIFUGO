@@ -805,8 +805,12 @@ export const AdminPanel: React.FC = () => {
       )}>
         <div className="p-6 border-b border-white/5 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-amber-500 rounded-xl flex items-center justify-center text-amber-950 shadow-lg">
-              <BarChart3 size={18} />
+            <div className="w-8 h-8 bg-amber-500 rounded-xl flex items-center justify-center text-amber-950 shadow-lg overflow-hidden">
+              {systemSettings?.app_logo ? (
+                <img src={systemSettings.app_logo} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                <BarChart3 size={18} />
+              )}
             </div>
             <h1 className="font-serif italic text-lg font-bold">Admin Menu</h1>
           </div>
@@ -874,8 +878,12 @@ export const AdminPanel: React.FC = () => {
         <div className="p-8 border-b border-white/5">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-amber-500 rounded-xl flex items-center justify-center text-amber-950 shadow-lg">
-                <BarChart3 size={18} />
+              <div className="w-8 h-8 bg-amber-500 rounded-xl flex items-center justify-center text-amber-950 shadow-lg overflow-hidden">
+                {systemSettings?.app_logo ? (
+                  <img src={systemSettings.app_logo} alt="Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <BarChart3 size={18} />
+                )}
               </div>
               <h1 className="font-serif italic text-lg font-bold">Admin</h1>
             </div>
