@@ -8,6 +8,7 @@ import { NotificationsModal } from '../components/NotificationsModal';
 import { DAYS, ADMIN_WA } from '../constants';
 import { formatCurrency, generateId } from '../utils';
 import { motion } from 'motion/react';
+import { GoogleGenAI } from "@google/genai";
 import { 
   LayoutDashboard, 
   Package, 
@@ -33,7 +34,12 @@ import {
   Gavel,
   Settings,
   ShieldCheck,
-  Bell
+  Bell,
+  Menu,
+  X,
+  Sparkles,
+  Tag,
+  FileText
 } from 'lucide-react';
 import { cn } from '../utils';
 
@@ -51,11 +57,12 @@ import {
 import { toast } from 'react-hot-toast';
 
 export const VendorPortal: React.FC = () => {
-  const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t, walletTransactions, notifications } = useApp();
+  const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, systemSettings, theme, setTheme, language, setLanguage, setView, t, walletTransactions, notifications, offers } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const unreadNotifications = notifications.filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status' | 'reviews' | 'auctions'>('dash');
+  const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status' | 'reviews' | 'auctions' | 'offers'>('dash');
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -177,6 +184,108 @@ export const VendorPortal: React.FC = () => {
     shopIcon: user.shopIcon || '',
     shopBanner: user.shopBanner || '',
   });
+  const [isSuggestingPrice, setIsSuggestingPrice] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<{ price: number, reason: string } | null>(null);
+
+  const [offerForm, setOfferForm] = useState({
+    title: '',
+    message: '',
+    image: '',
+    link: '',
+    expiryDate: '',
+    productIds: [] as string[]
+  });
+  const [isSendingOffer, setIsSendingOffer] = useState(false);
+
+  const suggestPrice = async (form: any, setForm: any) => {
+    if (!form.name || !form.category) {
+      toast.error('Tafadhali weka jina na kategoria ya bidhaa kwanza');
+      return;
+    }
+
+    setIsSuggestingPrice(true);
+    setAiSuggestion(null);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Wewe ni mtaalamu wa masoko ya kilimo Tanzania. Pendekeza bei ya wastani (kwa TZS) ya bidhaa hii: ${form.name} katika kategoria ya ${form.category}. Toa jibu katika mfumo wa JSON pekee wenye muundo huu: {"price": 5000, "reason": "Maelezo mafupi ya kwanini bei hii inafaa sokoni kwa sasa."}`,
+        config: {
+          responseMimeType: "application/json"
+        }
+      });
+
+      try {
+        const result = JSON.parse(response.text);
+        if (result.price && result.reason) {
+          setAiSuggestion(result);
+          toast.success('Ushauri wa AI umepatikana!');
+        } else {
+          toast.error('AI imeshindwa kutoa bei kwa sasa');
+        }
+      } catch (e) {
+        toast.error('AI imeshindwa kutoa bei kwa sasa');
+      }
+    } catch (error) {
+      console.error('AI Error:', error);
+      toast.error('Hitilafu katika AI');
+    } finally {
+      setIsSuggestingPrice(false);
+    }
+  };
+
+  const handleSendOffer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!offerForm.title || !offerForm.message) {
+      toast.error('Tafadhali jaza kichwa na ujumbe');
+      return;
+    }
+
+    setIsSendingOffer(true);
+    try {
+      const payload: any = {
+        vendorId: user?.id || 'admin',
+        title: offerForm.title,
+        message: offerForm.message,
+        image: offerForm.image || '',
+        link: offerForm.link || '',
+        expiryDate: offerForm.expiryDate || null,
+        productIds: offerForm.productIds,
+        createdAt: serverTimestamp()
+      };
+
+      await addDoc(collection(db, 'kuku_offers'), payload);
+      
+      // Also send a notification to everyone
+      await addDoc(collection(db, 'kuku_activity'), {
+        title: `OFA MPYA: ${offerForm.title}`,
+        message: offerForm.message,
+        userId: 'all',
+        readBy: [],
+        date: new Date().toISOString(),
+        icon: '🎁',
+        text: `Ofa Mpya: ${offerForm.title}`,
+        time: new Date().toISOString(),
+        createdAt: serverTimestamp()
+      });
+
+      toast.success('Ofa imetumwa kikamilifu!');
+      setOfferForm({
+        title: '',
+        message: '',
+        image: '',
+        link: '',
+        expiryDate: '',
+        productIds: []
+      });
+    } catch (error) {
+      console.error('Error sending offer:', error);
+      toast.error('Imeshindwa kutuma ofa');
+    } finally {
+      setIsSendingOffer(false);
+    }
+  };
+
   const [newProduct, setNewProduct] = useState({
     name: '',
     price: '',
@@ -599,16 +708,16 @@ export const VendorPortal: React.FC = () => {
   const isIKConfigured = isImageKitConfigured || (systemSettings?.imagekit_public_key && systemSettings?.imagekit_url_endpoint);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col md:flex-row pb-20 md:pb-0 transition-colors duration-300">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col lg:flex-row pb-20 lg:pb-0 transition-colors duration-300">
       <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
       {/* Mobile Header */}
-      <header className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-6 py-4 sticky top-0 z-30 flex items-center justify-between">
+      <header className="lg:hidden bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-6 py-4 sticky top-0 z-30 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => setView('shop')}
+            onClick={() => setIsDrawerOpen(true)}
             className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-emerald-600 dark:text-emerald-500"
           >
-            <ArrowLeft size={18} />
+            <Menu size={18} />
           </button>
           <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor</h1>
         </div>
@@ -657,8 +766,71 @@ export const VendorPortal: React.FC = () => {
         </div>
       </header>
 
+      {/* Mobile Drawer Overlay */}
+      {isDrawerOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity"
+          onClick={() => setIsDrawerOpen(false)}
+        />
+      )}
+
+      {/* Mobile Drawer */}
+      <aside className={cn(
+        "lg:hidden fixed top-0 left-0 bottom-0 w-[280px] bg-white dark:bg-slate-900 z-[60] transition-transform duration-300 ease-out flex flex-col shadow-2xl border-r border-slate-100 dark:border-slate-800",
+        isDrawerOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🏪</span>
+            <h1 className="font-serif italic text-lg text-emerald-800 dark:text-emerald-500 font-bold">Vendor Menu</h1>
+          </div>
+          <button onClick={() => setIsDrawerOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-400">
+            <X size={20} />
+          </button>
+        </div>
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          {[
+            { id: 'dash', label: 'Dashibodi', icon: LayoutDashboard },
+            { id: 'products', label: 'Bidhaa Zangu', icon: Package },
+            { id: 'auctions', label: 'Minada Yangu', icon: Gavel },
+            { id: 'offers', label: 'Ofa & Coupons', icon: Tag },
+            { id: 'orders', label: 'Maagizo', icon: ClipboardList },
+            { id: 'wallet', label: 'Wallet', icon: Wallet },
+            { id: 'reviews', label: 'Maoni (Reviews)', icon: MessageSquare },
+            { id: 'status', label: t('status'), icon: Camera },
+            { id: 'settings', label: 'Mipangilio', icon: Clock },
+          ].map(item => (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveTab(item.id as any);
+                setIsDrawerOpen(false);
+              }}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all",
+                activeTab === item.id 
+                  ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 shadow-sm" 
+                  : "text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-200"
+              )}
+            >
+              <item.icon size={18} />
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <div className="p-4 border-t border-slate-50 dark:border-slate-800">
+          <button 
+            onClick={() => setView('shop')}
+            className="w-full flex items-center justify-center gap-2 py-4 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-2xl text-sm font-black text-emerald-700 dark:text-emerald-500 transition-all border border-slate-100 dark:border-slate-800"
+          >
+            <ArrowLeft size={14} />
+            {t('go_to_market')}
+          </button>
+        </div>
+      </aside>
+
       {/* Sidebar (Desktop) */}
-      <aside className="hidden md:flex w-64 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex-col sticky top-0 h-screen z-20">
+      <aside className="hidden lg:flex w-64 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex-col sticky top-0 h-screen z-20">
         <div className="p-6 border-b border-slate-50 dark:border-slate-800">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -720,6 +892,7 @@ export const VendorPortal: React.FC = () => {
             { id: 'dash', label: 'Dashibodi', icon: LayoutDashboard },
             { id: 'products', label: 'Bidhaa Zangu', icon: Package },
             { id: 'auctions', label: 'Minada Yangu', icon: Gavel },
+            { id: 'offers', label: 'Ofa & Coupons', icon: Tag },
             { id: 'orders', label: 'Maagizo', icon: ClipboardList },
             { id: 'wallet', label: 'Wallet', icon: Wallet },
             { id: 'reviews', label: 'Maoni (Reviews)', icon: MessageSquare },
@@ -776,7 +949,7 @@ export const VendorPortal: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 md:p-10 overflow-y-auto">
+      <main className="flex-1 p-6 lg:p-10 overflow-y-auto">
         {user.status === 'pending' && (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-3xl p-6 mb-8 flex items-start gap-4">
             <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0">⏳</div>
@@ -939,6 +1112,152 @@ export const VendorPortal: React.FC = () => {
           </motion.div>
         )}
 
+        {activeTab === 'offers' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <h2 className="text-3xl font-black text-slate-900 mb-2">Ofa & Coupons</h2>
+            <p className="text-slate-500 mb-10">Tengeneza ofa maalum kwa ajili ya bidhaa zako.</p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
+              <div className="lg:col-span-2 space-y-6 md:space-y-8">
+                <div className="bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800 p-6 md:p-10 shadow-sm">
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white mb-6 md:mb-8">Tengeneza Ofa Mpya</h3>
+                  <form onSubmit={handleSendOffer} className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Kichwa cha Ofa</label>
+                      <input 
+                        type="text"
+                        value={offerForm.title}
+                        onChange={(e) => setOfferForm(prev => ({ ...prev, title: e.target.value }))}
+                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                        placeholder="Mfn: Punguzo la Sikukuu!"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Ujumbe wa Ofa</label>
+                      <textarea 
+                        value={offerForm.message}
+                        onChange={(e) => setOfferForm(prev => ({ ...prev, message: e.target.value }))}
+                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm min-h-[120px] resize-none"
+                        placeholder="Elezea ofa yako hapa..."
+                        required
+                      />
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Picha (URL)</label>
+                        <input 
+                          type="url"
+                          value={offerForm.image}
+                          onChange={(e) => setOfferForm(prev => ({ ...prev, image: e.target.value }))}
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                          placeholder="https://..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Tarehe ya Kuisha (Sio Lazima)</label>
+                        <input 
+                          type="datetime-local"
+                          value={offerForm.expiryDate}
+                          onChange={(e) => setOfferForm(prev => ({ ...prev, expiryDate: e.target.value }))}
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Chagua Bidhaa (Zote kama hujaweka)</label>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[200px] overflow-y-auto p-4 bg-slate-50 rounded-2xl border-2 border-slate-100">
+                        {myProducts.map(p => (
+                          <label key={p.id} className="flex items-center gap-2 cursor-pointer group">
+                            <input 
+                              type="checkbox"
+                              checked={offerForm.productIds.includes(p.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setOfferForm(prev => ({ ...prev, productIds: [...prev.productIds, p.id] }));
+                                } else {
+                                  setOfferForm(prev => ({ ...prev, productIds: prev.productIds.filter(id => id !== p.id) }));
+                                }
+                              }}
+                              className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                            />
+                            <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900 truncate">{p.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit"
+                      disabled={isSendingOffer}
+                      className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black transition-all active:scale-95 flex items-center justify-center gap-2 hover:bg-amber-700"
+                    >
+                      {isSendingOffer ? (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <Tag size={20} />
+                          TUMA OFA
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <h3 className="text-xl font-black text-slate-900">Ofa Zinazoendelea</h3>
+                <div className="space-y-4">
+                  {offers.filter(o => o.vendorId === user?.id).length === 0 ? (
+                    <div className="bg-white rounded-3xl p-10 text-center border border-dashed border-slate-200">
+                      <p className="text-slate-400 font-bold">Hakuna ofa kwa sasa</p>
+                    </div>
+                  ) : (
+                    offers.filter(o => o.vendorId === user?.id).map(offer => (
+                      <div key={offer.id} className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm relative group overflow-hidden">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600">
+                              <Tag size={16} />
+                            </div>
+                            <h4 className="font-black text-slate-900">{offer.title}</h4>
+                          </div>
+                          <button 
+                            onClick={async () => {
+                              if (confirm('Futa ofa hii?')) {
+                                await deleteDoc(doc(db, 'kuku_offers', offer.id));
+                                toast.success('Ofa imefutwa');
+                              }
+                            }}
+                            className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                        <p className="text-sm text-slate-500 mb-4 line-clamp-2">{offer.message}</p>
+                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+                          <span className="text-slate-400">Bidhaa: {offer.productIds.length === 0 ? 'Zote' : offer.productIds.length}</span>
+                          {offer.expiryDate && (
+                            <span className={cn(
+                              "px-2 py-1 rounded-lg",
+                              new Date(offer.expiryDate) < new Date() ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-500"
+                            )}>
+                              {new Date(offer.expiryDate) < new Date() ? 'Imeisha' : `Mwisho: ${new Date(offer.expiryDate).toLocaleDateString()}`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'orders' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <h2 className="text-3xl font-black text-slate-900 mb-8">Maagizo ya Duka</h2>
@@ -1015,6 +1334,17 @@ export const VendorPortal: React.FC = () => {
                       className="flex items-center gap-2 bg-emerald-100 text-emerald-700 px-4 py-2 rounded-xl text-xs font-black hover:bg-emerald-200 transition-all"
                     >
                       <Send size={14} /> WhatsApp Mteja
+                    </button>
+
+                    <button 
+                      onClick={() => {
+                        const date = new Date(order.createdAt).toLocaleString('sw-TZ');
+                        const msg = `*RISITI YA MALIPO - KUKU APP* 🧾\n--------------------------------\n*Namba ya Agizo:* #${order.id.substring(0,8)}\n*Tarehe:* ${date}\n*Mteja:* ${order.userName}\n*Simu:* ${order.userContact}\n\n*BIDHAA:*\n${order.items.map((item: any) => `${item.qty}x ${item.name} @ ${formatCurrency(item.price, currency)}`).join('\n')}\n\n*Gharama ya Usafiri:* ${formatCurrency(order.deliveryFee, currency)}\n*Jumla Kuu:* *${formatCurrency(order.total, currency)}*\n*Njia ya Malipo:* ${order.payMethod.toUpperCase()}\n*Hali ya Malipo:* ${order.paymentApproved ? 'Imelipwa ✅' : 'Inasubiri ⏳'}\n\nAsante kwa kununua na Kuku App! 🐔`;
+                        window.open(`https://wa.me/${order.userContact?.replace(/\+/,'')}?text=${encodeURIComponent(msg)}`);
+                      }}
+                      className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-slate-900 transition-all"
+                    >
+                      <FileText size={14} /> Tuma Risiti
                     </button>
 
                     {(order.status === 'delivered' || order.status === 'completed' || order.status === 'pickup') && (
@@ -1541,13 +1871,43 @@ export const VendorPortal: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Bei (TZS) *</label>
-              <input 
-                type="number" 
-                className="input-field"
-                placeholder="12000"
-                value={newProduct.price}
-                onChange={e => setNewProduct({...newProduct, price: e.target.value})}
-              />
+              <div className="flex gap-2">
+                <input 
+                  type="number" 
+                  className="input-field flex-1"
+                  placeholder="12000"
+                  value={newProduct.price}
+                  onChange={e => setNewProduct({...newProduct, price: e.target.value})}
+                />
+                <button 
+                  onClick={(e) => { e.preventDefault(); suggestPrice(newProduct, setNewProduct); }}
+                  disabled={isSuggestingPrice}
+                  className="p-3 bg-amber-100 text-amber-600 rounded-xl hover:bg-amber-200 transition-colors flex items-center justify-center"
+                  title="AI Price Suggestion"
+                >
+                  {isSuggestingPrice ? <div className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" /> : <Sparkles size={18} />}
+                </button>
+              </div>
+              {aiSuggestion && (
+                <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles size={16} className="text-amber-600" />
+                    <span className="text-xs font-black text-amber-900 uppercase tracking-widest">Ushauri wa AI</span>
+                  </div>
+                  <p className="text-sm font-bold text-amber-800 mb-1">Bei Inayopendekezwa: {aiSuggestion.price.toLocaleString()} TZS</p>
+                  <p className="text-xs text-amber-700 mb-3">{aiSuggestion.reason}</p>
+                  <button 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setNewProduct({...newProduct, price: aiSuggestion.price.toString()});
+                      setAiSuggestion(null);
+                    }}
+                    className="w-full py-2 bg-amber-600 text-white text-xs font-black rounded-xl hover:bg-amber-700 transition-colors"
+                  >
+                    TUMIA BEI HII
+                  </button>
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Stock (pcs)</label>
@@ -1773,13 +2133,43 @@ export const VendorPortal: React.FC = () => {
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Bei (TZS)</label>
-                <input 
-                  type="number" 
-                  className="input-field"
-                  placeholder="15000"
-                  value={editingProduct.price}
-                  onChange={e => setEditingProduct({...editingProduct, price: Number(e.target.value)})}
-                />
+                <div className="flex gap-2">
+                  <input 
+                    type="number" 
+                    className="input-field flex-1"
+                    placeholder="15000"
+                    value={editingProduct.price}
+                    onChange={e => setEditingProduct({...editingProduct, price: Number(e.target.value)})}
+                  />
+                  <button 
+                    onClick={(e) => { e.preventDefault(); suggestPrice(editingProduct, setEditingProduct); }}
+                    disabled={isSuggestingPrice}
+                    className="p-3 bg-amber-100 text-amber-600 rounded-xl hover:bg-amber-200 transition-colors flex items-center justify-center"
+                    title="AI Price Suggestion"
+                  >
+                    {isSuggestingPrice ? <div className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" /> : <Sparkles size={18} />}
+                  </button>
+                </div>
+                {aiSuggestion && (
+                  <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles size={16} className="text-amber-600" />
+                      <span className="text-xs font-black text-amber-900 uppercase tracking-widest">Ushauri wa AI</span>
+                    </div>
+                    <p className="text-sm font-bold text-amber-800 mb-1">Bei Inayopendekezwa: {aiSuggestion.price.toLocaleString()} TZS</p>
+                    <p className="text-xs text-amber-700 mb-3">{aiSuggestion.reason}</p>
+                    <button 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setEditingProduct({...editingProduct, price: aiSuggestion.price});
+                        setAiSuggestion(null);
+                      }}
+                      className="w-full py-2 bg-amber-600 text-white text-xs font-black rounded-xl hover:bg-amber-700 transition-colors"
+                    >
+                      TUMIA BEI HII
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -2495,17 +2885,22 @@ export const VendorPortal: React.FC = () => {
       </Modal>
 
       {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 px-6 py-3 flex items-center justify-between z-40">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 px-6 py-3 flex items-center justify-between z-40">
         {[
           { id: 'dash', icon: LayoutDashboard, label: 'Dash' },
           { id: 'orders', icon: ClipboardList, label: 'Oda' },
-          { id: 'products', icon: Package, label: 'Bidhaa' },
           { id: 'wallet', icon: Wallet, label: 'Wallet' },
-          { id: 'settings', icon: Settings, label: 'Seti' }
+          { id: 'more', icon: Menu, label: 'Zaidi' }
         ].map(item => (
           <button
             key={item.id}
-            onClick={() => setActiveTab(item.id as any)}
+            onClick={() => {
+              if (item.id === 'more') {
+                setIsDrawerOpen(true);
+              } else {
+                setActiveTab(item.id as any);
+              }
+            }}
             className={cn(
               "flex flex-col items-center gap-1 transition-all",
               activeTab === item.id ? "text-emerald-600" : "text-slate-400"

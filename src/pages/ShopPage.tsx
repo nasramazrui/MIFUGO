@@ -8,7 +8,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell } from 'lucide-react';
+import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell, BookOpen, Tag, FileText } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { getAuthEmail, isEmail } from '../utils/authUtils';
@@ -20,12 +20,13 @@ import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isI
 
 import { RecentPurchases } from '../components/RecentPurchases';
 import { NotificationsModal } from '../components/NotificationsModal';
+import { AcademyPage } from './AcademyPage';
 
 export const ShopPage: React.FC = () => {
-  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty, notifications } = useApp();
+  const { products, user, vendors, orders, setOrders, addActivity, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty, notifications, academyPosts, offers } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const unreadNotifications = notifications.filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
-  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'auctions'>('browse');
+  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'auctions' | 'academy'>('browse');
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
   const [viewedStatuses, setViewedStatuses] = useState<string[]>(() => {
     const saved = localStorage.getItem('viewed_statuses');
@@ -198,6 +199,41 @@ export const ShopPage: React.FC = () => {
       toast.error('Hitilafu wakati wa kusasisha wasifu');
     } finally {
       setIsProfileLoading(false);
+    }
+  };
+
+  const [isRedeeming, setIsRedeeming] = useState(false);
+  const handleRedeemPoints = async () => {
+    if (!user || !user.loyaltyPoints || user.loyaltyPoints < 100) {
+      toast.error('Unahitaji angalau pointi 100 ili kubadilisha.');
+      return;
+    }
+    
+    const value = user.loyaltyPoints * (systemSettings?.pointsValue || 10);
+    if (!confirm(`Je, unataka kubadilisha pointi ${user.loyaltyPoints} kuwa ${formatCurrency(value, currency)} kwenye Wallet yako?`)) return;
+
+    setIsRedeeming(true);
+    try {
+      await updateDoc(doc(db, 'kuku_users', user.id), {
+        loyaltyPoints: 0,
+        walletBalance: increment(value)
+      });
+      
+      await addDoc(collection(db, 'kuku_wallet'), {
+        userId: user.id,
+        userName: user.name,
+        amount: value,
+        type: 'deposit',
+        status: 'approved',
+        date: new Date().toISOString().split('T')[0],
+        createdAt: serverTimestamp()
+      });
+      
+      toast.success(`Umefanikiwa kupata ${formatCurrency(value, currency)}!`);
+    } catch (error) {
+      toast.error('Hitilafu imetokea. Jaribu tena.');
+    } finally {
+      setIsRedeeming(false);
     }
   };
 
@@ -646,6 +682,28 @@ export const ShopPage: React.FC = () => {
       const docRef = await addDoc(collection(db, 'kuku_orders'), orderData);
       setLastOrderId(docRef.id);
       addActivity('🛒', `${user.name} amenunua ${p.name} × ${qty} — ${formatCurrency(total, currency)}`);
+      
+      // Award Loyalty Points
+      if (systemSettings?.pointsPerOrder && systemSettings.pointsPerOrder > 0) {
+        const pointsToAward = Math.floor((total / 1000) * systemSettings.pointsPerOrder);
+        if (pointsToAward > 0) {
+          await updateDoc(doc(db, 'kuku_users', user.id), {
+            loyaltyPoints: increment(pointsToAward)
+          });
+          
+          await addDoc(collection(db, 'kuku_loyalty'), {
+            userId: user.id,
+            userName: user.name,
+            points: pointsToAward,
+            type: 'earn',
+            orderId: docRef.id,
+            description: `Points earned from order #${docRef.id.substring(0,6)}`,
+            createdAt: serverTimestamp()
+          });
+          
+          toast.success(`Hongera! Umejipatia pointi ${pointsToAward} za uaminifu! 🎁`);
+        }
+      }
       
       if (payMethod === 'cash' || payMethod === 'wallet') {
         setIsPaymentModalOpen(false);
@@ -1176,6 +1234,54 @@ export const ShopPage: React.FC = () => {
         ))}
         {activeTab === 'browse' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            {/* Offers Section */}
+            {offers.filter(o => !o.expiryDate || new Date(o.expiryDate) >= new Date()).length > 0 && (
+              <div className="mb-10">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                      <Tag className="text-amber-500" size={24} />
+                      Ofa Maalum
+                    </h2>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm font-bold">Punguzo na ofa zinazoendelea sasa</p>
+                  </div>
+                </div>
+                <div className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+                  {offers.filter(o => !o.expiryDate || new Date(o.expiryDate) >= new Date()).map(offer => {
+                    const vendor = vendors.find(v => v.id === offer.vendorId);
+                    return (
+                      <div key={offer.id} className="flex-shrink-0 w-[280px] sm:w-[320px] bg-gradient-to-br from-amber-500 to-orange-600 rounded-[32px] p-6 text-white shadow-lg shadow-amber-500/20 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-white/20 transition-all" />
+                        {offer.image && (
+                          <div className="absolute top-0 right-0 w-24 h-24 opacity-20 group-hover:opacity-30 transition-opacity">
+                            <img src={offer.image} alt="" className="w-full h-full object-cover rounded-bl-full" />
+                          </div>
+                        )}
+                        <div className="relative z-10">
+                          <div className="flex items-center gap-2 mb-4">
+                            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                              <Tag size={16} className="text-white" />
+                            </div>
+                            <span className="text-xs font-black uppercase tracking-widest bg-white/20 px-2 py-1 rounded-lg backdrop-blur-sm">
+                              {vendor?.shopName || 'Admin'}
+                            </span>
+                          </div>
+                          <h3 className="text-xl font-black mb-2 leading-tight">{offer.title}</h3>
+                          <p className="text-sm text-white/80 mb-4 line-clamp-2">{offer.message}</p>
+                          {offer.expiryDate && (
+                            <div className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-black/20 px-3 py-1.5 rounded-xl backdrop-blur-sm">
+                              <span>Mwisho:</span>
+                              <span className="text-amber-200">{new Date(offer.expiryDate).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Explore Categories Header */}
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -1361,6 +1467,7 @@ export const ShopPage: React.FC = () => {
         )}
 
         {activeTab === 'auctions' && <AuctionPage />}
+        {activeTab === 'academy' && <AcademyPage />}
 
         {activeTab === 'stores' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -1524,6 +1631,14 @@ export const ShopPage: React.FC = () => {
           </button>
           
           <button 
+            onClick={() => setActiveTab('academy')}
+            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'academy' ? "text-amber-500" : "text-slate-500")}
+          >
+            <BookOpen size={22} strokeWidth={2.5} />
+            <span className="text-[9px] font-black uppercase tracking-[0.15em]">ACADEMY</span>
+          </button>
+
+          <button 
             onClick={() => setIsProfileModalOpen(true)}
             className={cn("flex flex-col items-center gap-1.5 transition-all flex-1 text-slate-500")}
           >
@@ -1613,6 +1728,20 @@ export const ShopPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-800/50 flex flex-col items-center justify-center text-center relative group">
+                    <p className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1">Pointi za Uaminifu</p>
+                    <p className="text-2xl font-black text-amber-700 dark:text-amber-500">{user?.loyaltyPoints || 0}</p>
+                    <p className="text-[8px] font-bold text-amber-500/70 mt-1 uppercase">Thamani: {formatCurrency((user?.loyaltyPoints || 0) * (systemSettings?.pointsValue || 0), currency)}</p>
+                    {user?.loyaltyPoints && user.loyaltyPoints >= 100 ? (
+                      <button
+                        onClick={handleRedeemPoints}
+                        disabled={isRedeeming}
+                        className="absolute inset-0 bg-amber-500 text-white font-black text-xs rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center disabled:bg-amber-300"
+                      >
+                        {isRedeeming ? 'INABADILISHA...' : 'BADILISHA KUWA PESA'}
+                      </button>
+                    ) : null}
+                  </div>
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">{t('language')}</label>
                     <select 
@@ -1969,6 +2098,17 @@ export const ShopPage: React.FC = () => {
               className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 transition-all"
             >
               <Send size={18} /> WhatsApp Admin
+            </button>
+
+            <button 
+              onClick={() => {
+                const date = new Date(selectedOrder.createdAt).toLocaleString('sw-TZ');
+                const msg = `*RISITI YA MALIPO - KUKU APP* 🧾\n--------------------------------\n*Namba ya Agizo:* #${selectedOrder.id.substring(0,8)}\n*Tarehe:* ${date}\n*Mteja:* ${selectedOrder.userName}\n*Simu:* ${selectedOrder.userContact}\n\n*BIDHAA:*\n${selectedOrder.items.map((item: any) => `${item.qty}x ${item.name} @ ${formatCurrency(item.price, currency)}`).join('\n')}\n\n*Gharama ya Usafiri:* ${formatCurrency(selectedOrder.deliveryFee, currency)}\n*Jumla Kuu:* *${formatCurrency(selectedOrder.total, currency)}*\n*Njia ya Malipo:* ${selectedOrder.payMethod.toUpperCase()}\n*Hali ya Malipo:* ${selectedOrder.paymentApproved ? 'Imelipwa ✅' : 'Inasubiri ⏳'}\n\nAsante kwa kununua na Kuku App! 🐔`;
+                window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`);
+              }}
+              className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 transition-all"
+            >
+              <FileText size={18} /> Tuma Risiti WhatsApp
             </button>
           </div>
         )}

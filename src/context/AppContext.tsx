@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Product, Order, Review, Activity, Withdrawal, Status, Category, WalletTransaction, Auction, CartItem } from '../types';
+import { User, Product, Order, Review, Activity, Withdrawal, Status, Category, WalletTransaction, Auction, CartItem, AcademyPost, LoyaltyPoint, Invoice } from '../types';
 import { generateId } from '../utils';
 import { ADMIN_EMAIL, ADMIN_PASS, TRANSLATIONS } from '../constants';
 import { auth, db } from '../services/firebase';
@@ -90,6 +90,9 @@ interface AppContextType {
   addToCart: (product: Product, quantity: number) => void;
   removeFromCart: (id: string) => void;
   updateCartQty: (productId: string, delta: number) => void;
+  academyPosts: AcademyPost[];
+  loyaltyPoints: LoyaltyPoint[];
+  invoices: Invoice[];
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -119,6 +122,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem('kuku_cart');
     return saved ? JSON.parse(saved) : [];
   });
+  const [academyPosts, setAcademyPosts] = useState<AcademyPost[]>([]);
+  const [loyaltyPoints, setLoyaltyPoints] = useState<LoyaltyPoint[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   useEffect(() => {
     localStorage.setItem('kuku_cart', JSON.stringify(cart));
@@ -358,6 +364,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setOffers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Offer)));
     });
 
+    // Academy Posts
+    const qAcademy = query(collection(db, 'kuku_academy'), orderBy('createdAt', 'desc'));
+    const unsubAcademy = onSnapshot(qAcademy, (snap) => {
+      setAcademyPosts(snap.docs.map(d => ({ id: d.id, ...d.data() } as AcademyPost)));
+    });
+
+    // Loyalty Points
+    const qLoyalty = query(collection(db, 'kuku_loyalty'), orderBy('createdAt', 'desc'));
+    const unsubLoyalty = onSnapshot(qLoyalty, (snap) => {
+      setLoyaltyPoints(snap.docs.map(d => ({ id: d.id, ...d.data() } as LoyaltyPoint)));
+    });
+
+    // Invoices
+    const qInvoices = query(collection(db, 'kuku_invoices'), orderBy('createdAt', 'desc'));
+    const unsubInvoices = onSnapshot(qInvoices, (snap) => {
+      setInvoices(snap.docs.map(d => ({ id: d.id, ...d.data() } as Invoice)));
+    });
+
     return () => {
       unsubProducts();
       unsubOrders();
@@ -372,6 +396,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubAuctions();
       unsubNotifications();
       unsubOffers();
+      unsubAcademy();
+      unsubLoyalty();
+      unsubInvoices();
     };
   }, []);
 
@@ -440,7 +467,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCart,
       addToCart,
       removeFromCart,
-      updateCartQty
+      updateCartQty,
+      academyPosts,
+      loyaltyPoints,
+      invoices
     }}>
       {children}
     </AppContext.Provider>

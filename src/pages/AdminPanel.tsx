@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { GoogleGenAI } from "@google/genai";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { useApp } from '../context/AppContext';
 import { formatCurrency } from '../utils';
 import { Modal } from '../components/Modal';
@@ -50,7 +53,11 @@ import {
   RefreshCw,
   Send,
   Tag,
-  Menu
+  Menu,
+  BookOpen,
+  FileText,
+  Award,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '../utils';
 import { CATEGORIES } from '../constants';
@@ -84,6 +91,7 @@ export const AdminPanel: React.FC = () => {
     reviews,
     systemSettings,
     offers,
+    academyPosts,
     updateSystemSettings,
     logout, 
     addActivity,
@@ -95,7 +103,7 @@ export const AdminPanel: React.FC = () => {
     t
   } = useApp();
   const currency = systemSettings?.currency || 'TZS';
-  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'admins' | 'wallet' | 'settings' | 'status' | 'cats' | 'reviews' | 'announcements' | 'offers'>('over');
+  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'admins' | 'wallet' | 'settings' | 'status' | 'cats' | 'reviews' | 'announcements' | 'offers' | 'academy'>('over');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
@@ -142,6 +150,114 @@ export const AdminPanel: React.FC = () => {
     target: 'all' as 'all' | string
   });
   const [isSendingOffer, setIsSendingOffer] = useState(false);
+
+  const [academyForm, setAcademyForm] = useState({
+    title: '',
+    content: '',
+    image: '',
+    category: 'livestock' as 'livestock' | 'crops' | 'marketing' | 'general'
+  });
+  const [isSendingAcademy, setIsSendingAcademy] = useState(false);
+  const [isAcademyModalOpen, setIsAcademyModalOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<any>(null);
+  const [isSuggestingPrice, setIsSuggestingPrice] = useState(false);
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
+  const invoiceRef = useRef<HTMLDivElement>(null);
+
+  // Generate Invoice
+  const generateInvoice = async (order: any) => {
+    setIsGeneratingInvoice(true);
+    try {
+      // Create a temporary div for the invoice
+      const element = document.createElement('div');
+      element.style.padding = '40px';
+      element.style.width = '800px';
+      element.style.background = 'white';
+      element.style.color = 'black';
+      element.style.fontFamily = 'sans-serif';
+      
+      element.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 40px; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px;">
+          <div>
+            <h1 style="font-size: 24px; font-weight: 900; margin: 0; color: #d97706;">${systemSettings.app_name}</h1>
+            <p style="font-size: 12px; color: #64748b; margin-top: 4px;">Risiti ya Malipo / Invoice</p>
+          </div>
+          <div style="text-align: right;">
+            <p style="font-size: 14px; font-weight: 700; margin: 0;">#INV-${order.id.slice(-6).toUpperCase()}</p>
+            <p style="font-size: 12px; color: #64748b; margin-top: 4px;">Tarehe: ${new Date(order.createdAt?.seconds * 1000).toLocaleDateString()}</p>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px;">
+          <div>
+            <h3 style="font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Mteja</h3>
+            <p style="font-size: 14px; font-weight: 700; margin: 0;">${order.userName}</p>
+            <p style="font-size: 12px; color: #64748b; margin-top: 4px;">Simu: ${order.userPhone}</p>
+          </div>
+          <div style="text-align: right;">
+            <h3 style="font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Muuzaji</h3>
+            <p style="font-size: 14px; font-weight: 700; margin: 0;">${order.vendorName}</p>
+          </div>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
+          <thead>
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <th style="text-align: left; padding: 12px 0; font-size: 12px; font-weight: 900; color: #94a3b8; text-transform: uppercase;">Bidhaa</th>
+              <th style="text-align: center; padding: 12px 0; font-size: 12px; font-weight: 900; color: #94a3b8; text-transform: uppercase;">Idadi</th>
+              <th style="text-align: right; padding: 12px 0; font-size: 12px; font-weight: 900; color: #94a3b8; text-transform: uppercase;">Bei</th>
+              <th style="text-align: right; padding: 12px 0; font-size: 12px; font-weight: 900; color: #94a3b8; text-transform: uppercase;">Jumla</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 16px 0; font-size: 14px; font-weight: 700;">${order.productName}</td>
+              <td style="padding: 16px 0; font-size: 14px; font-weight: 700; text-align: center;">${order.quantity}</td>
+              <td style="padding: 16px 0; font-size: 14px; font-weight: 700; text-align: right;">${formatCurrency(order.productPrice, systemSettings.currency)}</td>
+              <td style="padding: 16px 0; font-size: 14px; font-weight: 700; text-align: right;">${formatCurrency(order.totalPrice, systemSettings.currency)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 60px;">
+          <div style="width: 200px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-size: 12px; color: #64748b;">Subtotal</span>
+              <span style="font-size: 12px; font-weight: 700;">${formatCurrency(order.totalPrice, systemSettings.currency)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 2px solid #f1f5f9;">
+              <span style="font-size: 14px; font-weight: 900;">Jumla Kuu</span>
+              <span style="font-size: 14px; font-weight: 900; color: #d97706;">${formatCurrency(order.totalPrice, systemSettings.currency)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 20px;">
+          <p style="font-size: 12px; color: #94a3b8; margin: 0;">Asante kwa kufanya biashara nasi!</p>
+          <p style="font-size: 10px; color: #cbd5e1; margin-top: 4px;">Hii ni risiti ya kielektroniki, haihitaji saini.</p>
+        </div>
+      `;
+
+      document.body.appendChild(element);
+      const canvas = await html2canvas(element);
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Risiti-${order.id.slice(-6)}.pdf`);
+      document.body.removeChild(element);
+      toast.success('Risiti imepakuliwa');
+    } catch (error) {
+      console.error('Invoice Error:', error);
+      toast.error('Imeshindwa kutengeneza risiti');
+    } finally {
+      setIsGeneratingInvoice(false);
+    }
+  };
+
   const [catForm, setCatForm] = useState({
     id: '',
     label: '',
@@ -223,6 +339,8 @@ export const AdminPanel: React.FC = () => {
     adminWhatsApp: '255764225358',
     paymentNumber: '0687225353',
     paymentName: 'Amour',
+    pointsPerOrder: 10, // 10 points per 1000 TZS
+    pointsValue: 1, // 1 point = 1 TZS
     firebase_service_account: '',
     maintenanceMode: false,
     themeColor: 'amber'
@@ -248,6 +366,8 @@ export const AdminPanel: React.FC = () => {
         adminWhatsApp: systemSettings.adminWhatsApp || '255764225358',
         paymentNumber: systemSettings.paymentNumber || '0687225353',
         paymentName: systemSettings.paymentName || 'Amour',
+        pointsPerOrder: systemSettings.pointsPerOrder || 10,
+        pointsValue: systemSettings.pointsValue || 1,
         firebase_service_account: systemSettings.firebase_service_account || '',
         maintenanceMode: systemSettings.maintenanceMode || false,
         themeColor: systemSettings.themeColor || 'amber'
@@ -357,6 +477,49 @@ export const AdminPanel: React.FC = () => {
       toast.error('Kosa: ' + (error as Error).message);
     } finally {
       setIsSendingOffer(false);
+    }
+  };
+
+  const handleSaveAcademy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!academyForm.title || !academyForm.content) {
+      toast.error('Tafadhali jaza kichwa na maelezo');
+      return;
+    }
+    setIsSendingAcademy(true);
+    try {
+      if (editingPost) {
+        await updateDoc(doc(db, 'kuku_academy', editingPost.id), {
+          ...academyForm,
+          updatedAt: serverTimestamp()
+        });
+        toast.success('Makala imesasishwa');
+      } else {
+        await addDoc(collection(db, 'kuku_academy'), {
+          ...academyForm,
+          authorId: user?.id || 'admin',
+          authorName: user?.name || 'Admin',
+          createdAt: serverTimestamp()
+        });
+        toast.success('Makala imeongezwa');
+      }
+      setIsAcademyModalOpen(false);
+      setEditingPost(null);
+      setAcademyForm({ title: '', content: '', image: '', category: 'livestock' });
+    } catch (error) {
+      toast.error('Hitilafu imetokea');
+    } finally {
+      setIsSendingAcademy(false);
+    }
+  };
+
+  const deleteAcademyPost = async (id: string) => {
+    if (!confirm('Futa makala hii?')) return;
+    try {
+      await deleteDoc(doc(db, 'kuku_academy', id));
+      toast.success('Makala imefutwa');
+    } catch (error) {
+      toast.error('Hitilafu imetokea');
     }
   };
 
@@ -666,6 +829,7 @@ export const AdminPanel: React.FC = () => {
             { id: 'status', label: t('status'), icon: Camera },
             { id: 'announcements', label: 'Matangazo', icon: Bell },
             { id: 'offers', label: 'Ofa & Coupons', icon: Tag },
+            { id: 'academy', label: 'Academy', icon: BookOpen },
             { id: 'settings', label: 'Mipangilio', icon: Settings },
           ].map(item => (
             <button
@@ -769,6 +933,7 @@ export const AdminPanel: React.FC = () => {
             { id: 'status', label: t('status'), icon: Camera },
             { id: 'announcements', label: 'Matangazo', icon: Bell },
             { id: 'offers', label: 'Ofa & Coupons', icon: Tag },
+            { id: 'academy', label: 'Academy', icon: BookOpen },
             { id: 'settings', label: 'Mipangilio', icon: Settings },
           ].map(item => (
             <button
@@ -1278,10 +1443,38 @@ export const AdminPanel: React.FC = () => {
                       </div>
                       <div className="flex gap-2">
                         <button 
+                          onClick={() => generateInvoice({
+                            id: o.id,
+                            createdAt: o.createdAt,
+                            userName: o.userName,
+                            userPhone: o.userContact,
+                            vendorName: o.vendorName,
+                            productName: o.items[0].name,
+                            quantity: o.items[0].quantity,
+                            productPrice: o.items[0].price,
+                            totalPrice: o.total
+                          })}
+                          disabled={isGeneratingInvoice}
+                          className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl text-[10px] font-black hover:bg-slate-200 transition-all flex items-center gap-1"
+                        >
+                          {isGeneratingInvoice ? <div className="w-3 h-3 border-2 border-slate-700 border-t-transparent rounded-full animate-spin" /> : <FileText size={12} />}
+                          RISITI
+                        </button>
+                        <button 
                           onClick={() => window.open(`https://wa.me/${o.userContact.replace(/\+/g,'')}?text=Habari ${o.userName}, kuhusu agizo lako #${o.id.substring(0,8)}...`)}
                           className="bg-green-100 text-green-700 px-3 py-1.5 rounded-xl text-[10px] font-black hover:bg-green-200 transition-all"
                         >
                           WA MTEJA
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const date = new Date(o.createdAt).toLocaleString('sw-TZ');
+                            const msg = `*RISITI YA MALIPO - KUKU APP* 🧾\n--------------------------------\n*Namba ya Agizo:* #${o.id.substring(0,8)}\n*Tarehe:* ${date}\n*Mteja:* ${o.userName}\n*Simu:* ${o.userContact}\n\n*BIDHAA:*\n${o.items.map((item: any) => `${item.qty}x ${item.name} @ ${formatCurrency(item.price, currency)}`).join('\n')}\n\n*Gharama ya Usafiri:* ${formatCurrency(o.deliveryFee, currency)}\n*Jumla Kuu:* *${formatCurrency(o.total, currency)}*\n*Njia ya Malipo:* ${o.payMethod.toUpperCase()}\n*Hali ya Malipo:* ${o.paymentApproved ? 'Imelipwa ✅' : 'Inasubiri ⏳'}\n\nAsante kwa kununua na Kuku App! 🐔`;
+                            window.open(`https://wa.me/${o.userContact.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
+                          }}
+                          className="bg-slate-800 text-white px-3 py-1.5 rounded-xl text-[10px] font-black hover:bg-slate-900 transition-all flex items-center gap-1"
+                        >
+                          <FileText size={12} /> TUMA RISITI
                         </button>
                         <button 
                           onClick={async () => {
@@ -2031,6 +2224,110 @@ export const AdminPanel: React.FC = () => {
           </motion.div>
         )}
 
+        {activeTab === 'academy' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900 dark:text-white">Farm Academy</h2>
+                <p className="text-sm text-slate-500">Elimu ya Kilimo na Masoko kwa Wakulima.</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setEditingPost(null);
+                  setAcademyForm({ title: '', content: '', image: '', category: 'livestock' });
+                  setIsAcademyModalOpen(true);
+                }}
+                className="btn-primary flex items-center gap-2"
+              >
+                <BookOpen size={20} />
+                ANDIKA MAKALA MPYA
+              </button>
+            </div>
+
+            <div className="grid lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-6">
+                {academyPosts.length === 0 ? (
+                  <div className="bg-white dark:bg-slate-900 rounded-[40px] p-20 text-center border-2 border-dashed border-slate-100 dark:border-slate-800">
+                    <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-6">📚</div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Hakuna Makala Bado</h3>
+                    <p className="text-slate-500 max-w-xs mx-auto">Anza kwa kuandika makala ya kwanza ya elimu ya kilimo hapa.</p>
+                  </div>
+                ) : (
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {academyPosts.map(post => (
+                      <div key={post.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm group">
+                        {post.image && (
+                          <div className="h-48 overflow-hidden">
+                            <img src={post.image} alt={post.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                          </div>
+                        )}
+                        <div className="p-6">
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] font-black uppercase tracking-widest rounded-full">
+                              {post.category}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400">
+                              {new Date(post.createdAt?.seconds * 1000).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <h4 className="text-lg font-black text-slate-900 dark:text-white mb-2 line-clamp-2">{post.title}</h4>
+                          <p className="text-sm text-slate-500 line-clamp-3 mb-6">{post.content}</p>
+                          <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-slate-800">
+                            <button 
+                              onClick={() => {
+                                setEditingPost(post);
+                                setAcademyForm({
+                                  title: post.title,
+                                  content: post.content,
+                                  image: post.image || '',
+                                  category: post.category
+                                });
+                                setIsAcademyModalOpen(true);
+                              }}
+                              className="text-xs font-black text-amber-600 hover:text-amber-700 flex items-center gap-1"
+                            >
+                              <FileText size={14} />
+                              HARIRI
+                            </button>
+                            <button 
+                              onClick={() => deleteAcademyPost(post.id)}
+                              className="text-xs font-black text-red-500 hover:text-red-600 flex items-center gap-1"
+                            >
+                              <Trash2 size={14} />
+                              FUTA
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-8">
+                <div className="bg-amber-600 rounded-[40px] p-10 text-white shadow-xl shadow-amber-600/20">
+                  <h3 className="text-xl font-black mb-4">Takwimu za Academy</h3>
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <span className="text-amber-100 font-bold">Jumla ya Makala</span>
+                      <span className="text-3xl font-black">{academyPosts.length}</span>
+                    </div>
+                    <div className="h-px bg-white/10" />
+                    <div className="space-y-4">
+                      {['livestock', 'crops', 'marketing', 'general'].map(cat => (
+                        <div key={cat} className="flex items-center justify-between text-sm">
+                          <span className="text-amber-100 font-bold capitalize">{cat}</span>
+                          <span className="font-black">{academyPosts.filter(p => p.category === cat).length}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'settings' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl">
             <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mb-2">Mipangilio ya Mfumo</h2>
@@ -2212,6 +2509,24 @@ export const AdminPanel: React.FC = () => {
                       onChange={(e) => setLocalSettings(prev => ({ ...prev, paymentName: e.target.value }))}
                       className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
                       placeholder="Amour"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Points Per 1000 TZS Spent</label>
+                    <input 
+                      type="number"
+                      value={localSettings.pointsPerOrder}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, pointsPerOrder: Number(e.target.value) }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Value of 1 Point (in TZS)</label>
+                    <input 
+                      type="number"
+                      value={localSettings.pointsValue}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, pointsValue: Number(e.target.value) }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
                     />
                   </div>
                 </div>
@@ -2502,15 +2817,49 @@ export const AdminPanel: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Bei</label>
-                  <input 
-                    type="number" 
-                    defaultValue={editingItem.data.price}
-                    onBlur={async (e) => {
-                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { price: Number(e.target.value) });
-                      toast.success('Bei imebadilishwa');
-                    }}
-                    className="input-field" 
-                  />
+                  <div className="flex gap-2">
+                    <input 
+                      type="number" 
+                      defaultValue={editingItem.data.price}
+                      onBlur={async (e) => {
+                        await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { price: Number(e.target.value) });
+                        toast.success('Bei imebadilishwa');
+                      }}
+                      className="input-field flex-1" 
+                    />
+                    <button 
+                      onClick={async () => {
+                        setIsSuggestingPrice(true);
+                        try {
+                          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+                          const response = await ai.models.generateContent({
+                            model: "gemini-3-flash-preview",
+                            contents: `Wewe ni mtaalamu wa masoko ya kilimo Tanzania. Pendekeza bei ya wastani (kwa TZS) ya bidhaa hii: ${editingItem.data.name} katika kategoria ya ${editingItem.data.category}. Toa namba pekee (kama 5000), bila maelezo mengine.`,
+                          });
+
+                          const suggestedPrice = parseInt(response.text.replace(/[^0-9]/g, ''));
+                          if (suggestedPrice) {
+                            await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { price: suggestedPrice });
+                            toast.success(`AI Imependekeza bei ya ${suggestedPrice.toLocaleString()} TZS`);
+                            // We need to refresh the UI, since we're using defaultValue
+                            setEditingItem(prev => prev ? { ...prev, data: { ...prev.data, price: suggestedPrice } } : null);
+                          } else {
+                            toast.error('AI imeshindwa kutoa bei kwa sasa');
+                          }
+                        } catch (error) {
+                          console.error('AI Error:', error);
+                          toast.error('Hitilafu katika AI');
+                        } finally {
+                          setIsSuggestingPrice(false);
+                        }
+                      }}
+                      disabled={isSuggestingPrice}
+                      className="p-3 bg-amber-100 text-amber-600 rounded-xl hover:bg-amber-200 transition-colors flex items-center justify-center"
+                      title="AI Price Suggestion"
+                    >
+                      {isSuggestingPrice ? <div className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" /> : <Sparkles size={18} />}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Stock</label>
@@ -2596,6 +2945,68 @@ export const AdminPanel: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      {/* Academy Modal */}
+      <Modal isOpen={isAcademyModalOpen} onClose={() => setIsAcademyModalOpen(false)} title={editingPost ? "Hariri Makala" : "Andika Makala Mpya"}>
+        <form onSubmit={handleSaveAcademy} className="space-y-6">
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Kichwa cha Habari (Title)</label>
+            <input 
+              type="text"
+              value={academyForm.title}
+              onChange={e => setAcademyForm({...academyForm, title: e.target.value})}
+              className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-amber-500 transition-all"
+              placeholder="Mf: Jinsi ya Kufuga Kuku wa Kienyeji"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Kategoria</label>
+            <select 
+              value={academyForm.category}
+              onChange={e => setAcademyForm({...academyForm, category: e.target.value as any})}
+              className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-amber-500 transition-all"
+            >
+              <option value="livestock">Ufugaji (Livestock)</option>
+              <option value="crops">Kilimo (Crops)</option>
+              <option value="marketing">Masoko (Marketing)</option>
+              <option value="general">Mengineyo (General)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Picha ya Makala (URL)</label>
+            <input 
+              type="text"
+              value={academyForm.image}
+              onChange={e => setAcademyForm({...academyForm, image: e.target.value})}
+              className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-amber-500 transition-all"
+              placeholder="https://..."
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Maelezo (Content)</label>
+            <textarea 
+              value={academyForm.content}
+              onChange={e => setAcademyForm({...academyForm, content: e.target.value})}
+              className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-amber-500 transition-all min-h-[200px]"
+              placeholder="Andika maelezo ya kina hapa..."
+            />
+          </div>
+          <button 
+            type="submit"
+            disabled={isSendingAcademy}
+            className="w-full py-4 bg-amber-500 text-amber-950 rounded-2xl font-black shadow-lg shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            {isSendingAcademy ? (
+              <div className="w-5 h-5 border-2 border-amber-950 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>
+                <Save size={20} />
+                {editingPost ? "HIFADHI MABADILIKO" : "CHAPISHA MAKALA"}
+              </>
+            )}
+          </button>
+        </form>
+      </Modal>
 
       {/* Category Modal */}
       <Modal isOpen={isCatModalOpen} onClose={() => setIsCatModalOpen(false)} title={isEditingCat ? "Hariri Kategoria" : "Ongeza Kategoria"}>

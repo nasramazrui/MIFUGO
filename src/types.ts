@@ -7,6 +7,7 @@ export interface User {
   contact?: string;
   hasWhatsApp?: boolean;
   status?: 'pending' | 'approved' | 'rejected';
+  points?: number; // Loyalty points
   // Vendor specific
   shopName?: string;
   shopIcon?: string;
@@ -25,6 +26,7 @@ export interface User {
   walletBalance?: number;
   language?: 'sw' | 'en' | 'ar' | 'hi';
   theme?: 'light' | 'dark';
+  loyaltyPoints?: number;
   createdAt: string;
 }
 
@@ -239,5 +241,38 @@ export interface SystemSettings {
   adminWhatsApp: string;
   paymentNumber: string;
   paymentName: string;
+  pointsPerOrder?: number; // How many points per 1000 TZS
+  pointsValue?: number; // Value of 1 point in TZS
   updatedAt: any;
+}
+
+export interface AcademyPost {
+  id: string;
+  title: string;
+  content: string;
+  image?: string;
+  category: 'livestock' | 'crops' | 'marketing' | 'general';
+  authorId: string;
+  authorName: string;
+  createdAt: any;
+}
+
+export interface LoyaltyPoint {
+  id: string;
+  userId: string;
+  points: number;
+  type: 'earned' | 'spent';
+  description: string;
+  createdAt: any;
+}
+
+export interface Invoice {
+  id: string;
+  orderId: string;
+  userId: string;
+  vendorId: string;
+  amount: number;
+  items: OrderItem[];
+  date: string;
+  createdAt: any;
 }
