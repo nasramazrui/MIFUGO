@@ -1,5 +1,5 @@
 {
   "name": "FarmConnect",
   "description": "Premium Agricultural & Livestock Marketplace with Real-time Tracking and Vendor Management.",
-  "requestFramePermissions": []
+  "requestFramePermissions": ["camera", "geolocation"]
 }
