@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { Status } from '../types';
+import { Status, User } from '../types';
 import { ProductCard } from '../components/ProductCard';
 import { CartFloatingBar } from '../components/CartFloatingBar';
 import { CATEGORIES, DAYS, ADMIN_WA } from '../constants';
@@ -20,6 +20,7 @@ import { VaccinationCalendar } from './VaccinationCalendar';
 import { Chat } from '../components/Chat';
 import { generateInvoicePDF } from '../utils/invoice';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import QRCode from 'react-qr-code';
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
 
@@ -35,6 +36,9 @@ export const ShopPage: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeChat, setActiveChat] = useState<{ id: string, name: string } | null>(null);
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+  const [isQRPaymentModalOpen, setIsQRPaymentModalOpen] = useState(false);
+  const [qrPaymentData, setQrPaymentData] = useState<{ vendor: User | null, amount: string }>({ vendor: null, amount: '' });
+  const [isProcessingQRPayment, setIsProcessingQRPayment] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
   const [viewedStatuses, setViewedStatuses] = useState<string[]>(() => {
     const saved = localStorage.getItem('viewed_statuses');
@@ -49,6 +53,8 @@ export const ShopPage: React.FC = () => {
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [isWalletHistoryOpen, setIsWalletHistoryOpen] = useState(false);
+  const [isOfflineQRModalOpen, setIsOfflineQRModalOpen] = useState(false);
+  const [offlineQRAmount, setOfflineQRAmount] = useState('');
   const [walletAmount, setWalletAmount] = useState('');
   const [walletStep, setWalletStep] = useState<'method' | 'details' | 'whatsapp'>('method');
   const [walletPayMethod, setWalletPayMethod] = useState<'mpesa' | 'tigo' | 'airtel' | 'halopesa'>('tigo');
@@ -68,6 +74,26 @@ export const ShopPage: React.FC = () => {
     }
   };
 
+  const playBeep = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // 800Hz beep
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Volume
+      
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.1); // 100ms beep
+    } catch (e) {
+      console.error("Audio API not supported", e);
+    }
+  };
+
   const startQRScanner = () => {
     setIsQRScannerOpen(true);
     setTimeout(() => {
@@ -78,12 +104,19 @@ export const ShopPage: React.FC = () => {
           if (data.type === 'payment' && data.vendorId) {
             const vendor = vendors.find(v => v.id === data.vendorId);
             if (vendor) {
-              setSelectedVendor(vendor);
-              setPayMethod('wallet');
-              // Logic to handle direct payment to vendor
-              toast.success(`QR Imesomwa: Malipo kwa ${vendor.shopName}`);
+              // Success feedback
+              playBeep();
+              if (navigator.vibrate) {
+                navigator.vibrate([200]);
+              }
+              
+              setQrPaymentData({ 
+                vendor, 
+                amount: data.amount ? data.amount.toString() : '' 
+              });
               scanner.clear();
               setIsQRScannerOpen(false);
+              setIsQRPaymentModalOpen(true);
             }
           }
         } catch (e) {
@@ -93,6 +126,75 @@ export const ShopPage: React.FC = () => {
         // console.warn(error);
       });
     }, 500);
+  };
+
+  const handleQRPayment = async () => {
+    if (!user) {
+      toast.error('Tafadhali ingia kwenye akaunti kwanza');
+      return;
+    }
+    if (!qrPaymentData.vendor) return;
+    
+    const amount = Number(qrPaymentData.amount);
+    if (!amount || amount <= 0) {
+      toast.error('Tafadhali weka kiasi sahihi');
+      return;
+    }
+
+    if (user.walletBalance < amount) {
+      toast.error('Salio halitoshi kwenye Wallet yako');
+      return;
+    }
+
+    setIsProcessingQRPayment(true);
+    try {
+      const userRef = doc(db, 'kuku_users', user.id);
+      const vendorRef = doc(db, 'kuku_users', qrPaymentData.vendor.id);
+      
+      // Deduct from user
+      await updateDoc(userRef, {
+        walletBalance: increment(-amount)
+      });
+      
+      // Add to vendor
+      await updateDoc(vendorRef, {
+        walletBalance: increment(amount)
+      });
+
+      // Record transaction
+      const txRef = doc(collection(db, 'kuku_transactions'));
+      await setDoc(txRef, {
+        id: txRef.id,
+        userId: user.id,
+        type: 'payment',
+        amount: amount,
+        status: 'completed',
+        reference: `QR-${Date.now()}`,
+        description: `Malipo ya QR kwa ${qrPaymentData.vendor.shopName}`,
+        createdAt: serverTimestamp()
+      });
+
+      // Notify vendor
+      const notifRef = doc(collection(db, 'kuku_notifications'));
+      await setDoc(notifRef, {
+        id: notifRef.id,
+        userId: qrPaymentData.vendor.id,
+        title: 'Malipo Mapya ya QR',
+        message: `Umepokea TZS ${amount.toLocaleString()} kutoka kwa ${user.name}`,
+        read: false,
+        createdAt: serverTimestamp(),
+        type: 'payment'
+      });
+
+      toast.success('Malipo yamefanikiwa!');
+      setIsQRPaymentModalOpen(false);
+      setQrPaymentData({ vendor: null, amount: '' });
+    } catch (error) {
+      console.error('QR Payment error:', error);
+      toast.error('Hitilafu imetokea wakati wa malipo');
+    } finally {
+      setIsProcessingQRPayment(false);
+    }
   };
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
@@ -2010,6 +2112,12 @@ export const ShopPage: React.FC = () => {
                     >
                       History
                     </button>
+                    <button 
+                      onClick={() => setIsOfflineQRModalOpen(true)}
+                      className="col-span-2 bg-slate-900 dark:bg-amber-500 text-white dark:text-slate-900 py-3 rounded-2xl font-black text-[10px] uppercase tracking-wider flex items-center justify-center gap-2"
+                    >
+                      <QrCode size={14} /> Tengeza QR (Offline Pay)
+                    </button>
                   </div>
                 </div>
               </div>
@@ -3048,6 +3156,63 @@ export const ShopPage: React.FC = () => {
         </div>
       </Modal>
 
+      {/* Offline QR Modal */}
+      <Modal
+        isOpen={isOfflineQRModalOpen}
+        onClose={() => {
+          setIsOfflineQRModalOpen(false);
+          setOfflineQRAmount('');
+        }}
+        title="Tengeneza QR ya Kulipa"
+      >
+        <div className="flex flex-col items-center p-6 space-y-6">
+          <div className="w-full">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Kiasi cha Kulipa ({systemSettings?.currency || 'TZS'})</label>
+            <input 
+              type="number"
+              value={offlineQRAmount}
+              onChange={(e) => setOfflineQRAmount(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-lg dark:text-white mt-2 text-center"
+              placeholder="Mfano: 5000"
+            />
+            {Number(offlineQRAmount) > (user?.walletBalance || 0) && (
+              <p className="text-xs text-red-500 font-bold mt-2 text-center">Salio lako halitoshi. Salio: {formatCurrency(user?.walletBalance || 0, currency)}</p>
+            )}
+          </div>
+
+          {Number(offlineQRAmount) > 0 && Number(offlineQRAmount) <= (user?.walletBalance || 0) && (
+            <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
+              <div className="bg-white p-6 rounded-[40px] shadow-2xl mb-4 relative">
+                <QRCode 
+                  value={JSON.stringify({ 
+                    type: 'offline_pay', 
+                    userId: user?.id, 
+                    amount: Number(offlineQRAmount),
+                    timestamp: Date.now()
+                  })} 
+                  size={200}
+                  level="H"
+                  fgColor={systemSettings?.qrColor || '#000000'}
+                />
+                {systemSettings?.qrLogo && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="bg-white p-1 rounded-xl shadow-sm">
+                      <img src={systemSettings.qrLogo} alt="Logo" className="w-10 h-10 object-contain rounded-lg" />
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="text-center text-sm font-bold text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs">
+                Muonyeshe Muuzaji QR hii ili akuscan na kukata kiasi cha {formatCurrency(Number(offlineQRAmount), currency)} kutoka kwenye Wallet yako.
+              </p>
+              <p className="text-[10px] text-amber-600 font-black mt-4 uppercase tracking-widest">
+                QR hii inatumika kwa dakika 10 tu
+              </p>
+            </div>
+          )}
+        </div>
+      </Modal>
+
 
       {/* Payment Modal */}
       <Modal 
@@ -3679,6 +3844,54 @@ export const ShopPage: React.FC = () => {
       <Modal isOpen={isQRScannerOpen} onClose={() => setIsQRScannerOpen(false)} title="Scan QR Code kwa Malipo">
         <div id="qr-reader" className="w-full"></div>
         <p className="text-center text-xs font-bold text-slate-400 mt-4 uppercase tracking-widest">Weka QR Code ndani ya mraba</p>
+      </Modal>
+
+      <Modal isOpen={isQRPaymentModalOpen} onClose={() => setIsQRPaymentModalOpen(false)} title="Kamilisha Malipo">
+        {qrPaymentData.vendor && (
+          <div className="flex flex-col items-center p-6">
+            <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-4">
+              <Store size={40} />
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-1">{qrPaymentData.vendor.shopName}</h3>
+            <p className="text-slate-500 dark:text-slate-400 mb-8">Malipo ya QR Code</p>
+            
+            <div className="w-full space-y-4">
+              <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Kiasi cha Kulipa ({systemSettings?.currency || 'TZS'})</label>
+                <input 
+                  type="number"
+                  value={qrPaymentData.amount}
+                  onChange={(e) => setQrPaymentData(prev => ({ ...prev, amount: e.target.value }))}
+                  className="w-full bg-transparent text-3xl font-black text-slate-900 dark:text-white outline-none"
+                  placeholder="0"
+                  autoFocus
+                />
+              </div>
+              
+              <div className="flex justify-between items-center p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100 dark:border-emerald-800/30">
+                <span className="text-sm font-bold text-emerald-800 dark:text-emerald-400">Salio Lako:</span>
+                <span className="text-lg font-black text-emerald-600 dark:text-emerald-500">
+                  {systemSettings?.currency || 'TZS'} {(user?.walletBalance || 0).toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <button 
+              onClick={handleQRPayment}
+              disabled={isProcessingQRPayment || !qrPaymentData.amount || Number(qrPaymentData.amount) <= 0 || (user?.walletBalance || 0) < Number(qrPaymentData.amount)}
+              className="mt-8 w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-black py-4 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              {isProcessingQRPayment ? (
+                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Check size={20} />
+                  THIBITISHA MALIPO
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </Modal>
 
       <AuthModal 

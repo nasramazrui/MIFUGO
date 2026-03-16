@@ -8,6 +8,7 @@ import { NotificationsModal } from '../components/NotificationsModal';
 import { DAYS, ADMIN_WA } from '../constants';
 import { formatCurrency, generateId } from '../utils';
 import QRCode from 'react-qr-code';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   BarChart, 
@@ -54,7 +55,8 @@ import {
   Sparkles,
   Tag,
   FileText,
-  ShoppingBag
+  ShoppingBag,
+  QrCode
 } from 'lucide-react';
 import { cn } from '../utils';
 
@@ -67,7 +69,9 @@ import {
   deleteDoc, 
   doc, 
   serverTimestamp,
-  increment
+  increment,
+  getDoc,
+  setDoc
 } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 
@@ -80,6 +84,10 @@ export const VendorPortal: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [qrAmount, setQrAmount] = useState<string>('');
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+  const [isProcessingOfflinePayment, setIsProcessingOfflinePayment] = useState(false);
+  const [offlinePaymentData, setOfflinePaymentData] = useState<{ userId: string, amount: number, timestamp: number } | null>(null);
 
   // Low Stock Alerts
   const lowStockProducts = products.filter(p => p.vendorId === user?.id && p.stock <= (p.lowStockThreshold || 5));
@@ -773,19 +781,215 @@ export const VendorPortal: React.FC = () => {
     }
   };
 
+  const playBeep = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // 800Hz beep
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Volume
+      
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.1); // 100ms beep
+    } catch (e) {
+      console.error("Audio API not supported", e);
+    }
+  };
+
+  const startQRScanner = () => {
+    setIsQRScannerOpen(true);
+    setTimeout(() => {
+      const scanner = new Html5QrcodeScanner("vendor-qr-reader", { fps: 10, qrbox: 250 }, false);
+      scanner.render((decodedText) => {
+        try {
+          const data = JSON.parse(decodedText);
+          if (data.type === 'offline_pay' && data.userId && data.amount && data.timestamp) {
+            // Check if QR is older than 10 minutes (600000 ms)
+            if (Date.now() - data.timestamp > 600000) {
+              toast.error('QR Code hii imeisha muda wake (Expired).');
+              return;
+            }
+            
+            // Success feedback
+            playBeep();
+            if (navigator.vibrate) {
+              navigator.vibrate([200]);
+            }
+            
+            setOfflinePaymentData({
+              userId: data.userId,
+              amount: data.amount,
+              timestamp: data.timestamp
+            });
+            scanner.clear();
+            setIsQRScannerOpen(false);
+          } else {
+            toast.error('QR Code isiyo sahihi kwa malipo haya');
+          }
+        } catch (e) {
+          toast.error('QR Code isiyo sahihi');
+        }
+      }, (error) => {
+        // console.warn(error);
+      });
+    }, 500);
+  };
+
+  const handleOfflinePayment = async () => {
+    if (!user || !offlinePaymentData) return;
+    
+    setIsProcessingOfflinePayment(true);
+    try {
+      const customerDoc = await getDoc(doc(db, 'kuku_users', offlinePaymentData.userId));
+      if (!customerDoc.exists()) {
+        toast.error('Mteja hajapatikana');
+        setIsProcessingOfflinePayment(false);
+        return;
+      }
+      
+      const customerData = customerDoc.data() as User;
+      if ((customerData.walletBalance || 0) < offlinePaymentData.amount) {
+        toast.error(`Salio la mteja halitoshi. Salio: ${formatCurrency(customerData.walletBalance || 0, systemSettings?.currency || 'TZS')}`);
+        setIsProcessingOfflinePayment(false);
+        setOfflinePaymentData(null);
+        return;
+      }
+
+      const userRef = doc(db, 'kuku_users', offlinePaymentData.userId);
+      const vendorRef = doc(db, 'kuku_users', user.id);
+      
+      // Deduct from customer
+      await updateDoc(userRef, {
+        walletBalance: increment(-offlinePaymentData.amount)
+      });
+      
+      // Add to vendor
+      await updateDoc(vendorRef, {
+        walletBalance: increment(offlinePaymentData.amount)
+      });
+
+      // Record transaction
+      const txRef = doc(collection(db, 'kuku_transactions'));
+      await setDoc(txRef, {
+        id: txRef.id,
+        userId: offlinePaymentData.userId,
+        type: 'payment',
+        amount: offlinePaymentData.amount,
+        status: 'completed',
+        reference: `OFFLINE-QR-${Date.now()}`,
+        description: `Malipo ya Offline QR kwa ${user.shopName}`,
+        createdAt: serverTimestamp()
+      });
+
+      // Notify customer
+      const notifRef = doc(collection(db, 'kuku_notifications'));
+      await setDoc(notifRef, {
+        id: notifRef.id,
+        userId: offlinePaymentData.userId,
+        title: 'Malipo ya Offline QR',
+        message: `Umelipa TZS ${offlinePaymentData.amount.toLocaleString()} kwa ${user.shopName}`,
+        read: false,
+        createdAt: serverTimestamp(),
+        type: 'payment'
+      });
+
+      toast.success(`Malipo ya ${formatCurrency(offlinePaymentData.amount, systemSettings?.currency || 'TZS')} yamefanikiwa!`);
+      setOfflinePaymentData(null);
+    } catch (error) {
+      console.error('Offline Payment error:', error);
+      toast.error('Hitilafu imetokea wakati wa malipo');
+    } finally {
+      setIsProcessingOfflinePayment(false);
+    }
+  };
+
   const isIKConfigured = isImageKitConfigured || (systemSettings?.imagekit_public_key && systemSettings?.imagekit_url_endpoint);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col lg:flex-row pb-20 lg:pb-0 transition-colors duration-300">
+      {/* QR Scanner Modal */}
+      <Modal isOpen={isQRScannerOpen} onClose={() => setIsQRScannerOpen(false)} title="Scan QR Code ya Mteja (Offline)">
+        <div id="vendor-qr-reader" className="w-full"></div>
+        <p className="text-center text-xs font-bold text-slate-400 mt-4 uppercase tracking-widest">Weka QR Code ya mteja ndani ya mraba</p>
+      </Modal>
+
+      {/* Offline Payment Confirmation Modal */}
+      <Modal isOpen={!!offlinePaymentData} onClose={() => setOfflinePaymentData(null)} title="Thibitisha Malipo ya Offline">
+        {offlinePaymentData && (
+          <div className="flex flex-col items-center p-6">
+            <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-4">
+              <Wallet size={40} />
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-1">Pokea Malipo</h3>
+            <p className="text-slate-500 dark:text-slate-400 mb-8">Kutoka kwenye Wallet ya Mteja</p>
+            
+            <div className="w-full space-y-4">
+              <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 text-center">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Kiasi cha Kukatwa</label>
+                <div className="text-4xl font-black text-emerald-600 dark:text-emerald-500">
+                  {formatCurrency(offlinePaymentData.amount, systemSettings?.currency || 'TZS')}
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onClick={handleOfflinePayment}
+              disabled={isProcessingOfflinePayment}
+              className="mt-8 w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-black py-4 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              {isProcessingOfflinePayment ? (
+                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <CheckCircle2 size={20} />
+                  THIBITISHA NA POKEA
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </Modal>
+
       {/* QR Modal */}
       <Modal isOpen={isQRModalOpen} onClose={() => setIsQRModalOpen(false)} title="QR Code ya Malipo">
         <div className="flex flex-col items-center p-8">
-          <div className="bg-white p-6 rounded-[40px] shadow-2xl mb-8">
+          <div className="w-full mb-6">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Weka Kiasi Maalum (Si Lazima)</label>
+            <input 
+              type="number"
+              value={qrAmount}
+              onChange={(e) => setQrAmount(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl px-5 py-4 outline-none focus:border-emerald-500 transition-all font-bold text-sm dark:text-white"
+              placeholder={`Mfano: 5000`}
+            />
+            <p className="text-[10px] text-slate-400 font-bold px-2 italic mt-1">
+              Ukiweka kiasi, mteja hatalazimika kuandika kiasi wakati wa kulipa.
+            </p>
+          </div>
+          <div className="bg-white p-6 rounded-[40px] shadow-2xl mb-8 relative">
             <QRCode 
-              value={JSON.stringify({ type: 'payment', vendorId: user?.id, shopName: user?.shopName })} 
+              value={JSON.stringify({ 
+                type: 'payment', 
+                vendorId: user?.id, 
+                shopName: user?.shopName,
+                amount: qrAmount ? Number(qrAmount) : undefined
+              })} 
               size={200}
               level="H"
+              fgColor={systemSettings?.qrColor || '#000000'}
             />
+            {systemSettings?.qrLogo && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="bg-white p-1 rounded-xl shadow-sm">
+                  <img src={systemSettings.qrLogo} alt="Logo" className="w-10 h-10 object-contain rounded-lg" />
+                </div>
+              </div>
+            )}
           </div>
           <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">{user?.shopName}</h3>
           <p className="text-center text-sm font-bold text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs">
@@ -1093,7 +1297,13 @@ export const VendorPortal: React.FC = () => {
                   onClick={() => setIsQRModalOpen(true)}
                   className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold px-6 py-3 rounded-2xl flex items-center gap-2 shadow-lg transition-all active:scale-95"
                 >
-                  <Settings size={20} /> QR Code
+                  <Settings size={20} /> QR Yangu
+                </button>
+                <button 
+                  onClick={startQRScanner}
+                  className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-6 py-3 rounded-2xl flex items-center gap-2 shadow-lg shadow-amber-100 dark:shadow-none transition-all active:scale-95"
+                >
+                  <QrCode size={20} /> Scan Mteja
                 </button>
               </div>
             </div>

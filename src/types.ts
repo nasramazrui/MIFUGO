@@ -314,6 +314,8 @@ export interface SystemSettings {
   firebase_service_account?: string;
   maintenanceMode?: boolean;
   themeColor?: string;
+  qrColor?: string;
+  qrLogo?: string;
   updatedAt: any;
 }
 

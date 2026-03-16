@@ -57,7 +57,8 @@ import {
   BookOpen,
   FileText,
   Award,
-  Sparkles
+  Sparkles,
+  QrCode
 } from 'lucide-react';
 import { cn } from '../utils';
 import { CATEGORIES } from '../constants';
@@ -345,7 +346,9 @@ export const AdminPanel: React.FC = () => {
     pointsValue: 1, // 1 point = 1 TZS
     firebase_service_account: '',
     maintenanceMode: false,
-    themeColor: 'amber'
+    themeColor: 'amber',
+    qrColor: '#000000',
+    qrLogo: ''
   });
 
   useEffect(() => {
@@ -372,7 +375,9 @@ export const AdminPanel: React.FC = () => {
         pointsValue: systemSettings.pointsValue || 1,
         firebase_service_account: systemSettings.firebase_service_account || '',
         maintenanceMode: systemSettings.maintenanceMode || false,
-        themeColor: systemSettings.themeColor || 'amber'
+        themeColor: systemSettings.themeColor || 'amber',
+        qrColor: systemSettings.qrColor || '#000000',
+        qrLogo: systemSettings.qrLogo || ''
       });
     }
   }, [systemSettings]);
@@ -2476,6 +2481,48 @@ export const AdminPanel: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                  
+                  {/* QR Code Settings */}
+                  <div className="md:col-span-2 space-y-4 pt-4 border-t border-slate-100">
+                    <h4 className="font-black text-slate-900 flex items-center gap-2">
+                      <QrCode size={20} className="text-amber-500" />
+                      Muonekano wa QR Code
+                    </h4>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Rangi ya QR Code (Hex)</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="color"
+                            value={localSettings.qrColor || '#000000'}
+                            onChange={(e) => setLocalSettings(prev => ({ ...prev, qrColor: e.target.value }))}
+                            className="w-14 h-14 rounded-xl cursor-pointer border-0 p-0"
+                          />
+                          <input 
+                            type="text"
+                            value={localSettings.qrColor || '#000000'}
+                            onChange={(e) => setLocalSettings(prev => ({ ...prev, qrColor: e.target.value }))}
+                            className="flex-1 bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                            placeholder="#000000"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Logo ya QR Code (URL)</label>
+                        <input 
+                          type="text"
+                          value={localSettings.qrLogo || ''}
+                          onChange={(e) => setLocalSettings(prev => ({ ...prev, qrLogo: e.target.value }))}
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                          placeholder="https://link.to/logo.png"
+                        />
+                        <p className="text-[10px] text-slate-400 font-bold px-2 italic">
+                          * Picha itawekwa katikati ya QR Code
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="md:col-span-2 space-y-4 pt-4 border-t border-slate-100">
                     <div className="flex items-center justify-between bg-slate-50 p-6 rounded-3xl border border-slate-100">
                       <div>
