@@ -102,7 +102,6 @@ interface AppContextType {
   chatMessages: ChatMessage[];
   vaccinationRecords: VaccinationRecord[];
   recurringOrders: RecurringOrder[];
-  askAI: (prompt: string) => Promise<string>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -518,49 +517,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return TRANSLATIONS[lang]?.[key] || TRANSLATIONS['sw']?.[key] || key;
   };
 
-  const askAI = async (prompt: string) => {
-    const key = systemSettings?.openRouterApiKey?.trim();
-    if (!key || key === "null" || key === "undefined" || key === "") {
-      return "Samahani, huduma ya AI haijaunganishwa. Tafadhali wasiliana na Admin.";
-    }
-
-    try {
-      const headers = new Headers();
-      headers.append("Authorization", `Bearer ${key}`);
-      headers.append("Content-Type", "application/json");
-      headers.append("HTTP-Referer", window.location.origin || "");
-      headers.append("X-Title", systemSettings.app_name || "Kuku App");
-
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify({
-          model: "google/gemini-2.0-flash-lite-preview-02-05:free",
-          messages: [
-            {
-              role: "system",
-              content: `Wewe ni msaidizi wa AI wa ${systemSettings.app_name || "Kuku App"}. 
-              Jibu maswali ya wateja kuhusu kilimo, ufugaji, na jinsi ya kutumia App hii. 
-              App hii inaruhusu kununua na kuuza bidhaa za kilimo, minada, na kujifunza kupitia Academy.
-              Tumia lugha ya Kiswahili sanifu na rafiki.`
-            },
-            { role: "user", content: prompt }
-          ]
-        })
-      });
-
-      const data = await response.json();
-      if (data.error) {
-        console.error("AI API Error:", data.error);
-        return "Samahani, kosa limetokea wakati wa kuwasiliana na AI.";
-      }
-      return data.choices?.[0]?.message?.content || "Samahani, siwezi kujibu kwa sasa.";
-    } catch (error) {
-      console.error("AI Error:", error);
-      return "Samahani, kosa limetokea wakati wa kuwasiliana na AI.";
-    }
-  };
-
   const handleReferral = async (referralCode: string, newUserId: string) => {
     try {
       const usersRef = collection(db, 'kuku_users');
@@ -648,7 +604,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       chatMessages,
       vaccinationRecords,
       recurringOrders,
-      askAI,
       handleReferral
     }}>
       {children}

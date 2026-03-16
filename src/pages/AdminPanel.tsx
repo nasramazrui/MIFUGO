@@ -343,7 +343,6 @@ export const AdminPanel: React.FC = () => {
     paymentName: 'Amour',
     pointsPerOrder: 10, // 10 points per 1000 TZS
     pointsValue: 1, // 1 point = 1 TZS
-    openRouterApiKey: '',
     firebase_service_account: '',
     maintenanceMode: false,
     themeColor: 'amber'
@@ -371,7 +370,6 @@ export const AdminPanel: React.FC = () => {
         paymentName: systemSettings.paymentName || 'Amour',
         pointsPerOrder: systemSettings.pointsPerOrder || 10,
         pointsValue: systemSettings.pointsValue || 1,
-        openRouterApiKey: systemSettings.openRouterApiKey || '',
         firebase_service_account: systemSettings.firebase_service_account || '',
         maintenanceMode: systemSettings.maintenanceMode || false,
         themeColor: systemSettings.themeColor || 'amber'
@@ -2678,31 +2676,6 @@ export const AdminPanel: React.FC = () => {
                   >
                     + ONGEZA BANNER MPYA
                   </button>
-                </div>
-              </div>
-
-              {/* AI & External APIs Section */}
-              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
-                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
-                  <div className="w-8 h-8 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
-                    <Sparkles size={18} />
-                  </div>
-                  AI & External APIs
-                </h3>
-                <div className="grid md:grid-cols-1 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">OpenRouter API Key</label>
-                    <input 
-                      type="password"
-                      value={localSettings.openRouterApiKey}
-                      onChange={(e) => setLocalSettings(prev => ({ ...prev, openRouterApiKey: e.target.value }))}
-                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
-                      placeholder="sk-or-v1-..."
-                    />
-                    <p className="text-[10px] text-slate-400 font-bold px-2 italic">
-                      * Inatumika kwa ajili ya huduma za AI kupitia OpenRouter.ai
-                    </p>
-                  </div>
                 </div>
               </div>
 
