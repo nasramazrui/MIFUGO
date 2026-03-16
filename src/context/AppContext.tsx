@@ -519,19 +519,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const askAI = async (prompt: string) => {
-    if (!systemSettings?.openRouterApiKey) {
+    const key = systemSettings?.openRouterApiKey?.trim();
+    if (!key || key === "null" || key === "undefined" || key === "") {
       return "Samahani, huduma ya AI haijaunganishwa. Tafadhali wasiliana na Admin.";
     }
 
     try {
+      const headers = new Headers();
+      headers.append("Authorization", `Bearer ${key}`);
+      headers.append("Content-Type", "application/json");
+      headers.append("HTTP-Referer", window.location.origin || "");
+      headers.append("X-Title", systemSettings.app_name || "Kuku App");
+
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${systemSettings.openRouterApiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": window.location.origin,
-          "X-Title": systemSettings.app_name || "Kuku App"
-        },
+        headers: headers,
         body: JSON.stringify({
           model: "google/gemini-2.0-flash-lite-preview-02-05:free",
           messages: [
@@ -548,7 +550,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       const data = await response.json();
-      return data.choices[0].message.content || "Samahani, siwezi kujibu kwa sasa.";
+      if (data.error) {
+        console.error("AI API Error:", data.error);
+        return "Samahani, kosa limetokea wakati wa kuwasiliana na AI.";
+      }
+      return data.choices?.[0]?.message?.content || "Samahani, siwezi kujibu kwa sasa.";
     } catch (error) {
       console.error("AI Error:", error);
       return "Samahani, kosa limetokea wakati wa kuwasiliana na AI.";
