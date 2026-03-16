@@ -8,13 +8,18 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell, BookOpen, Tag, FileText } from 'lucide-react';
+import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell, BookOpen, Tag, FileText, Syringe, QrCode } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { getAuthEmail, isEmail } from '../utils/authUtils';
 import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, updateProfile, deleteUser, updatePassword } from 'firebase/auth';
 import { AuctionPage } from './AuctionPage';
+import { Forum } from './Forum';
+import { VaccinationCalendar } from './VaccinationCalendar';
+import { Chat } from '../components/Chat';
+import { generateInvoicePDF } from '../utils/invoice';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
 
@@ -26,7 +31,10 @@ export const ShopPage: React.FC = () => {
   const { products, user, vendors, orders, setOrders, addActivity, addNotification, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty, notifications, academyPosts, offers } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const unreadNotifications = notifications.filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
-  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'auctions' | 'academy'>('browse');
+  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'auctions' | 'academy' | 'forum' | 'vaccination' | 'chat'>('browse');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeChat, setActiveChat] = useState<{ id: string, name: string } | null>(null);
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
   const [viewedStatuses, setViewedStatuses] = useState<string[]>(() => {
     const saved = localStorage.getItem('viewed_statuses');
@@ -50,7 +58,42 @@ export const ShopPage: React.FC = () => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const handleDownloadInvoice = async (order: any) => {
+    try {
+      const doc = await generateInvoicePDF(order, systemSettings);
+      doc.save(`Invoice-${order.id.substring(0, 8)}.pdf`);
+      toast.success('Risiti inapakuliwa...');
+    } catch (error) {
+      toast.error('Imeshindwa kupakua risiti');
+    }
+  };
+
+  const startQRScanner = () => {
+    setIsQRScannerOpen(true);
+    setTimeout(() => {
+      const scanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: 250 }, false);
+      scanner.render((decodedText) => {
+        try {
+          const data = JSON.parse(decodedText);
+          if (data.type === 'payment' && data.vendorId) {
+            const vendor = vendors.find(v => v.id === data.vendorId);
+            if (vendor) {
+              setSelectedVendor(vendor);
+              setPayMethod('wallet');
+              // Logic to handle direct payment to vendor
+              toast.success(`QR Imesomwa: Malipo kwa ${vendor.shopName}`);
+              scanner.clear();
+              setIsQRScannerOpen(false);
+            }
+          }
+        } catch (e) {
+          toast.error('QR Code isiyo sahihi');
+        }
+      }, (error) => {
+        // console.warn(error);
+      });
+    }, 500);
+  };
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1207,29 +1250,64 @@ export const ShopPage: React.FC = () => {
               <button className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all">
                 <Search size={20} className="sm:w-6 sm:h-6" />
               </button>
-              <button 
-                onClick={() => setIsLangOpen(!isLangOpen)}
-                className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-100 dark:bg-slate-900 rounded-full border border-slate-100 dark:border-slate-800 hover:bg-slate-200 transition-all"
-              >
-                <Globe size={16} className="text-slate-400 sm:w-[18px] sm:h-[18px]" />
-                <span className="text-[10px] sm:text-sm font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">SW</span>
-              </button>
-              {user && (
-                <motion.button 
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  animate={unreadNotifications > 0 ? {
-                    rotate: [0, -10, 10, -10, 10, 0],
-                    transition: { repeat: Infinity, duration: 2, repeatDelay: 1 }
-                  } : {}}
-                  onClick={() => setIsNotificationsOpen(true)}
-                  className="relative w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all"
+              <div className="relative" ref={langRef}>
+                <button 
+                  onClick={() => setIsLangOpen(!isLangOpen)}
+                  className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-100 dark:bg-slate-900 rounded-full border border-slate-100 dark:border-slate-800 hover:bg-slate-200 transition-all"
                 >
-                  <Bell size={20} className="sm:w-6 sm:h-6" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-950"></span>
+                  <Globe size={16} className="text-slate-400 sm:w-[18px] sm:h-[18px]" />
+                  <span className="text-[10px] sm:text-sm font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">{language === 'sw' ? 'SW' : 'EN'}</span>
+                </button>
+                <AnimatePresence>
+                  {isLangOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute top-full mt-2 right-0 w-32 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden z-50"
+                    >
+                      <button
+                        onClick={() => { setLanguage('sw'); setIsLangOpen(false); }}
+                        className={cn("w-full px-4 py-3 text-left text-sm font-bold transition-colors", language === 'sw' ? "bg-amber-50 dark:bg-amber-900/20 text-amber-600" : "hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300")}
+                      >
+                        Swahili
+                      </button>
+                      <button
+                        onClick={() => { setLanguage('en'); setIsLangOpen(false); }}
+                        className={cn("w-full px-4 py-3 text-left text-sm font-bold transition-colors", language === 'en' ? "bg-amber-50 dark:bg-amber-900/20 text-amber-600" : "hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300")}
+                      >
+                        English
+                      </button>
+                    </motion.div>
                   )}
-                </motion.button>
+                </AnimatePresence>
+              </div>
+              {user && (
+                <>
+                  <motion.button 
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => startQRScanner()}
+                    className="relative w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all"
+                  >
+                    <QrCode size={20} className="sm:w-6 sm:h-6" />
+                  </motion.button>
+                  <motion.button 
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    animate={unreadNotifications > 0 ? {
+                      rotate: [0, -10, 10, -10, 10, 0],
+                      transition: { repeat: Infinity, duration: 2, repeatDelay: 1 }
+                    } : {}}
+                    onClick={() => setIsNotificationsOpen(true)}
+                    className="relative w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all"
+                  >
+                    <Bell size={20} className="sm:w-6 sm:h-6" />
+                    {unreadNotifications > 0 && (
+                      <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-950"></span>
+                    )}
+                  </motion.button>
+                </>
               )}
             </div>
 
@@ -1284,6 +1362,42 @@ export const ShopPage: React.FC = () => {
             </div>
           )
         ))}
+        {activeTab === 'forum' && <Forum />}
+        {activeTab === 'vaccination' && <VaccinationCalendar />}
+        {activeTab === 'chat' && (
+          <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 h-[600px] overflow-hidden shadow-xl">
+            {activeChat ? (
+              <Chat 
+                receiverId={activeChat.id} 
+                receiverName={activeChat.name} 
+                onClose={() => setActiveChat(null)} 
+              />
+            ) : (
+              <div className="p-8 h-full flex flex-col">
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6">Mazungumzo</h2>
+                <div className="flex-1 overflow-y-auto space-y-4">
+                  {vendors.filter(v => v.status === 'approved').map(v => (
+                    <button 
+                      key={v.id}
+                      onClick={() => setActiveChat({ id: v.id, name: v.shopName })}
+                      className="w-full p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-left"
+                    >
+                      <div className="w-12 h-12 bg-amber-100 dark:bg-amber-500/10 rounded-full flex items-center justify-center text-amber-600">
+                        <UserIcon size={24} />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-slate-900 dark:text-white">{v.shopName}</h4>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Muuzaji</p>
+                      </div>
+                      <ChevronRight size={20} className="ml-auto text-slate-300" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'browse' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             {/* Offers Section */}
@@ -1659,19 +1773,19 @@ export const ShopPage: React.FC = () => {
           </button>
           
           <button 
-            onClick={() => setActiveTab('auctions')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'auctions' ? "text-amber-500" : "text-slate-500")}
+            onClick={() => setActiveTab('chat')}
+            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'chat' ? "text-amber-500" : "text-slate-500")}
           >
-            <Gavel size={22} strokeWidth={2.5} />
-            <span className="text-[9px] font-black uppercase tracking-[0.15em]">MINADA</span>
+            <Send size={22} strokeWidth={2.5} />
+            <span className="text-[9px] font-black uppercase tracking-[0.15em]">CHAT</span>
           </button>
 
           <button 
-            onClick={() => setActiveTab('stores')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'stores' ? "text-amber-500" : "text-slate-500")}
+            onClick={() => setActiveTab('vaccination')}
+            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'vaccination' ? "text-amber-500" : "text-slate-500")}
           >
-            <Store size={22} strokeWidth={2.5} />
-            <span className="text-[9px] font-black uppercase tracking-[0.15em]">MADUKA</span>
+            <Syringe size={22} strokeWidth={2.5} />
+            <span className="text-[9px] font-black uppercase tracking-[0.15em]">CHANJO</span>
           </button>
 
           <button 
@@ -1683,11 +1797,11 @@ export const ShopPage: React.FC = () => {
           </button>
           
           <button 
-            onClick={() => setActiveTab('academy')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'academy' ? "text-amber-500" : "text-slate-500")}
+            onClick={() => setActiveTab('forum')}
+            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'forum' ? "text-amber-500" : "text-slate-500")}
           >
-            <BookOpen size={22} strokeWidth={2.5} />
-            <span className="text-[9px] font-black uppercase tracking-[0.15em]">ACADEMY</span>
+            <MessageSquare size={22} strokeWidth={2.5} />
+            <span className="text-[9px] font-black uppercase tracking-[0.15em]">FORUM</span>
           </button>
 
           <button 
@@ -3561,6 +3675,11 @@ export const ShopPage: React.FC = () => {
 
       <RecentPurchases />
       <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
+
+      <Modal isOpen={isQRScannerOpen} onClose={() => setIsQRScannerOpen(false)} title="Scan QR Code kwa Malipo">
+        <div id="qr-reader" className="w-full"></div>
+        <p className="text-center text-xs font-bold text-slate-400 mt-4 uppercase tracking-widest">Weka QR Code ndani ya mraba</p>
+      </Modal>
 
       <AuthModal 
         isOpen={isAuthModalOpen} 

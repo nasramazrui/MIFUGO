@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Product, Order, Review, Activity, Withdrawal, Status, Category, WalletTransaction, Auction, CartItem, AcademyPost, LoyaltyPoint, Invoice } from '../types';
+import { User, Product, Order, Review, Activity, Withdrawal, Status, Category, WalletTransaction, Auction, CartItem, AcademyPost, LoyaltyPoint, Invoice, ForumPost, ChatMessage, VaccinationRecord, RecurringOrder } from '../types';
 import { generateId } from '../utils';
 import { ADMIN_EMAIL, ADMIN_PASS, TRANSLATIONS } from '../constants';
 import { auth, db } from '../services/firebase';
+import { GoogleGenAI } from "@google/genai";
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { 
   collection, 
@@ -15,8 +16,11 @@ import {
   getDoc,
   setDoc,
   updateDoc,
-  where
+  where,
+  increment,
+  getDocs
 } from 'firebase/firestore';
+import { toast } from 'react-hot-toast';
 
 export interface Notification {
   id: string;
@@ -94,6 +98,11 @@ interface AppContextType {
   academyPosts: AcademyPost[];
   loyaltyPoints: LoyaltyPoint[];
   invoices: Invoice[];
+  forumPosts: ForumPost[];
+  chatMessages: ChatMessage[];
+  vaccinationRecords: VaccinationRecord[];
+  recurringOrders: RecurringOrder[];
+  askAI: (prompt: string) => Promise<string>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -126,6 +135,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [academyPosts, setAcademyPosts] = useState<AcademyPost[]>([]);
   const [loyaltyPoints, setLoyaltyPoints] = useState<LoyaltyPoint[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [forumPosts, setForumPosts] = useState<ForumPost[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [vaccinationRecords, setVaccinationRecords] = useState<VaccinationRecord[]>([]);
+  const [recurringOrders, setRecurringOrders] = useState<RecurringOrder[]>([]);
   const [lastNotificationCount, setLastNotificationCount] = useState(0);
 
   const playNotificationSound = () => {
@@ -405,6 +418,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setInvoices(snap.docs.map(d => ({ id: d.id, ...d.data() } as Invoice)));
     });
 
+    // Forum Posts
+    const qForum = query(collection(db, 'kuku_forum'), orderBy('createdAt', 'desc'));
+    const unsubForum = onSnapshot(qForum, (snap) => {
+      setForumPosts(snap.docs.map(d => ({ id: d.id, ...d.data() } as ForumPost)));
+    });
+
+    // Chat Messages
+    const qChat = query(collection(db, 'kuku_chats'), orderBy('createdAt', 'asc'));
+    const unsubChat = onSnapshot(qChat, (snap) => {
+      setChatMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage)));
+    });
+
+    // Vaccination Records
+    const qVaccination = query(collection(db, 'kuku_vaccinations'), orderBy('createdAt', 'desc'));
+    const unsubVaccination = onSnapshot(qVaccination, (snap) => {
+      setVaccinationRecords(snap.docs.map(d => ({ id: d.id, ...d.data() } as VaccinationRecord)));
+    });
+
+    // Recurring Orders
+    const qRecurring = query(collection(db, 'kuku_recurring'), orderBy('createdAt', 'desc'));
+    const unsubRecurring = onSnapshot(qRecurring, (snap) => {
+      setRecurringOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as RecurringOrder)));
+    });
+
     return () => {
       unsubProducts();
       unsubOrders();
@@ -422,6 +459,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubAcademy();
       unsubLoyalty();
       unsubInvoices();
+      unsubForum();
+      unsubChat();
+      unsubVaccination();
+      unsubRecurring();
     };
   }, []);
 
@@ -477,6 +518,90 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return TRANSLATIONS[lang]?.[key] || TRANSLATIONS['sw']?.[key] || key;
   };
 
+  const askAI = async (prompt: string) => {
+    if (!systemSettings?.openRouterApiKey) {
+      return "Samahani, huduma ya AI haijaunganishwa. Tafadhali wasiliana na Admin.";
+    }
+
+    try {
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${systemSettings.openRouterApiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": window.location.origin,
+          "X-Title": systemSettings.app_name || "Kuku App"
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.0-flash-lite-preview-02-05:free",
+          messages: [
+            {
+              role: "system",
+              content: `Wewe ni msaidizi wa AI wa ${systemSettings.app_name || "Kuku App"}. 
+              Jibu maswali ya wateja kuhusu kilimo, ufugaji, na jinsi ya kutumia App hii. 
+              App hii inaruhusu kununua na kuuza bidhaa za kilimo, minada, na kujifunza kupitia Academy.
+              Tumia lugha ya Kiswahili sanifu na rafiki.`
+            },
+            { role: "user", content: prompt }
+          ]
+        })
+      });
+
+      const data = await response.json();
+      return data.choices[0].message.content || "Samahani, siwezi kujibu kwa sasa.";
+    } catch (error) {
+      console.error("AI Error:", error);
+      return "Samahani, kosa limetokea wakati wa kuwasiliana na AI.";
+    }
+  };
+
+  const handleReferral = async (referralCode: string, newUserId: string) => {
+    try {
+      const usersRef = collection(db, 'kuku_users');
+      const q = query(usersRef, where('referralCode', '==', referralCode));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const referrerDoc = querySnapshot.docs[0];
+        const referrerId = referrerDoc.id;
+        const referrerData = referrerDoc.data();
+        const bonus = systemSettings?.referralBonus || 500;
+        
+        // Award points to referrer
+        await updateDoc(doc(db, 'kuku_users', referrerId), {
+          loyaltyPoints: increment(bonus)
+        });
+        
+        // Award points to referee
+        await updateDoc(doc(db, 'kuku_users', newUserId), {
+          loyaltyPoints: increment(bonus),
+          referredBy: referrerId
+        });
+
+        await addDoc(collection(db, 'kuku_loyalty'), {
+          userId: referrerId,
+          userName: referrerData.name || 'User',
+          points: bonus,
+          type: 'referral',
+          description: `Referral bonus for inviting a new user`,
+          createdAt: serverTimestamp()
+        });
+
+        await addDoc(collection(db, 'kuku_loyalty'), {
+          userId: newUserId,
+          points: bonus,
+          type: 'referral',
+          description: `Welcome bonus for using referral code`,
+          createdAt: serverTimestamp()
+        });
+
+        toast.success(`Zawadi ya mwaliko imetolewa! 🎁`);
+      }
+    } catch (error) {
+      console.error("Referral Error:", error);
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       user, setUser,
@@ -512,7 +637,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateCartQty,
       academyPosts,
       loyaltyPoints,
-      invoices
+      invoices,
+      forumPosts,
+      chatMessages,
+      vaccinationRecords,
+      recurringOrders,
+      askAI,
+      handleReferral
     }}>
       {children}
     </AppContext.Provider>

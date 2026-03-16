@@ -7,7 +7,21 @@ import { Modal } from '../components/Modal';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { DAYS, ADMIN_WA } from '../constants';
 import { formatCurrency, generateId } from '../utils';
+import QRCode from 'react-qr-code';
 import { motion, AnimatePresence } from 'motion/react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  AreaChart,
+  Area
+} from 'recharts';
 import { GoogleGenAI } from "@google/genai";
 import { 
   LayoutDashboard, 
@@ -65,6 +79,26 @@ export const VendorPortal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status' | 'reviews' | 'auctions' | 'offers'>('dash');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+
+  // Low Stock Alerts
+  const lowStockProducts = products.filter(p => p.vendorId === user?.id && p.stock <= (p.lowStockThreshold || 5));
+
+  useEffect(() => {
+    if (lowStockProducts.length > 0 && user) {
+      lowStockProducts.forEach(p => {
+        // Only notify once per session or use a more robust logic
+        const notifiedKey = `notified_low_stock_${p.id}`;
+        if (!sessionStorage.getItem(notifiedKey)) {
+          toast(`Bidhaa "${p.name}" inakaribia kuisha! (Zimebaki ${p.stock})`, {
+            icon: '⚠️',
+            duration: 5000
+          });
+          sessionStorage.setItem(notifiedKey, 'true');
+        }
+      });
+    }
+  }, [lowStockProducts.length]);
   const langRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -743,6 +777,29 @@ export const VendorPortal: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col lg:flex-row pb-20 lg:pb-0 transition-colors duration-300">
+      {/* QR Modal */}
+      <Modal isOpen={isQRModalOpen} onClose={() => setIsQRModalOpen(false)} title="QR Code ya Malipo">
+        <div className="flex flex-col items-center p-8">
+          <div className="bg-white p-6 rounded-[40px] shadow-2xl mb-8">
+            <QRCode 
+              value={JSON.stringify({ type: 'payment', vendorId: user?.id, shopName: user?.shopName })} 
+              size={200}
+              level="H"
+            />
+          </div>
+          <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">{user?.shopName}</h3>
+          <p className="text-center text-sm font-bold text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs">
+            Wateja wanaweza kuscan QR hii ili kukulipa moja kwa moja kupitia Wallet yao.
+          </p>
+          <button 
+            onClick={() => window.print()}
+            className="mt-8 w-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-black py-4 rounded-2xl transition-all active:scale-95"
+          >
+            PAKUA / CHAPISHA QR
+          </button>
+        </div>
+      </Modal>
+
       <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
       {/* Mobile Header */}
       <header className="lg:hidden bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-6 py-4 sticky top-0 z-30 flex items-center justify-between">
@@ -1032,6 +1089,12 @@ export const VendorPortal: React.FC = () => {
                 >
                   <TrendingUp size={20} /> Weka Mnada
                 </button>
+                <button 
+                  onClick={() => setIsQRModalOpen(true)}
+                  className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold px-6 py-3 rounded-2xl flex items-center gap-2 shadow-lg transition-all active:scale-95"
+                >
+                  <Settings size={20} /> QR Code
+                </button>
               </div>
             </div>
 
@@ -1052,7 +1115,61 @@ export const VendorPortal: React.FC = () => {
               ))}
             </div>
 
+            {lowStockProducts.length > 0 && (
+              <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 rounded-3xl p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <AlertCircle className="text-amber-600" />
+                  <h3 className="font-black text-amber-900 dark:text-amber-400 uppercase tracking-widest text-sm">Arifa za Akiba (Low Stock)</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {lowStockProducts.map(p => (
+                    <div key={p.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-amber-200 dark:border-amber-500/20 flex items-center justify-between">
+                      <div>
+                        <p className="font-black text-slate-900 dark:text-white text-sm">{p.name}</p>
+                        <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Zimebaki {p.stock} {p.unit}</p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setEditingProduct(p);
+                          setIsEditModalOpen(true);
+                        }}
+                        className="p-2 bg-amber-100 dark:bg-amber-500/20 text-amber-600 rounded-xl hover:bg-amber-200 transition-colors"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid lg:grid-cols-2 gap-8">
+              <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-8 shadow-sm">
+                <h3 className="font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                  <TrendingUp size={20} className="text-emerald-500" /> Uchambuzi wa Mauzo
+                </h3>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={myOrders.slice(-7).map(o => ({ date: o.date.split('-').slice(1).join('/'), amount: o.total }))}>
+                      <defs>
+                        <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700 }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700 }} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                        labelStyle={{ fontWeight: 900, marginBottom: '4px' }}
+                      />
+                      <Area type="monotone" dataKey="amount" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorAmount)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
               <div className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-8 shadow-sm">
                 <h3 className="font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                   <Clock size={20} className="text-amber-500" /> Maagizo ya Hivi Karibuni

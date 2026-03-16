@@ -10,6 +10,7 @@ import {
   updateProfile
 } from 'firebase/auth';
 import { getAuthEmail, isEmail } from '../utils/authUtils';
+import { generateId } from '../utils';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { AlertCircle } from 'lucide-react';
 
@@ -20,7 +21,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { addActivity, systemSettings, t, theme, language } = useApp();
+  const { addActivity, systemSettings, t, theme, language, handleReferral } = useApp();
   const [view, setView] = useState<'choice' | 'login' | 'register'>('choice');
   const [loading, setLoading] = useState(false);
   const [serverStatus, setServerStatus] = useState<'checking' | 'ok' | 'fail'>('checking');
@@ -36,6 +37,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     password: '',
     confirmPassword: '',
     contact: '',
+    referralCode: '',
     hasWhatsApp: true
   });
 
@@ -74,6 +76,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       
       await updateProfile(fbUser, { displayName: formData.name });
       
+      const myReferralCode = generateId().substring(0, 8).toUpperCase();
+
       const userData = {
         name: formData.name,
         email: isEmail(formData.identifier) ? formData.identifier : '',
@@ -82,11 +86,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         hasWhatsApp: formData.hasWhatsApp,
         theme,
         language,
+        referralCode: myReferralCode,
+        loyaltyPoints: 0,
         createdAt: new Date().toISOString(),
         serverCreatedAt: serverTimestamp()
       };
       
       await setDoc(doc(db, 'kuku_users', fbUser.uid), userData);
+      
+      // Handle Referral
+      if (formData.referralCode) {
+        await handleReferral(formData.referralCode, fbUser.uid);
+      }
       
       addActivity('👤', `Mteja mpya "${formData.name}" amesajiliwa`);
       toast.success('Akaunti imetengenezwa!');
@@ -228,6 +239,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 />
               </div>
             )}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Kodi ya Mwaliko (Referral Code - Optional)</label>
+              <input 
+                type="text" 
+                className="input-field"
+                placeholder="Mfano: ABC12345"
+                value={formData.referralCode}
+                onChange={e => setFormData({...formData, referralCode: e.target.value.toUpperCase()})}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{t('password')}</label>

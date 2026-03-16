@@ -27,6 +27,8 @@ export interface User {
   language?: 'sw' | 'en' | 'ar' | 'hi';
   theme?: 'light' | 'dark';
   loyaltyPoints?: number;
+  referralCode?: string;
+  referredBy?: string;
   createdAt: string;
 }
 
@@ -234,8 +236,74 @@ export interface CartItem {
   vendorId: string;
 }
 
+export interface ForumPost {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  title: string;
+  content: string;
+  image?: string;
+  likes: string[];
+  comments: ForumComment[];
+  createdAt: any;
+}
+
+export interface ForumComment {
+  id: string;
+  userId: string;
+  userName: string;
+  text: string;
+  createdAt: any;
+}
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  text: string;
+  image?: string;
+  read: boolean;
+  createdAt: any;
+}
+
+export interface VaccinationRecord {
+  id: string;
+  userId: string;
+  birdType: string;
+  vaccineName: string;
+  date: string;
+  nextDueDate: string;
+  notes?: string;
+  completed: boolean;
+  createdAt: any;
+}
+
+export interface RecurringOrder {
+  id: string;
+  userId: string;
+  productId: string;
+  qty: number;
+  frequency: 'weekly' | 'monthly';
+  nextDelivery: string;
+  status: 'active' | 'paused';
+  createdAt: any;
+}
+
 export interface SystemSettings {
   id: string;
+  imagekit_public_key?: string;
+  imagekit_private_key?: string;
+  imagekit_url_endpoint?: string;
+  firebase_api_key?: string;
+  firebase_auth_domain?: string;
+  firebase_project_id?: string;
+  banners?: { image: string, link: string }[];
+  app_logo?: string;
+  app_name?: string;
+  currency?: string;
+  loading_icon?: string;
+  loading_url?: string;
   withdrawalFeeType: 'fixed' | 'percentage';
   withdrawalFeeValue: number;
   adminWhatsApp: string;
@@ -244,6 +312,9 @@ export interface SystemSettings {
   pointsPerOrder?: number; // How many points per 1000 TZS
   pointsValue?: number; // Value of 1 point in TZS
   openRouterApiKey?: string;
+  firebase_service_account?: string;
+  maintenanceMode?: boolean;
+  themeColor?: string;
   updatedAt: any;
 }
 

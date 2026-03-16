@@ -8,6 +8,7 @@ import { applyThemeColor } from './utils/theme';
 import { Wrench, LogIn } from 'lucide-react';
 import { AuthModal } from './components/AuthModal';
 import { RecentPurchases } from './components/RecentPurchases';
+import { AIChatbot } from './components/AIChatbot';
 
 const AppContent: React.FC = () => {
   const { user, loading, systemSettings, view } = useApp();
@@ -140,6 +141,7 @@ const AppContent: React.FC = () => {
         
         {/* Global Components */}
         <RecentPurchases />
+        <AIChatbot />
       </div>
     </>
   );
