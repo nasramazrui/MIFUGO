@@ -52,6 +52,26 @@ export interface Product {
   deliveryCity: number;
   deliveryOut: number;
   createdAt: string;
+  // Livestock specific
+  isLivestock?: boolean;
+  age?: string;
+  weight?: number;
+  gender?: 'male' | 'female' | 'other';
+  breed?: string;
+  healthStatus?: 'healthy' | 'sick' | 'recovered';
+  birthDate?: string;
+  tagNumber?: string;
+}
+
+export interface LivestockHealthRecord {
+  id: string;
+  productId: string;
+  type: 'vaccination' | 'treatment' | 'checkup';
+  title: string;
+  date: string;
+  notes?: string;
+  performedBy?: string;
+  createdAt: any;
 }
 
 export interface OrderItem {

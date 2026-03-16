@@ -56,7 +56,8 @@ import {
   Tag,
   FileText,
   ShoppingBag,
-  QrCode
+  QrCode,
+  Syringe
 } from 'lucide-react';
 import { cn } from '../utils';
 
@@ -76,7 +77,7 @@ import {
 import { toast } from 'react-hot-toast';
 
 export const VendorPortal: React.FC = () => {
-  const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, addNotification, systemSettings, theme, setTheme, language, setLanguage, setView, t, walletTransactions, notifications, offers } = useApp();
+  const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, addNotification, systemSettings, theme, setTheme, language, setLanguage, setView, t, walletTransactions, notifications, offers, livestockHealthRecords } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const unreadNotifications = notifications.filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -86,6 +87,18 @@ export const VendorPortal: React.FC = () => {
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [qrAmount, setQrAmount] = useState<string>('');
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+  const [selectedProductQR, setSelectedProductQR] = useState<Product | null>(null);
+  const [isProductQRModalOpen, setIsProductQRModalOpen] = useState(false);
+  const [isHealthModalOpen, setIsHealthModalOpen] = useState(false);
+  const [selectedProductHealth, setSelectedProductHealth] = useState<Product | null>(null);
+  const [isAddHealthModalOpen, setIsAddHealthModalOpen] = useState(false);
+  const [newHealthRecord, setNewHealthRecord] = useState({
+    type: 'vaccination' as 'vaccination' | 'treatment' | 'checkup',
+    title: '',
+    date: new Date().toISOString().split('T')[0],
+    notes: '',
+    performedBy: ''
+  });
   const [isProcessingOfflinePayment, setIsProcessingOfflinePayment] = useState(false);
   const [offlinePaymentData, setOfflinePaymentData] = useState<{ userId: string, amount: number, timestamp: number } | null>(null);
 
@@ -324,7 +337,7 @@ export const VendorPortal: React.FC = () => {
       await addDoc(collection(db, 'kuku_offers'), payload);
       
       // Also send a notification to everyone
-      await addDoc(collection(db, 'kuku_activity'), {
+      await addDoc(collection(db, 'kuku_notifications'), {
         title: `OFA MPYA: ${offerForm.title}`,
         message: offerForm.message,
         userId: 'all',
@@ -362,7 +375,15 @@ export const VendorPortal: React.FC = () => {
     emoji: '🥚',
     image: '',
     desc: '',
-    location: ''
+    location: '',
+    isLivestock: false,
+    age: '',
+    weight: '',
+    gender: 'male' as 'male' | 'female' | 'other',
+    breed: '',
+    healthStatus: 'healthy' as 'healthy' | 'sick' | 'recovered',
+    birthDate: '',
+    tagNumber: ''
   });
 
   // Status State
@@ -449,17 +470,61 @@ export const VendorPortal: React.FC = () => {
       deliveryCity: user.deliveryCity || 0,
       deliveryOut: user.deliveryOut || 0,
       createdAt: new Date().toISOString(),
-      serverCreatedAt: serverTimestamp()
+      serverCreatedAt: serverTimestamp(),
+      // Livestock fields
+      isLivestock: newProduct.isLivestock,
+      age: newProduct.age,
+      weight: Number(newProduct.weight) || 0,
+      gender: newProduct.gender,
+      breed: newProduct.breed,
+      healthStatus: newProduct.healthStatus,
+      tagNumber: newProduct.tagNumber
     };
 
     try {
       await addDoc(collection(db, 'kuku_products'), productData);
       addActivity('📦', `Bidhaa mpya "${productData.name}" imeongezwa na ${user.shopName}`);
       setIsAddModalOpen(false);
-      setNewProduct({ name: '', price: '', stock: '', category: 'mayai', unit: 'Piece', emoji: '🥚', image: '', desc: '', location: '' });
+      setNewProduct({ 
+        name: '', price: '', stock: '', category: 'mayai', unit: 'Piece', emoji: '🥚', image: '', desc: '', location: '',
+        isLivestock: false, age: '', weight: '', gender: 'male', breed: '', healthStatus: 'healthy', birthDate: '', tagNumber: ''
+      });
       toast.success('Bidhaa imeongezwa!');
     } catch (error: any) {
       toast.error('Hitilafu wakati wa kuongeza bidhaa');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddHealthRecord = async () => {
+    if (!selectedProductHealth || !newHealthRecord.title) return;
+    setLoading(true);
+
+    const recordData = {
+      productId: selectedProductHealth.id,
+      type: newHealthRecord.type,
+      title: newHealthRecord.title,
+      date: newHealthRecord.date,
+      notes: newHealthRecord.notes,
+      performedBy: newHealthRecord.performedBy,
+      createdAt: serverTimestamp()
+    };
+
+    try {
+      await addDoc(collection(db, 'kuku_livestock_health'), recordData);
+      addActivity('🏥', `Rekodi ya afya "${recordData.title}" imeongezwa kwa ${selectedProductHealth.name}`);
+      setIsAddHealthModalOpen(false);
+      setNewHealthRecord({
+        type: 'vaccination',
+        title: '',
+        date: new Date().toISOString().split('T')[0],
+        notes: '',
+        performedBy: ''
+      });
+      toast.success('Rekodi imehifadhiwa!');
+    } catch (error: any) {
+      toast.error('Imeshindwa kuhifadhi rekodi');
     } finally {
       setLoading(false);
     }
@@ -893,16 +958,12 @@ export const VendorPortal: React.FC = () => {
       });
 
       // Notify customer
-      const notifRef = doc(collection(db, 'kuku_notifications'));
-      await setDoc(notifRef, {
-        id: notifRef.id,
-        userId: offlinePaymentData.userId,
-        title: 'Malipo ya Offline QR',
-        message: `Umelipa TZS ${offlinePaymentData.amount.toLocaleString()} kwa ${user.shopName}`,
-        read: false,
-        createdAt: serverTimestamp(),
-        type: 'payment'
-      });
+      await addNotification(
+        'Malipo ya Offline QR',
+        `Umelipa TZS ${offlinePaymentData.amount.toLocaleString()} kwa ${user.shopName}`,
+        offlinePaymentData.userId,
+        'wallet'
+      );
 
       toast.success(`Malipo ya ${formatCurrency(offlinePaymentData.amount, systemSettings?.currency || 'TZS')} yamefanikiwa!`);
       setOfflinePaymentData(null);
@@ -1006,6 +1067,198 @@ export const VendorPortal: React.FC = () => {
             className="mt-8 w-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-black py-4 rounded-2xl transition-all active:scale-95"
           >
             PAKUA / CHAPISHA QR
+          </button>
+        </div>
+      </Modal>
+
+      {/* Product QR Modal */}
+      <Modal 
+        isOpen={isProductQRModalOpen} 
+        onClose={() => setIsProductQRModalOpen(false)}
+        title="QR Code ya Mfugo/Bidhaa"
+      >
+        <div className="p-8 flex flex-col items-center text-center">
+          {selectedProductQR && (
+            <>
+              <div className="bg-white p-6 rounded-3xl shadow-xl border-4 border-emerald-500 mb-6">
+                <QRCode 
+                  value={JSON.stringify({
+                    type: 'product',
+                    productId: selectedProductQR.id,
+                    vendorId: user?.id
+                  })}
+                  size={200}
+                  level="H"
+                />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 mb-2">{selectedProductQR.name}</h3>
+              <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                Scan code hii ili kuona maelezo ya mfugo huu au kununua moja kwa moja.
+              </p>
+              <div className="grid grid-cols-2 gap-4 w-full">
+                <button 
+                  onClick={() => window.print()}
+                  className="py-4 bg-slate-100 text-slate-900 rounded-2xl font-black flex items-center justify-center gap-2"
+                >
+                  <FileText size={20} /> PRINT
+                </button>
+                <button 
+                  onClick={() => setIsProductQRModalOpen(false)}
+                  className="py-4 bg-emerald-600 text-white rounded-2xl font-black"
+                >
+                  TAYARI
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
+      {/* Livestock Health History Modal */}
+      <Modal 
+        isOpen={isHealthModalOpen} 
+        onClose={() => setIsHealthModalOpen(false)} 
+        title="Historia ya Afya & Chanjo"
+      >
+        {selectedProductHealth && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="text-4xl">{selectedProductHealth.emoji}</div>
+              <div>
+                <h4 className="font-black text-slate-900">{selectedProductHealth.name}</h4>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Tag: {selectedProductHealth.tagNumber || 'N/A'}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h5 className="text-xs font-black text-slate-900 uppercase tracking-widest">Rekodi za Hivi Karibuni</h5>
+                <button 
+                  onClick={() => setIsAddHealthModalOpen(true)}
+                  className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1"
+                >
+                  <Plus size={14} /> Ongeza Rekodi
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {livestockHealthRecords
+                  .filter(r => r.productId === selectedProductHealth.id)
+                  .length === 0 ? (
+                    <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Hakuna rekodi bado</p>
+                    </div>
+                  ) : (
+                    livestockHealthRecords
+                      .filter(r => r.productId === selectedProductHealth.id)
+                      .map(record => (
+                        <div key={record.id} className="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm flex items-start gap-3">
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                            record.type === 'vaccination' ? "bg-emerald-100 text-emerald-600" :
+                            record.type === 'treatment' ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-600"
+                          )}>
+                            {record.type === 'vaccination' ? <Syringe size={18} /> : 
+                             record.type === 'treatment' ? <CheckCircle2 size={18} /> : <FileText size={18} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-sm font-black text-slate-900 truncate">{record.title}</p>
+                              <span className="text-[9px] font-black text-slate-400 uppercase">{record.date}</span>
+                            </div>
+                            {record.notes && <p className="text-xs text-slate-500 line-clamp-2">{record.notes}</p>}
+                            {record.performedBy && (
+                              <p className="text-[9px] font-black text-emerald-600 uppercase mt-2">Daktari: {record.performedBy}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                  )}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Add Health Record Modal */}
+      <Modal 
+        isOpen={isAddHealthModalOpen} 
+        onClose={() => setIsAddHealthModalOpen(false)} 
+        title="Ongeza Rekodi ya Afya"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Aina ya Rekodi</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'vaccination', label: 'Chanjo', icon: Syringe },
+                { id: 'treatment', label: 'Matibabu', icon: CheckCircle2 },
+                { id: 'checkup', label: 'Uchunguzi', icon: FileText }
+              ].map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setNewHealthRecord({...newHealthRecord, type: t.id as any})}
+                  className={cn(
+                    "flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all",
+                    newHealthRecord.type === t.id ? "border-emerald-500 bg-emerald-50 text-emerald-600" : "border-slate-100 bg-white text-slate-400"
+                  )}
+                >
+                  <t.icon size={20} />
+                  <span className="text-[10px] font-black uppercase">{t.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Kichwa cha Habari</label>
+            <input 
+              type="text" 
+              className="input-field"
+              placeholder="Mf: Chanjo ya Gumboro"
+              value={newHealthRecord.title}
+              onChange={e => setNewHealthRecord({...newHealthRecord, title: e.target.value})}
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Tarehe</label>
+            <input 
+              type="date" 
+              className="input-field"
+              value={newHealthRecord.date}
+              onChange={e => setNewHealthRecord({...newHealthRecord, date: e.target.value})}
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Daktari / Mtaalamu (Hiari)</label>
+            <input 
+              type="text" 
+              className="input-field"
+              placeholder="Jina la daktari"
+              value={newHealthRecord.performedBy}
+              onChange={e => setNewHealthRecord({...newHealthRecord, performedBy: e.target.value})}
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Maelezo ya Ziada</label>
+            <textarea 
+              className="input-field resize-none"
+              rows={3}
+              placeholder="Weka maelezo zaidi hapa..."
+              value={newHealthRecord.notes}
+              onChange={e => setNewHealthRecord({...newHealthRecord, notes: e.target.value})}
+            />
+          </div>
+
+          <button 
+            onClick={handleAddHealthRecord}
+            disabled={loading || !newHealthRecord.title}
+            className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl hover:bg-emerald-700 transition-all active:scale-95 flex items-center justify-center gap-2 mt-4"
+          >
+            {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'HIFADHI REKODI'}
           </button>
         </div>
       </Modal>
@@ -1454,6 +1707,28 @@ export const VendorPortal: React.FC = () => {
                   <div className="aspect-video bg-slate-50 flex items-center justify-center text-5xl relative">
                     {p.emoji}
                     <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => {
+                          setSelectedProductQR(p);
+                          setIsProductQRModalOpen(true);
+                        }}
+                        className="w-10 h-10 bg-white shadow-lg rounded-xl flex items-center justify-center text-emerald-500 hover:bg-emerald-50 transition-colors"
+                        title="Tengeneza QR Code"
+                      >
+                        <QrCode size={18} />
+                      </button>
+                      {p.isLivestock && (
+                        <button 
+                          onClick={() => {
+                            setSelectedProductHealth(p);
+                            setIsHealthModalOpen(true);
+                          }}
+                          className="w-10 h-10 bg-white shadow-lg rounded-xl flex items-center justify-center text-rose-500 hover:bg-rose-50 transition-colors"
+                          title="Usimamizi wa Afya"
+                        >
+                          <Syringe size={18} />
+                        </button>
+                      )}
                       <button 
                         onClick={() => {
                           setEditingProduct(p);
@@ -2405,6 +2680,113 @@ export const VendorPortal: React.FC = () => {
               onChange={e => setNewProduct({...newProduct, desc: e.target.value})}
             />
           </div>
+
+          {/* Livestock Specific Fields */}
+          <div className="bg-slate-50 p-4 rounded-2xl space-y-4 border border-slate-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600">
+                  <Tag size={16} />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-slate-900 uppercase">Ni Mfugo?</p>
+                  <p className="text-[10px] text-slate-500 font-bold">Weka taarifa za ziada za mnyama</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setNewProduct({...newProduct, isLivestock: !newProduct.isLivestock})}
+                className={cn(
+                  "w-12 h-6 rounded-full transition-all relative",
+                  newProduct.isLivestock ? "bg-emerald-500" : "bg-slate-300"
+                )}
+              >
+                <div className={cn(
+                  "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                  newProduct.isLivestock ? "left-7" : "left-1"
+                )} />
+              </button>
+            </div>
+
+            {newProduct.isLivestock && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="space-y-4 pt-2 border-t border-slate-200"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Umri</label>
+                    <input 
+                      type="text" 
+                      className="input-field py-3"
+                      placeholder="Mf: Miezi 6"
+                      value={newProduct.age}
+                      onChange={e => setNewProduct({...newProduct, age: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Uzito (Kg)</label>
+                    <input 
+                      type="number" 
+                      className="input-field py-3"
+                      placeholder="Mf: 15"
+                      value={newProduct.weight}
+                      onChange={e => setNewProduct({...newProduct, weight: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Jinsia</label>
+                    <select 
+                      className="input-field py-3"
+                      value={newProduct.gender}
+                      onChange={e => setNewProduct({...newProduct, gender: e.target.value as any})}
+                    >
+                      <option value="male">Dume</option>
+                      <option value="female">Jike</option>
+                      <option value="other">Nyingine</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Uzao (Breed)</label>
+                    <input 
+                      type="text" 
+                      className="input-field py-3"
+                      placeholder="Mf: Friesian"
+                      value={newProduct.breed}
+                      onChange={e => setNewProduct({...newProduct, breed: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Hali ya Afya</label>
+                    <select 
+                      className="input-field py-3"
+                      value={newProduct.healthStatus}
+                      onChange={e => setNewProduct({...newProduct, healthStatus: e.target.value as any})}
+                    >
+                      <option value="healthy">Mzima</option>
+                      <option value="sick">Mgonjwa</option>
+                      <option value="recovered">Amepona</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Namba ya Tag</label>
+                    <input 
+                      type="text" 
+                      className="input-field py-3"
+                      placeholder="Mf: TZ-001"
+                      value={newProduct.tagNumber}
+                      onChange={e => setNewProduct({...newProduct, tagNumber: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Picha ya Bidhaa (Hiari)</label>
             <div className="flex gap-2 mb-4">
@@ -2647,6 +3029,119 @@ export const VendorPortal: React.FC = () => {
                 </select>
               </div>
             </div>
+
+            <div className="flex flex-col justify-end pb-2">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div className="relative">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only"
+                    checked={editingProduct.isLivestock}
+                    onChange={e => setEditingProduct({...editingProduct, isLivestock: e.target.checked})}
+                  />
+                  <div className={cn(
+                    "w-12 h-6 rounded-full transition-colors",
+                    editingProduct.isLivestock ? "bg-emerald-500" : "bg-slate-200"
+                  )} />
+                  <div className={cn(
+                    "absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform",
+                    editingProduct.isLivestock ? "translate-x-6" : "translate-x-0"
+                  )} />
+                </div>
+                <span className="text-xs font-black text-slate-600 uppercase tracking-widest group-hover:text-emerald-600 transition-colors">Ni Mfugo?</span>
+              </label>
+            </div>
+
+            {editingProduct.isLivestock && (
+              <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100 space-y-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <Tag size={18} className="text-emerald-600" />
+                  <h4 className="text-xs font-black text-emerald-900 uppercase tracking-widest">Taarifa za Mfugo</h4>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-2 ml-1">Tag Number / ID</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-white border-2 border-emerald-100 rounded-2xl px-4 py-3 outline-none focus:border-emerald-500 transition-all font-bold text-sm"
+                      placeholder="Mf: TZ-001"
+                      value={editingProduct.tagNumber}
+                      onChange={e => setEditingProduct({...editingProduct, tagNumber: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-2 ml-1">Uzao / Breed</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-white border-2 border-emerald-100 rounded-2xl px-4 py-3 outline-none focus:border-emerald-500 transition-all font-bold text-sm"
+                      placeholder="Mf: Boran"
+                      value={editingProduct.breed}
+                      onChange={e => setEditingProduct({...editingProduct, breed: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-2 ml-1">Umri</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-white border-2 border-emerald-100 rounded-2xl px-4 py-3 outline-none focus:border-emerald-500 transition-all font-bold text-sm"
+                      placeholder="Mf: Miezi 6"
+                      value={editingProduct.age}
+                      onChange={e => setEditingProduct({...editingProduct, age: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-2 ml-1">Uzito (Kg)</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-white border-2 border-emerald-100 rounded-2xl px-4 py-3 outline-none focus:border-emerald-500 transition-all font-bold text-sm"
+                      placeholder="Mf: 250"
+                      value={editingProduct.weight}
+                      onChange={e => setEditingProduct({...editingProduct, weight: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-2 ml-1">Jinsia</label>
+                    <select 
+                      className="w-full bg-white border-2 border-emerald-100 rounded-2xl px-4 py-3 outline-none focus:border-emerald-500 transition-all font-bold text-sm"
+                      value={editingProduct.gender}
+                      onChange={e => setEditingProduct({...editingProduct, gender: e.target.value as 'male' | 'female'})}
+                    >
+                      <option value="male">Dume</option>
+                      <option value="female">Jike</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-2 ml-1">Hali ya Afya</label>
+                    <select 
+                      className="w-full bg-white border-2 border-emerald-100 rounded-2xl px-4 py-3 outline-none focus:border-emerald-500 transition-all font-bold text-sm"
+                      value={editingProduct.healthStatus}
+                      onChange={e => setEditingProduct({...editingProduct, healthStatus: e.target.value as any})}
+                    >
+                      <option value="healthy">Mzima (Healthy)</option>
+                      <option value="sick">Mgonjwa (Sick)</option>
+                      <option value="quarantine">Karantini (Quarantine)</option>
+                      <option value="recovered">Amepona (Recovered)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-2 ml-1">Tarehe ya Kuzaliwa</label>
+                    <input 
+                      type="date" 
+                      className="w-full bg-white border-2 border-emerald-100 rounded-2xl px-4 py-3 outline-none focus:border-emerald-500 transition-all font-bold text-sm"
+                      value={editingProduct.birthDate}
+                      onChange={e => setEditingProduct({...editingProduct, birthDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Maelezo</label>
               <textarea 

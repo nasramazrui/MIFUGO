@@ -8,11 +8,11 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell, BookOpen, Tag, FileText, Syringe, QrCode } from 'lucide-react';
+import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell, BookOpen, Tag, FileText, Syringe, QrCode, CheckCircle2, MessageCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { getAuthEmail, isEmail } from '../utils/authUtils';
-import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc, getDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, updateProfile, deleteUser, updatePassword } from 'firebase/auth';
 import { AuctionPage } from './AuctionPage';
 import { Forum } from './Forum';
@@ -29,7 +29,7 @@ import { NotificationsModal } from '../components/NotificationsModal';
 import { AcademyPage } from './AcademyPage';
 
 export const ShopPage: React.FC = () => {
-  const { products, user, vendors, orders, setOrders, addActivity, addNotification, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty, notifications, academyPosts, offers } = useApp();
+  const { products, user, vendors, orders, setOrders, addActivity, addNotification, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty, notifications, academyPosts, offers, livestockHealthRecords } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const unreadNotifications = notifications.filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
   const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'auctions' | 'academy' | 'forum' | 'vaccination' | 'chat'>('browse');
@@ -94,7 +94,7 @@ export const ShopPage: React.FC = () => {
     }
   };
 
-  const handleQRScan = (decodedText: string) => {
+  const handleQRScan = async (decodedText: string) => {
     try {
       const data = JSON.parse(decodedText);
       if (data.type === 'payment' && data.vendorId) {
@@ -112,6 +112,32 @@ export const ShopPage: React.FC = () => {
           });
           setIsQRScannerOpen(false);
           setIsQRPaymentModalOpen(true);
+        }
+      } else if (data.type === 'product' && data.productId) {
+        let product = products.find(p => p.id === data.productId);
+        
+        if (!product) {
+          // Fallback: Try to fetch directly from Firestore if not in local state
+          try {
+            const productDoc = await getDoc(doc(db, 'kuku_products', data.productId));
+            if (productDoc.exists()) {
+              product = { id: productDoc.id, ...productDoc.data() } as any;
+            }
+          } catch (err) {
+            console.error("Error fetching product manually:", err);
+          }
+        }
+
+        if (product) {
+          playBeep();
+          if (navigator.vibrate) {
+            navigator.vibrate([200]);
+          }
+          setSelectedProduct(product);
+          setIsQRScannerOpen(false);
+          toast.success(`Mfugo umepatikana: ${product.name}`);
+        } else {
+          toast.error('Bidhaa haijapatikana');
         }
       } else {
         toast.success(`Scanned: ${decodedText}`);
@@ -156,30 +182,51 @@ export const ShopPage: React.FC = () => {
         walletBalance: increment(amount)
       });
 
-      // Record transaction
-      const txRef = doc(collection(db, 'kuku_transactions'));
-      await setDoc(txRef, {
-        id: txRef.id,
+      const vendorName = qrPaymentData.vendor.shopName || qrPaymentData.vendor.name;
+
+      // Record transaction for sender (user)
+      const senderTxRef = doc(collection(db, 'kuku_wallet'));
+      await setDoc(senderTxRef, {
+        id: senderTxRef.id,
         userId: user.id,
+        userName: user.name,
         type: 'payment',
+        amount: -amount,
+        status: 'approved',
+        description: `Malipo ya QR kwa ${vendorName}`,
+        date: new Date().toISOString().split('T')[0],
+        createdAt: serverTimestamp()
+      });
+
+      // Record transaction for recipient (vendor)
+      const recipientTxRef = doc(collection(db, 'kuku_wallet'));
+      await setDoc(recipientTxRef, {
+        id: recipientTxRef.id,
+        userId: qrPaymentData.vendor.id,
+        userName: vendorName,
+        type: 'sale',
         amount: amount,
-        status: 'completed',
-        reference: `QR-${Date.now()}`,
-        description: `Malipo ya QR kwa ${qrPaymentData.vendor.shopName}`,
+        status: 'approved',
+        description: `Malipo ya QR kutoka kwa ${user.name}`,
+        date: new Date().toISOString().split('T')[0],
         createdAt: serverTimestamp()
       });
 
       // Notify vendor
-      const notifRef = doc(collection(db, 'kuku_notifications'));
-      await setDoc(notifRef, {
-        id: notifRef.id,
-        userId: qrPaymentData.vendor.id,
-        title: 'Malipo Mapya ya QR',
-        message: `Umepokea TZS ${amount.toLocaleString()} kutoka kwa ${user.name}`,
-        read: false,
-        createdAt: serverTimestamp(),
-        type: 'payment'
-      });
+      await addNotification(
+        'Malipo Mapya ya QR 💰',
+        `Umepokea TZS ${amount.toLocaleString()} kutoka kwa ${user.name}`,
+        qrPaymentData.vendor.id,
+        'wallet'
+      );
+
+      // Notify user
+      await addNotification(
+        'Malipo Yamekamilika ✅',
+        `Umelipa TZS ${amount.toLocaleString()} kwa ${vendorName}`,
+        user.id,
+        'wallet'
+      );
 
       toast.success('Malipo yamefanikiwa!');
       setIsQRPaymentModalOpen(false);
@@ -428,7 +475,88 @@ export const ShopPage: React.FC = () => {
     closeTime: '18:00',
     openDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as string[]
   });
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [isVendorLoading, setIsVendorLoading] = useState(false);
+  const [withdrawForm, setWithdrawForm] = useState({
+    amount: '',
+    method: 'mobile' as 'mobile' | 'bank',
+    network: 'mpesa',
+    phoneNumber: '',
+    bankName: '',
+    accountNumber: ''
+  });
+  const [withdrawStep, setWithdrawStep] = useState<'form' | 'summary' | 'whatsapp'>('form');
+  const [isWithdrawLoading, setIsWithdrawLoading] = useState(false);
+  const [lastWithdrawalId, setLastWithdrawalId] = useState('');
+
+  const calculateWithdrawFee = (amount: number) => {
+    if (!systemSettings) return 0;
+    if (systemSettings.withdrawalFeeType === 'fixed') return systemSettings.withdrawalFeeValue || 0;
+    return (amount * (systemSettings.withdrawalFeeValue || 0)) / 100;
+  };
+
+  const handleWithdraw = async () => {
+    if (!user) return;
+    const amountNum = Number(withdrawForm.amount);
+    if (!amountNum || amountNum <= 0) {
+      toast.error('Weka kiasi sahihi');
+      return;
+    }
+
+    if (amountNum > (user.walletBalance || 0)) {
+      toast.error('Salio halitoshi');
+      return;
+    }
+
+    if (withdrawForm.method === 'mobile' && !withdrawForm.phoneNumber) {
+      toast.error('Tafadhali weka namba ya simu');
+      return;
+    }
+
+    setIsWithdrawLoading(true);
+    try {
+      const method = withdrawForm.method === 'mobile' ? withdrawForm.network : 'Visa / Mastercard';
+      const phone = withdrawForm.method === 'mobile' ? withdrawForm.phoneNumber : `${withdrawForm.bankName} - ${withdrawForm.accountNumber}`;
+      const fee = calculateWithdrawFee(amountNum);
+      const netAmount = amountNum - fee;
+
+      const withdrawRef = await addDoc(collection(db, 'kuku_withdrawals'), {
+        userId: user.id,
+        userName: user.name,
+        amount: amountNum,
+        fee,
+        netAmount,
+        method,
+        phoneNumber: phone,
+        status: 'Pending',
+        createdAt: serverTimestamp()
+      });
+
+      await addDoc(collection(db, 'kuku_wallet'), {
+        userId: user.id,
+        userName: user.name,
+        type: 'withdrawal',
+        amount: -amountNum,
+        status: 'Pending',
+        description: `Withdrawal to ${method} (${phone})`,
+        createdAt: serverTimestamp(),
+        withdrawalId: withdrawRef.id
+      });
+
+      await updateDoc(doc(db, 'kuku_users', user.id), {
+        walletBalance: increment(-amountNum)
+      });
+
+      setLastWithdrawalId(withdrawRef.id);
+      setWithdrawStep('whatsapp');
+      toast.success('Ombi la kutoa pesa limetumwa!');
+      addActivity('💸', `Umeomba kutoa ${formatCurrency(amountNum, currency)}`);
+    } catch (error: any) {
+      toast.error(error.message || 'Hitilafu wakati wa kutuma maombi');
+    } finally {
+      setIsWithdrawLoading(false);
+    }
+  };
 
   const handleVendorRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1350,6 +1478,13 @@ export const ShopPage: React.FC = () => {
               >
                 <Menu size={20} className="sm:w-6 sm:h-6" />
               </button>
+              <button 
+                onClick={() => setIsQRScannerOpen(true)}
+                className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 transition-all"
+                title="Scan QR Code"
+              >
+                <QrCode size={20} className="sm:w-6 sm:h-6" />
+              </button>
               <button className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all">
                 <Search size={20} className="sm:w-6 sm:h-6" />
               </button>
@@ -2100,6 +2235,12 @@ export const ShopPage: React.FC = () => {
                       + Add Money
                     </button>
                     <button 
+                      onClick={() => setIsWithdrawModalOpen(true)}
+                      className="bg-emerald-600 text-white py-3 rounded-2xl font-black text-[10px] uppercase tracking-wider shadow-lg shadow-emerald-600/20"
+                    >
+                      Withdraw
+                    </button>
+                    <button 
                       onClick={() => setIsWalletHistoryOpen(true)}
                       className="bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-400 py-3 rounded-2xl font-black text-[10px] uppercase tracking-wider border border-amber-200 dark:border-amber-900/50"
                     >
@@ -2296,7 +2437,201 @@ export const ShopPage: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Order Tracking Modal */}
+      {/* User Withdraw Modal */}
+      <Modal 
+        isOpen={isWithdrawModalOpen} 
+        onClose={() => setIsWithdrawModalOpen(false)}
+        title={withdrawStep === 'form' ? "Omba Malipo (Withdraw)" : withdrawStep === 'summary' ? "Thibitisha Malipo" : "Tuma Ombi WhatsApp"}
+      >
+        {withdrawStep === 'form' && (
+          <div className="space-y-6">
+            <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center">
+              <p className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-1">Salio la Wallet</p>
+              <p className="text-3xl font-black text-emerald-800">{formatCurrency(user?.walletBalance || 0, currency)}</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kiasi cha Kutoa (TZS)</label>
+              <input 
+                type="number" 
+                placeholder="Mf. 50000"
+                className="input-field"
+                value={withdrawForm.amount}
+                onChange={e => setWithdrawForm({...withdrawForm, amount: e.target.value})}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Njia ya Malipo</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  onClick={() => setWithdrawForm({...withdrawForm, method: 'mobile'})}
+                  className={cn(
+                    "py-4 rounded-2xl font-black text-xs transition-all border-2",
+                    withdrawForm.method === 'mobile' ? "border-amber-500 bg-amber-50 text-amber-700" : "border-slate-100 text-slate-400"
+                  )}
+                >
+                  📱 Mtandao wa Simu
+                </button>
+                <button 
+                  onClick={() => setWithdrawForm({...withdrawForm, method: 'bank'})}
+                  className={cn(
+                    "py-4 rounded-2xl font-black text-xs transition-all border-2",
+                    withdrawForm.method === 'bank' ? "border-amber-500 bg-amber-50 text-amber-700" : "border-slate-100 text-slate-400"
+                  )}
+                >
+                  💳 Visa / Mastercard
+                </button>
+              </div>
+            </div>
+
+            {withdrawForm.method === 'mobile' ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Chagua Mtandao</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['mpesa', 'tigo', 'airtel', 'halopesa'].map(net => (
+                      <button 
+                        key={net}
+                        onClick={() => setWithdrawForm({...withdrawForm, network: net})}
+                        className={cn(
+                          "py-3 rounded-xl font-bold text-[10px] uppercase transition-all border",
+                          withdrawForm.network === net ? "border-amber-500 bg-amber-50 text-amber-600" : "border-slate-100 text-slate-500"
+                        )}
+                      >
+                        {net}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Namba ya Simu ya Malipo</label>
+                  <input 
+                    type="tel" 
+                    placeholder="0xxx xxx xxx"
+                    className="input-field"
+                    value={withdrawForm.phoneNumber}
+                    onChange={e => setWithdrawForm({...withdrawForm, phoneNumber: e.target.value})}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Jina la Benki</label>
+                  <input 
+                    type="text" 
+                    placeholder="Mf. CRDB, NMB"
+                    className="input-field"
+                    value={withdrawForm.bankName}
+                    onChange={e => setWithdrawForm({...withdrawForm, bankName: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Namba ya Akaunti</label>
+                  <input 
+                    type="text" 
+                    placeholder="0123456789"
+                    className="input-field"
+                    value={withdrawForm.accountNumber}
+                    onChange={e => setWithdrawForm({...withdrawForm, accountNumber: e.target.value})}
+                  />
+                </div>
+              </div>
+            )}
+
+            <button 
+              onClick={() => setWithdrawStep('summary')}
+              disabled={!withdrawForm.amount || Number(withdrawForm.amount) <= 0}
+              className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-2xl transition-all active:scale-95 shadow-xl shadow-amber-100 flex items-center justify-center gap-2"
+            >
+              ENDELEA <ArrowRight size={18} />
+            </button>
+          </div>
+        )}
+
+        {withdrawStep === 'summary' && (
+          <div className="space-y-6">
+            <div className="bg-slate-50 p-6 rounded-3xl space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-400 uppercase">Kiasi unachotoa</span>
+                <span className="font-black text-slate-900">{formatCurrency(Number(withdrawForm.amount), currency)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-400 uppercase">Makato (Fee)</span>
+                <span className="font-black text-red-500">-{formatCurrency(calculateWithdrawFee(Number(withdrawForm.amount)), currency)}</span>
+              </div>
+              <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
+                <span className="text-xs font-black text-slate-900 uppercase">Utapokea (Net)</span>
+                <span className="text-xl font-black text-emerald-600">{formatCurrency(Number(withdrawForm.amount) - calculateWithdrawFee(Number(withdrawForm.amount)), currency)}</span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl">
+                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Njia ya Malipo</p>
+                <p className="text-sm font-bold text-blue-900">
+                  {withdrawForm.method === 'mobile' ? `${withdrawForm.network.toUpperCase()} (${withdrawForm.phoneNumber})` : `${withdrawForm.bankName} (${withdrawForm.accountNumber})`}
+                </p>
+              </div>
+              <p className="text-[10px] text-center text-slate-400 font-bold uppercase leading-relaxed">
+                Ombi lako litahakikiwa na Admin ndani ya saa 24. Pesa itatumwa kwenye njia uliyochagua.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setWithdrawStep('form')}
+                className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl"
+              >
+                RUDI
+              </button>
+              <button 
+                onClick={handleWithdraw}
+                disabled={isWithdrawLoading}
+                className="flex-2 py-4 bg-amber-600 text-white font-black rounded-2xl flex items-center justify-center gap-2"
+              >
+                {isWithdrawLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'THIBITISHA NA TUMA'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {withdrawStep === 'whatsapp' && (
+          <div className="text-center space-y-6 py-4">
+            <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+              <CheckCircle2 size={40} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-slate-900 mb-2">Ombi Limetumwa!</h3>
+              <p className="text-sm text-slate-500 font-medium">Tafadhali tuma ujumbe WhatsApp kwa Admin ili kuharakisha mchakato wa malipo.</p>
+            </div>
+            
+            <button 
+              onClick={() => {
+                const amountNum = Number(withdrawForm.amount);
+                const fee = calculateWithdrawFee(amountNum);
+                const net = amountNum - fee;
+                const method = withdrawForm.method === 'mobile' ? withdrawForm.network.toUpperCase() : 'BANK';
+                const phone = withdrawForm.method === 'mobile' ? withdrawForm.phoneNumber : `${withdrawForm.bankName} - ${withdrawForm.accountNumber}`;
+                
+                const msg = `Habari Admin,\n\nNaomba kutoa pesa kutoka kwenye Wallet yangu.\n\n👤 Jina: *${user?.name}*\n💰 Kiasi: *${formatCurrency(amountNum, currency)}*\n📉 Makato: *${formatCurrency(fee, currency)}*\n💵 Net: *${formatCurrency(net, currency)}*\n💳 Njia: *${method}*\n📱 Maelezo: *${phone}*\n🆔 ID: *${lastWithdrawalId}*\n\nTafadhali nihakikie.`;
+                window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
+              }}
+              className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-black rounded-2xl shadow-xl shadow-green-100 flex items-center justify-center gap-2"
+            >
+              <MessageCircle size={20} /> TUMA WHATSAPP
+            </button>
+            
+            <button 
+              onClick={() => setIsWithdrawModalOpen(false)}
+              className="w-full py-4 bg-slate-100 text-slate-600 font-black rounded-2xl"
+            >
+              FUNGA
+            </button>
+          </div>
+        )}
+      </Modal>
       <Modal
         isOpen={isTrackingModalOpen}
         onClose={() => setIsTrackingModalOpen(false)}
@@ -2688,6 +3023,84 @@ export const ShopPage: React.FC = () => {
               </div>
               <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">{selectedProduct.desc}</p>
             </div>
+
+            {selectedProduct.isLivestock && (
+              <div className="bg-emerald-50 dark:bg-emerald-900/10 p-6 rounded-[32px] border border-emerald-100 dark:border-emerald-900/30 space-y-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <Tag size={18} className="text-emerald-600" />
+                  <h4 className="text-xs font-black text-emerald-900 dark:text-emerald-400 uppercase tracking-widest">Pasipoti ya Mfugo (Livestock Passport)</h4>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white dark:bg-slate-900/50 p-3 rounded-2xl border border-emerald-100/50 dark:border-emerald-900/20">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Tag Number</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">{selectedProduct.tagNumber || 'N/A'}</p>
+                  </div>
+                  <div className="bg-white dark:bg-slate-900/50 p-3 rounded-2xl border border-emerald-100/50 dark:border-emerald-900/20">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Breed / Uzao</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">{selectedProduct.breed || 'N/A'}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-white dark:bg-slate-900/50 p-3 rounded-2xl border border-emerald-100/50 dark:border-emerald-900/20 text-center">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Umri</p>
+                    <p className="text-xs font-black text-slate-900 dark:text-white">{selectedProduct.age || 'N/A'}</p>
+                  </div>
+                  <div className="bg-white dark:bg-slate-900/50 p-3 rounded-2xl border border-emerald-100/50 dark:border-emerald-900/20 text-center">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Uzito</p>
+                    <p className="text-xs font-black text-slate-900 dark:text-white">{selectedProduct.weight ? `${selectedProduct.weight} Kg` : 'N/A'}</p>
+                  </div>
+                  <div className="bg-white dark:bg-slate-900/50 p-3 rounded-2xl border border-emerald-100/50 dark:border-emerald-900/20 text-center">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Jinsia</p>
+                    <p className="text-xs font-black text-slate-900 dark:text-white uppercase">{selectedProduct.gender === 'male' ? 'Dume' : 'Jike'}</p>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-emerald-100/50 dark:border-emerald-900/20">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Hali ya Afya</p>
+                    <span className={cn(
+                      "text-[9px] font-black px-2 py-0.5 rounded-full uppercase",
+                      selectedProduct.healthStatus === 'healthy' ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+                    )}>
+                      {selectedProduct.healthStatus}
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest border-b border-slate-50 dark:border-slate-800 pb-2">Historia ya Chanjo & Matibabu</p>
+                    {livestockHealthRecords.filter(r => r.productId === selectedProduct.id).length === 0 ? (
+                      <p className="text-[10px] text-slate-400 italic py-2">Hakuna rekodi za afya zilizopatikana.</p>
+                    ) : (
+                      <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-hide">
+                        {livestockHealthRecords
+                          .filter(r => r.productId === selectedProduct.id)
+                          .map(record => (
+                            <div key={record.id} className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                              <div className={cn(
+                                "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                                record.type === 'vaccination' ? "bg-emerald-100 text-emerald-600" :
+                                record.type === 'treatment' ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-600"
+                              )}>
+                                {record.type === 'vaccination' ? <Syringe size={14} /> : 
+                                 record.type === 'treatment' ? <CheckCircle2 size={14} /> : <FileText size={14} />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-center">
+                                  <p className="text-[10px] font-black text-slate-900 dark:text-white truncate">{record.title}</p>
+                                  <span className="text-[8px] font-bold text-slate-400">{record.date}</span>
+                                </div>
+                                {record.performedBy && <p className="text-[8px] text-emerald-600 font-bold uppercase">Daktari: {record.performedBy}</p>}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Reviews Section */}
             <div className="border-t border-slate-50 dark:border-slate-800 pt-6">
@@ -3851,7 +4264,7 @@ export const ShopPage: React.FC = () => {
           <QRScanner 
             onScan={handleQRScan} 
             onClose={() => setIsQRScannerOpen(false)} 
-            title="Skani QR Code kwa Malipo"
+            title="Skani QR Code"
           />
         )}
       </AnimatePresence>

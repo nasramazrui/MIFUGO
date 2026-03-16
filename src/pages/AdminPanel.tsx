@@ -362,7 +362,7 @@ export const AdminPanel: React.FC = () => {
         if (announcementForm.image) payload.image = announcementForm.image;
         if (announcementForm.link) payload.link = announcementForm.link;
 
-        await addDoc(collection(db, 'kuku_activity'), payload);
+        await addDoc(collection(db, 'kuku_notifications'), payload);
         toast.success('Tangazo limetumwa kikamilifu!');
         setAnnouncementForm({ ...announcementForm, title: '', message: '', image: '', link: '' });
       }
@@ -397,7 +397,7 @@ export const AdminPanel: React.FC = () => {
       await addDoc(collection(db, 'kuku_offers'), payload);
       
       // Also send a notification to everyone
-      await addDoc(collection(db, 'kuku_activity'), {
+      await addDoc(collection(db, 'kuku_notifications'), {
         title: `OFA MPYA: ${offerForm.title}`,
         message: offerForm.message,
         userId: 'all',
@@ -551,7 +551,7 @@ export const AdminPanel: React.FC = () => {
       await addNotification(
         'Malipo Yameidhinishwa! ✅',
         `Ombi lako la kutoa kiasi ${formatCurrency(data.amount, currency)} limeidhinishwa. Pesa imetumwa kwenye namba yako.`,
-        data.vendorId,
+        data.userId || data.vendorId,
         'wallet'
       );
 
@@ -577,9 +577,17 @@ export const AdminPanel: React.FC = () => {
         await updateDoc(doc(db, 'kuku_wallet', transSnapshot.docs[0].id), { status: 'Rejected' });
       }
 
-      await updateDoc(doc(db, 'kuku_users', data.vendorId), {
+      await updateDoc(doc(db, 'kuku_users', data.userId || data.vendorId), {
         walletBalance: increment(data.amount)
       });
+
+      // Notify User
+      await addNotification(
+        'Ombi la Malipo Limekataliwa ❌',
+        `Ombi lako la kutoa kiasi ${formatCurrency(data.amount, currency)} limekataliwa. Salio limerudishwa kwenye wallet yako.`,
+        data.userId || data.vendorId,
+        'wallet'
+      );
 
       addActivity('✕', `Maombi ya malipo yamekataliwa (Rejected)`);
       toast.success('Maombi yamekataliwa');
@@ -1274,6 +1282,13 @@ export const AdminPanel: React.FC = () => {
                         <TrendingUp size={18} />
                       </button>
                       <button 
+                        onClick={() => setEditingItem({ type: 'vendor', data: v })}
+                        className="w-10 h-10 bg-emerald-50 text-emerald-500 rounded-xl flex items-center justify-center hover:bg-emerald-100 transition-all"
+                        title="Wallet"
+                      >
+                        <Wallet size={18} />
+                      </button>
+                      <button 
                         onClick={() => deleteUser(v.id)}
                         className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-100 transition-colors"
                       >
@@ -1550,6 +1565,13 @@ export const AdminPanel: React.FC = () => {
                       title="Edit User"
                     >
                       <Settings size={18} />
+                    </button>
+                    <button 
+                      onClick={() => setEditingItem({ type: 'user', data: u })}
+                      className="w-10 h-10 bg-emerald-50 text-emerald-500 rounded-xl flex items-center justify-center hover:bg-emerald-100 transition-all"
+                      title="Wallet"
+                    >
+                      <Wallet size={18} />
                     </button>
                     <button 
                       onClick={() => deleteUser(u.id)}
@@ -2824,6 +2846,35 @@ export const AdminPanel: React.FC = () => {
                     className="input-field" 
                   />
                 </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">Wallet Balance ({currency})</label>
+                  <input 
+                    type="number" 
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    defaultValue={editingItem.data.walletBalance || 0}
+                    onBlur={async (e) => {
+                      const newBalance = Number(e.target.value);
+                      if (newBalance !== editingItem.data.walletBalance) {
+                        await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { walletBalance: newBalance });
+                        
+                        // Record transaction
+                        await addDoc(collection(db, 'kuku_wallet'), {
+                          userId: editingItem.data.id,
+                          userName: editingItem.data.name,
+                          amount: newBalance - (editingItem.data.walletBalance || 0),
+                          type: 'adjustment',
+                          status: 'approved',
+                          description: 'Admin balance adjustment',
+                          date: new Date().toISOString().split('T')[0],
+                          createdAt: serverTimestamp()
+                        });
+                        
+                        toast.success('Salio limesasishwa');
+                      }
+                    }}
+                  />
+                </div>
+
                 {editingItem.type === 'vendor' && (
                   <>
                     <div>

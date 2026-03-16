@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Product, Order, Review, Activity, Withdrawal, Status, Category, WalletTransaction, Auction, CartItem, AcademyPost, LoyaltyPoint, Invoice, ForumPost, ChatMessage, VaccinationRecord, RecurringOrder } from '../types';
+import { User, Product, Order, Review, Activity, Withdrawal, Status, Category, WalletTransaction, Auction, CartItem, AcademyPost, LoyaltyPoint, Invoice, ForumPost, ChatMessage, VaccinationRecord, RecurringOrder, LivestockHealthRecord } from '../types';
 import { generateId } from '../utils';
 import { ADMIN_EMAIL, ADMIN_PASS, TRANSLATIONS } from '../constants';
 import { auth, db } from '../services/firebase';
@@ -102,6 +102,7 @@ interface AppContextType {
   chatMessages: ChatMessage[];
   vaccinationRecords: VaccinationRecord[];
   recurringOrders: RecurringOrder[];
+  livestockHealthRecords: LivestockHealthRecord[];
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -138,6 +139,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [vaccinationRecords, setVaccinationRecords] = useState<VaccinationRecord[]>([]);
   const [recurringOrders, setRecurringOrders] = useState<RecurringOrder[]>([]);
+  const [livestockHealthRecords, setLivestockHealthRecords] = useState<LivestockHealthRecord[]>([]);
   const [lastNotificationCount, setLastNotificationCount] = useState(0);
 
   const playNotificationSound = () => {
@@ -387,10 +389,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setWalletTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction)));
     });
 
-    // Notifications (stored in kuku_activity)
-    const qNotifications = query(collection(db, 'kuku_activity'), orderBy('createdAt', 'desc'));
+    // Notifications
+    const qNotifications = query(collection(db, 'kuku_notifications'), orderBy('createdAt', 'desc'));
     const unsubNotifications = onSnapshot(qNotifications, (snap) => {
-      setNotifications(snap.docs.filter(d => d.data().title).map(d => ({ id: d.id, ...d.data() } as Notification)));
+      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
+    });
+
+    // Livestock Health Records
+    const qHealth = query(collection(db, 'kuku_livestock_health'), orderBy('createdAt', 'desc'));
+    const unsubHealth = onSnapshot(qHealth, (snap) => {
+      setLivestockHealthRecords(snap.docs.map(d => ({ id: d.id, ...d.data() } as LivestockHealthRecord)));
     });
 
     // Offers
@@ -480,7 +488,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addNotification = async (title: string, message: string, userId: string = 'all', link?: string) => {
     try {
-      await addDoc(collection(db, 'kuku_activity'), {
+      await addDoc(collection(db, 'kuku_notifications'), {
         title,
         message,
         userId,
@@ -491,6 +499,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         readBy: [],
         createdAt: serverTimestamp()
       });
+      
+      // Also add to activity for general log
+      await addActivity('🔔', `${title}: ${message}`);
     } catch (e) {
       console.error("Error adding notification: ", e);
     }
@@ -604,6 +615,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       chatMessages,
       vaccinationRecords,
       recurringOrders,
+      livestockHealthRecords,
       handleReferral
     }}>
       {children}

@@ -1,0 +1,76 @@
+src/components/Chat.tsx:import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
+src/components/NotificationsModal.tsx:import { doc, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
+src/components/NotificationsModal.tsx:      await updateDoc(doc(db, 'kuku_notifications', id), { 
+src/components/NotificationsModal.tsx:        await updateDoc(doc(db, 'kuku_notifications', n.id), { 
+src/pages/ShopPage.tsx:import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
+src/pages/ShopPage.tsx:      await updateDoc(userRef, {
+src/pages/ShopPage.tsx:      await updateDoc(vendorRef, {
+src/pages/ShopPage.tsx:      await updateDoc(doc(db, 'kuku_users', user.id), {
+src/pages/ShopPage.tsx:      await updateDoc(doc(db, 'kuku_users', user.id), {
+src/pages/ShopPage.tsx:      await updateDoc(doc(db, 'kuku_users', user.id), {
+src/pages/ShopPage.tsx:        await updateDoc(doc(db, 'kuku_users', user.id), vendorData);
+src/pages/ShopPage.tsx:      await updateDoc(reviewRef, {
+src/pages/ShopPage.tsx:      await updateDoc(reviewRef, { likes: newLikes });
+src/pages/ShopPage.tsx:      await updateDoc(reviewRef, { reactions: newReactions });
+src/pages/ShopPage.tsx:      await updateDoc(doc(db, 'kuku_products', p.id), {
+src/pages/ShopPage.tsx:        await updateDoc(doc(db, 'kuku_users', user.id), {
+src/pages/ShopPage.tsx:          await updateDoc(doc(db, 'kuku_users', user.id), {
+src/pages/ShopPage.tsx:      await updateDoc(orderRef, { 
+src/pages/ShopPage.tsx:      await updateDoc(vendorRef, {
+src/pages/ShopPage.tsx:      await updateDoc(doc(db, 'kuku_statuses', statusId), { likes: newLikes });
+src/pages/ShopPage.tsx:      await updateDoc(doc(db, 'kuku_statuses', statusId), {
+src/pages/VendorPortal.tsx:  updateDoc, 
+src/pages/VendorPortal.tsx:      await updateDoc(doc(db, 'kuku_products', id), {
+src/pages/VendorPortal.tsx:      await updateDoc(auctionRef, {
+src/pages/VendorPortal.tsx:      await updateDoc(doc(db, 'kuku_orders', order.id), { status });
+src/pages/VendorPortal.tsx:      await updateDoc(doc(db, 'kuku_users', user.id), {
+src/pages/VendorPortal.tsx:      await updateDoc(doc(db, 'kuku_users', user.id), settings);
+src/pages/VendorPortal.tsx:      await updateDoc(userRef, {
+src/pages/VendorPortal.tsx:      await updateDoc(vendorRef, {
+src/pages/Forum.tsx:import { collection, addDoc, serverTimestamp, updateDoc, doc, arrayUnion, arrayRemove } from 'firebase/firestore';
+src/pages/Forum.tsx:      await updateDoc(doc(db, 'kuku_forum', postId), {
+src/pages/Forum.tsx:      await updateDoc(doc(db, 'kuku_forum', postId), {
+src/pages/AuctionPage.tsx:import { collection, addDoc, updateDoc, doc, serverTimestamp, query, where, orderBy, onSnapshot, increment, getDoc, deleteDoc } from 'firebase/firestore';
+src/pages/AuctionPage.tsx:          await updateDoc(auctionRef, {
+src/pages/AuctionPage.tsx:      await updateDoc(doc(db, 'kuku_auctions', selectedAuction.id), {
+src/pages/AuctionPage.tsx:        await updateDoc(doc(db, 'kuku_users', user.id), {
+src/pages/AuctionPage.tsx:      await updateDoc(doc(db, 'kuku_auctions', selectedAuction.id), {
+src/pages/VaccinationCalendar.tsx:import { collection, addDoc, serverTimestamp, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+src/pages/VaccinationCalendar.tsx:      await updateDoc(doc(db, 'kuku_vaccinations', id), { completed: !current });
+src/pages/AdminPanel.tsx:  updateDoc, 
+src/pages/AdminPanel.tsx:        await updateDoc(doc(db, 'kuku_categories', catForm.id), {
+src/pages/AdminPanel.tsx:        await updateDoc(doc(db, 'kuku_academy', editingPost.id), {
+src/pages/AdminPanel.tsx:      await updateDoc(doc(db, 'kuku_withdrawals', id), {
+src/pages/AdminPanel.tsx:        await updateDoc(doc(db, 'kuku_wallet', transSnapshot.docs[0].id), { status: 'Completed' });
+src/pages/AdminPanel.tsx:      await updateDoc(doc(db, 'kuku_withdrawals', id), {
+src/pages/AdminPanel.tsx:        await updateDoc(doc(db, 'kuku_wallet', transSnapshot.docs[0].id), { status: 'Rejected' });
+src/pages/AdminPanel.tsx:      await updateDoc(doc(db, 'kuku_users', data.userId || data.vendorId), {
+src/pages/AdminPanel.tsx:      await updateDoc(doc(db, 'kuku_wallet', tx.id), { status: 'approved' });
+src/pages/AdminPanel.tsx:      await updateDoc(doc(db, 'kuku_users', tx.userId), { 
+src/pages/AdminPanel.tsx:      await updateDoc(doc(db, 'kuku_wallet', id), { status: 'rejected' });
+src/pages/AdminPanel.tsx:          await updateDoc(doc(db, 'kuku_users', order.vendorId), {
+src/pages/AdminPanel.tsx:      await updateDoc(doc(db, 'kuku_users', id), { status: 'approved' });
+src/pages/AdminPanel.tsx:      await updateDoc(doc(db, 'kuku_users', id), { status: 'rejected' });
+src/pages/AdminPanel.tsx:                            await updateDoc(doc(db, 'kuku_products', p.id), { approved: !p.approved });
+src/pages/AdminPanel.tsx:                                    await updateDoc(doc(db, 'kuku_orders', o.id), { paymentApproved: true });
+src/pages/AdminPanel.tsx:                      await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { role: e.target.value });
+src/pages/AdminPanel.tsx:                      await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { name: e.target.value });
+src/pages/AdminPanel.tsx:                      await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { phone: e.target.value });
+src/pages/AdminPanel.tsx:                      await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { location: e.target.value });
+src/pages/AdminPanel.tsx:                        await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { walletBalance: newBalance });
+src/pages/AdminPanel.tsx:                          await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { shopName: e.target.value });
+src/pages/AdminPanel.tsx:                          await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { region: e.target.value });
+src/pages/AdminPanel.tsx:                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { name: e.target.value });
+src/pages/AdminPanel.tsx:                        await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { price: Number(e.target.value) });
+src/pages/AdminPanel.tsx:                            await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { price: suggestedPrice });
+src/pages/AdminPanel.tsx:                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { stock: Number(e.target.value) });
+src/pages/AdminPanel.tsx:                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { category: e.target.value });
+src/pages/AdminPanel.tsx:                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { unit: e.target.value });
+src/pages/AdminPanel.tsx:                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { desc: e.target.value });
+src/pages/AdminPanel.tsx:                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { emoji: e.target.value });
+src/pages/AdminPanel.tsx:                      await updateDoc(doc(db, 'kuku_products', editingItem.data.id), { image: e.target.value });
+src/context/AppContext.tsx:  updateDoc,
+src/context/AppContext.tsx:        await updateDoc(doc(db, 'kuku_users', user.id), { theme: newTheme });
+src/context/AppContext.tsx:        await updateDoc(doc(db, 'kuku_users', user.id), { language: newLang });
+src/context/AppContext.tsx:        await updateDoc(doc(db, 'kuku_users', referrerId), {
+src/context/AppContext.tsx:        await updateDoc(doc(db, 'kuku_users', newUserId), {

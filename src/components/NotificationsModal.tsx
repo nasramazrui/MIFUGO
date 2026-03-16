@@ -21,7 +21,7 @@ export const NotificationsModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const markAsRead = async (id: string) => {
     if (!user) return;
     try {
-      await updateDoc(doc(db, 'kuku_activity', id), { 
+      await updateDoc(doc(db, 'kuku_notifications', id), { 
         readBy: arrayUnion(user.id) 
       });
     } catch (error) {
@@ -33,9 +33,9 @@ export const NotificationsModal: React.FC<Props> = ({ isOpen, onClose }) => {
     if (!user) return;
     try {
       if (n.userId === user.id) {
-        await deleteDoc(doc(db, 'kuku_activity', n.id));
+        await deleteDoc(doc(db, 'kuku_notifications', n.id));
       } else {
-        await updateDoc(doc(db, 'kuku_activity', n.id), { 
+        await updateDoc(doc(db, 'kuku_notifications', n.id), { 
           deletedBy: arrayUnion(user.id) 
         });
       }
