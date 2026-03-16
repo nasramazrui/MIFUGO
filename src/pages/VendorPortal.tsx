@@ -369,6 +369,8 @@ export const VendorPortal: React.FC = () => {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [statusVideoUrl, setStatusVideoUrl] = useState('');
+  const [statusMediaUrl, setStatusMediaUrl] = useState('');
+  const [statusMediaType, setStatusMediaType] = useState<'image' | 'video' | null>(null);
   const [isStatusLoading, setIsStatusLoading] = useState(false);
 
   React.useEffect(() => {
@@ -756,6 +758,8 @@ export const VendorPortal: React.FC = () => {
         vendorAvatar: user.avatar || '',
         text: statusText,
         videoUrl: statusVideoUrl,
+        mediaUrl: statusMediaUrl,
+        mediaType: statusMediaType,
         likes: [],
         comments: [],
         createdAt: serverTimestamp()
@@ -763,6 +767,8 @@ export const VendorPortal: React.FC = () => {
       toast.success('Status imewekwa!');
       setStatusText('');
       setStatusVideoUrl('');
+      setStatusMediaUrl('');
+      setStatusMediaType(null);
       setIsStatusModalOpen(false);
     } catch (error) {
       toast.error('Hitilafu wakati wa kuweka status');
@@ -2211,6 +2217,56 @@ export const VendorPortal: React.FC = () => {
               onChange={e => setStatusText(e.target.value)}
               required
             />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pakia Picha au Video (Hiari)</label>
+            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+              {statusMediaUrl ? (
+                <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-black">
+                  {statusMediaType === 'video' ? (
+                    <video src={statusMediaUrl} className="w-full h-full object-cover" />
+                  ) : (
+                    <img src={statusMediaUrl} className="w-full h-full object-cover" />
+                  )}
+                  <button 
+                    onClick={() => { setStatusMediaUrl(''); setStatusMediaType(null); }}
+                    className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full shadow-lg"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex-1">
+                  <IKContext 
+                    publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
+                    urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
+                    authenticator={async () => {
+                      const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
+                      return await res.json();
+                    }}
+                  >
+                    <IKUpload
+                      fileName={`status_${Date.now()}`}
+                      onSuccess={(res) => {
+                        setStatusMediaUrl(res.url);
+                        setStatusMediaType(res.fileType === 'non-image' ? 'video' : 'image');
+                        toast.success('File limepakiwa!');
+                      }}
+                      onError={(err) => toast.error('Imeshindwa kupakia file')}
+                      className="hidden"
+                      id="status-media-upload"
+                    />
+                  </IKContext>
+                  <label 
+                    htmlFor="status-media-upload"
+                    className="flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-600 cursor-pointer hover:bg-slate-50 transition-all"
+                  >
+                    <Plus size={16} />
+                    CHAGUA FILE (PICHA/VIDEO)
+                  </label>
+                </div>
+              )}
+            </div>
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('video_link')}</label>
