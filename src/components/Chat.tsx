@@ -25,17 +25,22 @@ export const Chat: React.FC<ChatProps> = ({ receiverId, receiverName, onClose })
 
     const q = query(
       collection(db, 'kuku_chats'),
-      where('participants', 'array-contains', user.id),
-      orderBy('createdAt', 'asc')
+      where('participants', 'array-contains', user.id)
     );
 
     const unsubscribe = onSnapshot(q, (snap) => {
       const allMsgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Filter for this specific conversation
-      const filtered = allMsgs.filter((m: any) => 
-        (m.senderId === user.id && m.receiverId === receiverId) ||
-        (m.senderId === receiverId && m.receiverId === user.id)
-      );
+      // Filter for this specific conversation and sort by date
+      const filtered = allMsgs
+        .filter((m: any) => 
+          (m.senderId === user.id && m.receiverId === receiverId) ||
+          (m.senderId === receiverId && m.receiverId === user.id)
+        )
+        .sort((a: any, b: any) => {
+          const timeA = a.createdAt?.seconds || 0;
+          const timeB = b.createdAt?.seconds || 0;
+          return timeA - timeB;
+        });
       setMessages(filtered);
       setLoading(false);
     });

@@ -1165,9 +1165,12 @@ export const ShopPage: React.FC = () => {
                   {[
                     { id: 'browse', label: t('market'), icon: ShoppingBag },
                     { id: 'auctions', label: t('auctions'), icon: Gavel },
-                    { id: 'cart', label: t('cart_title'), icon: ShoppingCart },
                     { id: 'stores', label: t('stores'), icon: Store },
                     { id: 'orders', label: t('orders'), icon: Package },
+                    { id: 'chat', label: t('chat'), icon: Send },
+                    { id: 'vaccination', label: t('vaccination'), icon: Syringe },
+                    { id: 'forum', label: t('forum'), icon: MessageSquare },
+                    { id: 'cart', label: t('cart_title'), icon: ShoppingCart },
                     { id: 'profile', label: t('profile'), icon: UserIcon },
                   ].map((item) => (
                     <button
@@ -1268,9 +1271,12 @@ export const ShopPage: React.FC = () => {
             {[
               { id: 'browse', label: t('market'), icon: ShoppingBag },
               { id: 'auctions', label: t('auctions'), icon: Gavel },
-              { id: 'cart', label: t('cart_title'), icon: ShoppingCart },
               { id: 'stores', label: t('stores'), icon: Store },
               { id: 'orders', label: t('orders'), icon: Package },
+              { id: 'chat', label: t('chat'), icon: Send },
+              { id: 'vaccination', label: t('vaccination'), icon: Syringe },
+              { id: 'forum', label: t('forum'), icon: MessageSquare },
+              { id: 'cart', label: t('cart_title'), icon: ShoppingCart },
               { id: 'profile', label: t('profile'), icon: UserIcon },
             ].map((item) => (
               <button
@@ -1875,19 +1881,19 @@ export const ShopPage: React.FC = () => {
           </button>
           
           <button 
-            onClick={() => setActiveTab('chat')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'chat' ? "text-amber-500" : "text-slate-500")}
+            onClick={() => setActiveTab('auctions')}
+            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'auctions' ? "text-amber-500" : "text-slate-500")}
           >
-            <Send size={22} strokeWidth={2.5} />
-            <span className="text-[9px] font-black uppercase tracking-[0.15em]">CHAT</span>
+            <Gavel size={22} strokeWidth={2.5} />
+            <span className="text-[9px] font-black uppercase tracking-[0.15em]">MINADA</span>
           </button>
 
           <button 
-            onClick={() => setActiveTab('vaccination')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'vaccination' ? "text-amber-500" : "text-slate-500")}
+            onClick={() => setActiveTab('stores')}
+            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'stores' ? "text-amber-500" : "text-slate-500")}
           >
-            <Syringe size={22} strokeWidth={2.5} />
-            <span className="text-[9px] font-black uppercase tracking-[0.15em]">CHANJO</span>
+            <Store size={22} strokeWidth={2.5} />
+            <span className="text-[9px] font-black uppercase tracking-[0.15em]">MADUKA</span>
           </button>
 
           <button 
@@ -1896,14 +1902,6 @@ export const ShopPage: React.FC = () => {
           >
             <Package size={22} strokeWidth={2.5} />
             <span className="text-[9px] font-black uppercase tracking-[0.15em]">ODA</span>
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('forum')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'forum' ? "text-amber-500" : "text-slate-500")}
-          >
-            <MessageSquare size={22} strokeWidth={2.5} />
-            <span className="text-[9px] font-black uppercase tracking-[0.15em]">FORUM</span>
           </button>
 
           <button 
