@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { generateInvoicePDF } from '../utils/invoice';
 import { useApp } from '../context/AppContext';
 import { formatCurrency } from '../utils';
 import { Modal } from '../components/Modal';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../services/firebase';
 import { 
   collection, 
@@ -22,6 +22,7 @@ import {
   limit
 } from 'firebase/firestore';
 import { WalletTransaction } from '../types';
+import { QRScanner } from '../components/QRScanner';
 import { 
   LayoutDashboard,
   BarChart3, 
@@ -165,93 +166,32 @@ export const AdminPanel: React.FC = () => {
   const [editingPost, setEditingPost] = useState<any>(null);
   const [isSuggestingPrice, setIsSuggestingPrice] = useState(false);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   // Generate Invoice
+  const handleScan = async (decodedText: string) => {
+    setIsScannerOpen(false);
+    toast.success(`Scanned: ${decodedText}`);
+    
+    // Logic to handle scanned text (e.g., find order or product)
+    if (decodedText.startsWith('ORDER:')) {
+      const orderId = decodedText.replace('ORDER:', '');
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        setActiveTab('orders');
+        // You could also open a modal for this order here
+        toast.success(`Oda imepatikana: ${orderId}`);
+      } else {
+        toast.error('Oda haijapatikana');
+      }
+    }
+  };
   const generateInvoice = async (order: any) => {
     setIsGeneratingInvoice(true);
     try {
-      // Create a temporary div for the invoice
-      const element = document.createElement('div');
-      element.style.padding = '40px';
-      element.style.width = '800px';
-      element.style.background = 'white';
-      element.style.color = 'black';
-      element.style.fontFamily = 'sans-serif';
-      
-      element.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 40px; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px;">
-          <div>
-            <h1 style="font-size: 24px; font-weight: 900; margin: 0; color: #d97706;">${systemSettings.app_name}</h1>
-            <p style="font-size: 12px; color: #64748b; margin-top: 4px;">Risiti ya Malipo / Invoice</p>
-          </div>
-          <div style="text-align: right;">
-            <p style="font-size: 14px; font-weight: 700; margin: 0;">#INV-${order.id.slice(-6).toUpperCase()}</p>
-            <p style="font-size: 12px; color: #64748b; margin-top: 4px;">Tarehe: ${new Date(order.createdAt?.seconds * 1000).toLocaleDateString()}</p>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px;">
-          <div>
-            <h3 style="font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Mteja</h3>
-            <p style="font-size: 14px; font-weight: 700; margin: 0;">${order.userName}</p>
-            <p style="font-size: 12px; color: #64748b; margin-top: 4px;">Simu: ${order.userPhone}</p>
-          </div>
-          <div style="text-align: right;">
-            <h3 style="font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Muuzaji</h3>
-            <p style="font-size: 14px; font-weight: 700; margin: 0;">${order.vendorName}</p>
-          </div>
-        </div>
-
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px;">
-          <thead>
-            <tr style="border-bottom: 1px solid #f1f5f9;">
-              <th style="text-align: left; padding: 12px 0; font-size: 12px; font-weight: 900; color: #94a3b8; text-transform: uppercase;">Bidhaa</th>
-              <th style="text-align: center; padding: 12px 0; font-size: 12px; font-weight: 900; color: #94a3b8; text-transform: uppercase;">Idadi</th>
-              <th style="text-align: right; padding: 12px 0; font-size: 12px; font-weight: 900; color: #94a3b8; text-transform: uppercase;">Bei</th>
-              <th style="text-align: right; padding: 12px 0; font-size: 12px; font-weight: 900; color: #94a3b8; text-transform: uppercase;">Jumla</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr style="border-bottom: 1px solid #f1f5f9;">
-              <td style="padding: 16px 0; font-size: 14px; font-weight: 700;">${order.productName}</td>
-              <td style="padding: 16px 0; font-size: 14px; font-weight: 700; text-align: center;">${order.quantity}</td>
-              <td style="padding: 16px 0; font-size: 14px; font-weight: 700; text-align: right;">${formatCurrency(order.productPrice, systemSettings.currency)}</td>
-              <td style="padding: 16px 0; font-size: 14px; font-weight: 700; text-align: right;">${formatCurrency(order.totalPrice, systemSettings.currency)}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div style="display: flex; justify-content: flex-end; margin-bottom: 60px;">
-          <div style="width: 200px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-              <span style="font-size: 12px; color: #64748b;">Subtotal</span>
-              <span style="font-size: 12px; font-weight: 700;">${formatCurrency(order.totalPrice, systemSettings.currency)}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 2px solid #f1f5f9;">
-              <span style="font-size: 14px; font-weight: 900;">Jumla Kuu</span>
-              <span style="font-size: 14px; font-weight: 900; color: #d97706;">${formatCurrency(order.totalPrice, systemSettings.currency)}</span>
-            </div>
-          </div>
-        </div>
-
-        <div style="text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 20px;">
-          <p style="font-size: 12px; color: #94a3b8; margin: 0;">Asante kwa kufanya biashara nasi!</p>
-          <p style="font-size: 10px; color: #cbd5e1; margin-top: 4px;">Hii ni risiti ya kielektroniki, haihitaji saini.</p>
-        </div>
-      `;
-
-      document.body.appendChild(element);
-      const canvas = await html2canvas(element);
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Risiti-${order.id.slice(-6)}.pdf`);
-      document.body.removeChild(element);
+      const doc = await generateInvoicePDF(order, systemSettings);
+      doc.save(`Risiti-${order.id.slice(-6).toUpperCase()}.pdf`);
       toast.success('Risiti imepakuliwa');
     } catch (error) {
       console.error('Invoice Error:', error);
@@ -1000,6 +940,14 @@ export const AdminPanel: React.FC = () => {
               ) : null}
             </button>
           ))}
+          
+          <button
+            onClick={() => setIsScannerOpen(true)}
+            className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-sm font-bold text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 transition-all border border-amber-500/20 mt-4"
+          >
+            <QrCode size={18} />
+            Skani QR Code
+          </button>
         </nav>
 
         <div className="p-6 border-t border-white/5">
@@ -1051,6 +999,13 @@ export const AdminPanel: React.FC = () => {
                   {notifications.filter(n => !n.readBy?.includes(user?.id || '')).length} Unread
                 </span>
               </div>
+              <button 
+                onClick={() => setIsScannerOpen(true)}
+                className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-amber-950 px-5 py-2.5 rounded-2xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 font-black text-xs"
+              >
+                <QrCode size={18} />
+                Skani QR
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
@@ -3185,6 +3140,16 @@ export const AdminPanel: React.FC = () => {
           </button>
         ))}
       </nav>
+      {/* QR Scanner */}
+      <AnimatePresence>
+        {isScannerOpen && (
+          <QRScanner 
+            onScan={handleScan} 
+            onClose={() => setIsScannerOpen(false)} 
+            title="Skani Risiti au Bidhaa"
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

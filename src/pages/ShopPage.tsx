@@ -19,7 +19,7 @@ import { Forum } from './Forum';
 import { VaccinationCalendar } from './VaccinationCalendar';
 import { Chat } from '../components/Chat';
 import { generateInvoicePDF } from '../utils/invoice';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { QRScanner } from '../components/QRScanner';
 import QRCode from 'react-qr-code';
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
@@ -94,38 +94,33 @@ export const ShopPage: React.FC = () => {
     }
   };
 
-  const startQRScanner = () => {
-    setIsQRScannerOpen(true);
-    setTimeout(() => {
-      const scanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: 250 }, false);
-      scanner.render((decodedText) => {
-        try {
-          const data = JSON.parse(decodedText);
-          if (data.type === 'payment' && data.vendorId) {
-            const vendor = vendors.find(v => v.id === data.vendorId);
-            if (vendor) {
-              // Success feedback
-              playBeep();
-              if (navigator.vibrate) {
-                navigator.vibrate([200]);
-              }
-              
-              setQrPaymentData({ 
-                vendor, 
-                amount: data.amount ? data.amount.toString() : '' 
-              });
-              scanner.clear();
-              setIsQRScannerOpen(false);
-              setIsQRPaymentModalOpen(true);
-            }
+  const handleQRScan = (decodedText: string) => {
+    try {
+      const data = JSON.parse(decodedText);
+      if (data.type === 'payment' && data.vendorId) {
+        const vendor = vendors.find(v => v.id === data.vendorId);
+        if (vendor) {
+          // Success feedback
+          playBeep();
+          if (navigator.vibrate) {
+            navigator.vibrate([200]);
           }
-        } catch (e) {
-          toast.error('QR Code isiyo sahihi');
+          
+          setQrPaymentData({ 
+            vendor, 
+            amount: data.amount ? data.amount.toString() : '' 
+          });
+          setIsQRScannerOpen(false);
+          setIsQRPaymentModalOpen(true);
         }
-      }, (error) => {
-        // console.warn(error);
-      });
-    }, 500);
+      } else {
+        toast.success(`Scanned: ${decodedText}`);
+        setIsQRScannerOpen(false);
+      }
+    } catch (e) {
+      toast.success(`Scanned: ${decodedText}`);
+      setIsQRScannerOpen(false);
+    }
   };
 
   const handleQRPayment = async () => {
@@ -1395,7 +1390,7 @@ export const ShopPage: React.FC = () => {
                   <motion.button 
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
-                    onClick={() => startQRScanner()}
+                    onClick={() => setIsQRScannerOpen(true)}
                     className="relative w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all"
                   >
                     <QrCode size={20} className="sm:w-6 sm:h-6" />
@@ -3839,10 +3834,27 @@ export const ShopPage: React.FC = () => {
       <RecentPurchases />
       <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
 
-      <Modal isOpen={isQRScannerOpen} onClose={() => setIsQRScannerOpen(false)} title="Scan QR Code kwa Malipo">
-        <div id="qr-reader" className="w-full"></div>
-        <p className="text-center text-xs font-bold text-slate-400 mt-4 uppercase tracking-widest">Weka QR Code ndani ya mraba</p>
-      </Modal>
+      {/* Floating Scan Button (Mobile) */}
+      <div className="fixed bottom-24 right-6 z-40 lg:hidden">
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setIsQRScannerOpen(true)}
+          className="w-14 h-14 bg-amber-500 text-amber-950 rounded-full shadow-2xl flex items-center justify-center border-4 border-white dark:border-slate-950"
+        >
+          <QrCode size={24} />
+        </motion.button>
+      </div>
+
+      <AnimatePresence>
+        {isQRScannerOpen && (
+          <QRScanner 
+            onScan={handleQRScan} 
+            onClose={() => setIsQRScannerOpen(false)} 
+            title="Skani QR Code kwa Malipo"
+          />
+        )}
+      </AnimatePresence>
 
       <Modal isOpen={isQRPaymentModalOpen} onClose={() => setIsQRPaymentModalOpen(false)} title="Kamilisha Malipo">
         {qrPaymentData.vendor && (

@@ -1,5 +1,4 @@
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { Order, SystemSettings } from '../types';
 import { formatCurrency } from '../utils';
 
@@ -10,7 +9,7 @@ export const generateInvoicePDF = async (order: Order, systemSettings: SystemSet
     format: 'a4'
   });
 
-  const appName = systemSettings?.app_name || 'Kuku App';
+  const appName = String(systemSettings?.app_name || 'Kuku App');
   const primaryColor = '#d97706'; // amber-600
 
   // Header
@@ -35,16 +34,30 @@ export const generateInvoicePDF = async (order: Order, systemSettings: SystemSet
   
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.text(`Namba ya Oda: #${order.id.substring(0, 8).toUpperCase()}`, 20, 65);
-  doc.text(`Tarehe: ${new Date(order.createdAt).toLocaleDateString('sw-TZ')}`, 20, 72);
+  
+  const orderAny = order as any;
+  const orderId = String(order.id || '').substring(0, 8).toUpperCase();
+  doc.text(`Namba ya Oda: #${orderId}`, 20, 65);
+
+  let dateStr = '';
+  try {
+    const createdAt = orderAny.createdAt;
+    const date = createdAt?.seconds 
+      ? new Date(createdAt.seconds * 1000) 
+      : new Date(createdAt || Date.now());
+    dateStr = date.toLocaleDateString('sw-TZ');
+  } catch (e) {
+    dateStr = new Date().toLocaleDateString('sw-TZ');
+  }
+  doc.text(`Tarehe: ${dateStr}`, 20, 72);
   doc.text(`Hali ya Malipo: ${order.paymentApproved ? 'IMELIPWA' : 'HAIJALIPWA'}`, 20, 79);
 
   // Customer Info
   doc.setFont('helvetica', 'bold');
   doc.text('MTEJA:', 120, 55);
   doc.setFont('helvetica', 'normal');
-  doc.text(order.userName, 120, 65);
-  doc.text(order.userContact, 120, 72);
+  doc.text(String(order.userName || 'Mteja'), 120, 65);
+  doc.text(String(order.userContact || orderAny.userPhone || ''), 120, 72);
 
   // Table Header
   doc.setFillColor(15, 23, 42);
@@ -60,11 +73,20 @@ export const generateInvoicePDF = async (order: Order, systemSettings: SystemSet
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'normal');
   let y = 115;
-  order.items.forEach((item) => {
-    doc.text(item.name, 25, y);
-    doc.text(formatCurrency(item.price, systemSettings?.currency || 'TZS'), 100, y);
-    doc.text(item.qty.toString(), 130, y);
-    doc.text(formatCurrency(item.price * item.qty, systemSettings?.currency || 'TZS'), 160, y);
+  
+  const items = order.items && order.items.length > 0 
+    ? order.items 
+    : [{ 
+        name: String(orderAny.productName || 'Bidhaa'), 
+        price: Number(order.productPrice || 0), 
+        qty: Number(order.qty || orderAny.quantity || 1) 
+      }];
+
+  items.forEach((item) => {
+    doc.text(String(item.name || ''), 25, y);
+    doc.text(formatCurrency(Number(item.price || 0), systemSettings?.currency || 'TZS'), 100, y);
+    doc.text(String(item.qty || 0), 130, y);
+    doc.text(formatCurrency(Number(item.price || 0) * Number(item.qty || 0), systemSettings?.currency || 'TZS'), 160, y);
     y += 10;
   });
 
@@ -76,14 +98,14 @@ export const generateInvoicePDF = async (order: Order, systemSettings: SystemSet
   
   doc.setFont('helvetica', 'normal');
   doc.text('Gharama ya Usafiri:', 120, y);
-  doc.text(formatCurrency(order.deliveryFee, systemSettings?.currency || 'TZS'), 160, y);
+  doc.text(formatCurrency(Number(order.deliveryFee || 0), systemSettings?.currency || 'TZS'), 160, y);
   
   y += 10;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   doc.text('JUMLA KUU:', 120, y);
   doc.setTextColor(primaryColor);
-  doc.text(formatCurrency(order.total, systemSettings?.currency || 'TZS'), 160, y);
+  doc.text(formatCurrency(Number(order.total || orderAny.totalPrice || 0), systemSettings?.currency || 'TZS'), 160, y);
 
   // Footer
   doc.setTextColor(148, 163, 184); // slate-400
