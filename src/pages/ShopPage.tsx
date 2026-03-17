@@ -307,6 +307,16 @@ export const ShopPage: React.FC = () => {
   const langRef = useRef<HTMLDivElement>(null);
 
   // Status State
+  const activeLiveSessions = liveSessions.filter(s => s.status === 'live');
+  const endedLiveSessions = liveSessions.filter(s => s.status === 'ended');
+
+  // Filter out ended sessions that are older than 24 hours
+  const filteredEndedSessions = endedLiveSessions.filter(s => {
+    if (!s.endedAt) return true;
+    const endedTime = s.endedAt.seconds * 1000;
+    const now = Date.now();
+    return now - endedTime < 24 * 60 * 60 * 1000;
+  });
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [statusVideoUrl, setStatusVideoUrl] = useState('');
@@ -1879,7 +1889,7 @@ export const ShopPage: React.FC = () => {
 
               <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                 {/* Live Sessions */}
-                {liveSessions.map(session => (
+                {activeLiveSessions.map(session => (
                   <button 
                     key={session.id}
                     onClick={() => setActiveLiveRoomId(session.roomId)}
@@ -1937,17 +1947,50 @@ export const ShopPage: React.FC = () => {
                   </button>
                 )}
 
-                {statuses.length === 0 && !(user?.role === 'vendor' || user?.role === 'admin') ? (
+                {statuses.length === 0 && filteredEndedSessions.length === 0 && !(user?.role === 'vendor' || user?.role === 'admin') ? (
                   <div className="flex-shrink-0 w-full py-12 text-center">
                     <p className="text-slate-400 font-bold text-sm">Hakuna status kwa sasa.</p>
                   </div>
                 ) : (
-                  statuses.map(status => (
-                    <button 
-                      key={status.id}
-                      onClick={() => setSelectedStatus(status)}
-                      className="flex-shrink-0 w-32 h-52 rounded-[24px] overflow-hidden relative group shadow-lg transition-all hover:scale-[1.02] active:scale-95"
-                    >
+                  <>
+                    {/* Ended Live Sessions as Stories */}
+                    {filteredEndedSessions.map(session => (
+                      <button 
+                        key={session.id}
+                        onClick={() => {
+                          // When clicking an ended live, we show it as a "status"
+                          // We can reuse the status viewer or show the live modal in "ended" mode
+                          // For now, let's just show the live modal, it will handle the 'ended' status
+                          setActiveLiveRoomId(session.roomId);
+                        }}
+                        className="flex-shrink-0 w-32 h-52 rounded-[24px] overflow-hidden relative group shadow-lg transition-all hover:scale-[1.02] active:scale-95 border-2 border-slate-200 dark:border-slate-800"
+                      >
+                        <div className="absolute inset-0 bg-slate-800">
+                          {session.hostAvatar ? (
+                            <img src={session.hostAvatar} alt="" className="w-full h-full object-cover opacity-60" />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900" />
+                          )}
+                        </div>
+                        <div className="absolute inset-0 bg-black/20" />
+                        <div className="absolute top-3 left-3 z-10">
+                          <div className="bg-slate-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                            REPLAY
+                          </div>
+                        </div>
+                        <div className="absolute bottom-4 left-3 right-3 z-10">
+                          <p className="text-[11px] font-black text-white leading-tight line-clamp-2">{session.hostName}</p>
+                          <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-0.5">Live Ended</p>
+                        </div>
+                      </button>
+                    ))}
+
+                    {statuses.map(status => (
+                      <button 
+                        key={status.id}
+                        onClick={() => setSelectedStatus(status)}
+                        className="flex-shrink-0 w-32 h-52 rounded-[24px] overflow-hidden relative group shadow-lg transition-all hover:scale-[1.02] active:scale-95"
+                      >
                       {/* Background Content */}
                       <div className="absolute inset-0 bg-slate-800">
                         {status.videoUrl ? (
@@ -1984,10 +2027,11 @@ export const ShopPage: React.FC = () => {
                         <p className="text-[11px] font-black text-white leading-tight line-clamp-2 drop-shadow-md">{status.vendorName}</p>
                       </div>
                     </button>
-                  ))
-                )}
-              </div>
+                  ))}
+                </>
+              )}
             </div>
+          </div>
 
             {/* Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
@@ -4605,6 +4649,7 @@ export const ShopPage: React.FC = () => {
         }}
       />
       <LiveStreamModal 
+        key={activeLiveRoomId || 'no-room'}
         isOpen={!!activeLiveRoomId} 
         onClose={() => setActiveLiveRoomId(null)} 
         roomId={activeLiveRoomId || ''} 

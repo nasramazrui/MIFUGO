@@ -3920,6 +3920,7 @@ export const VendorPortal: React.FC = () => {
       </AnimatePresence>
 
       <LiveStreamModal 
+        key={liveStreamAuctionId || 'no-room'}
         isOpen={!!liveStreamAuctionId} 
         onClose={() => setLiveStreamAuctionId(null)} 
         roomId={liveStreamAuctionId || ''} 
