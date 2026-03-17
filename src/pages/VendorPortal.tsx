@@ -1082,11 +1082,7 @@ export const VendorPortal: React.FC = () => {
             <>
               <div className="bg-white p-6 rounded-3xl shadow-xl border-4 border-emerald-500 mb-6">
                 <QRCode 
-                  value={JSON.stringify({
-                    type: 'product',
-                    productId: selectedProductQR.id,
-                    vendorId: user?.id
-                  })}
+                  value={`${window.location.origin}?productId=${selectedProductQR.id}`}
                   size={200}
                   level="H"
                 />

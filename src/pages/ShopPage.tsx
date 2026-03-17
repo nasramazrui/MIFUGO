@@ -24,6 +24,8 @@ import QRCode from 'react-qr-code';
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
 
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { RecentPurchases } from '../components/RecentPurchases';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { AcademyPage } from './AcademyPage';
@@ -144,6 +146,35 @@ export const ShopPage: React.FC = () => {
         setIsQRScannerOpen(false);
       }
     } catch (e) {
+      // Try to parse as URL if JSON parse fails
+      try {
+        const url = new URL(decodedText);
+        const productId = url.searchParams.get('productId');
+        if (productId) {
+          let product = products.find(p => p.id === productId);
+          if (!product) {
+            const productDoc = await getDoc(doc(db, 'kuku_products', productId));
+            if (productDoc.exists()) {
+              product = { id: productDoc.id, ...productDoc.data() } as any;
+            }
+          }
+          if (product) {
+            playBeep();
+            if (navigator.vibrate) navigator.vibrate([200]);
+            setSelectedProduct(product);
+            setIsQRScannerOpen(false);
+            toast.success(`Mfugo umepatikana: ${product.name}`);
+            return;
+          } else {
+            toast.error('Bidhaa haijapatikana');
+            setIsQRScannerOpen(false);
+            return;
+          }
+        }
+      } catch (urlError) {
+        // Not a valid URL, just show the text
+      }
+      
       toast.success(`Scanned: ${decodedText}`);
       setIsQRScannerOpen(false);
     }
@@ -285,6 +316,37 @@ export const ShopPage: React.FC = () => {
   const [commentText, setCommentText] = useState<{ [key: string]: string }>({});
   const [statusProgress, setStatusProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+
+  // Handle URL parameters for QR scans
+  useEffect(() => {
+    const checkUrlParams = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const productId = params.get('productId');
+      if (productId) {
+        let product = products.find(p => p.id === productId);
+        if (!product) {
+          try {
+            const productDoc = await getDoc(doc(db, 'kuku_products', productId));
+            if (productDoc.exists()) {
+              product = { id: productDoc.id, ...productDoc.data() } as any;
+            }
+          } catch (err) {
+            console.error("Error fetching product from URL:", err);
+          }
+        }
+        if (product) {
+          setSelectedProduct(product);
+          // Clean up URL without reloading
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+    };
+    
+    // Only run if products are loaded or if it's the first render
+    if (products.length > 0) {
+      checkUrlParams();
+    }
+  }, [products]);
 
   // Auto-expiry for Statuses (24 hours)
   useEffect(() => {
@@ -1057,6 +1119,48 @@ export const ShopPage: React.FC = () => {
       toast.error('Hitilafu imetokea');
     } finally {
       setIsWalletLoading(false);
+    }
+  };
+
+  const handleDownloadCertificate = async () => {
+    if (!selectedProduct || !selectedProduct.isLivestock) return;
+    
+    const certElement = document.getElementById('livestock-certificate');
+    if (!certElement) return;
+
+    try {
+      toast.loading('Inatengeneza cheti...', { id: 'cert-toast' });
+      
+      // Temporarily make it visible for capture
+      certElement.style.display = 'block';
+      
+      const canvas = await html2canvas(certElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      certElement.style.display = 'none';
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Pasipoti_${selectedProduct.tagNumber || selectedProduct.name}.pdf`);
+      
+      toast.success('Cheti kimepakuliwa kikamilifu!', { id: 'cert-toast' });
+    } catch (error) {
+      console.error('Error generating certificate:', error);
+      toast.error('Imeshindwa kutengeneza cheti', { id: 'cert-toast' });
+      certElement.style.display = 'none';
     }
   };
 
@@ -3097,6 +3201,131 @@ export const ShopPage: React.FC = () => {
                           ))}
                       </div>
                     )}
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleDownloadCertificate}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-colors shadow-lg shadow-emerald-200 dark:shadow-emerald-900/20"
+                >
+                  <FileText size={16} /> Pakua Cheti (PDF)
+                </button>
+              </div>
+            )}
+
+            {/* Hidden Certificate Layout for PDF Generation */}
+            {selectedProduct.isLivestock && (
+              <div 
+                id="livestock-certificate" 
+                className="hidden absolute top-0 left-0 w-[800px] bg-white p-10 text-slate-900 z-[-100]"
+                style={{ fontFamily: 'sans-serif' }}
+              >
+                <div className="border-8 border-emerald-600 p-8 rounded-3xl relative overflow-hidden">
+                  {/* Watermark */}
+                  <div className="absolute inset-0 opacity-5 flex items-center justify-center pointer-events-none">
+                    <QrCode size={400} />
+                  </div>
+
+                  <div className="flex justify-between items-start mb-10 border-b-2 border-slate-100 pb-6 relative z-10">
+                    <div>
+                      <h1 className="text-4xl font-black text-emerald-800 uppercase tracking-tighter mb-2">Digital Livestock Passport</h1>
+                      <p className="text-slate-500 font-bold uppercase tracking-widest">Cheti cha Mfugo & Afya</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Tarehe</p>
+                      <p className="text-lg font-black">{new Date().toLocaleDateString()}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-8 mb-10 relative z-10">
+                    <div className="w-64 h-64 bg-slate-50 rounded-3xl border-4 border-emerald-100 flex items-center justify-center overflow-hidden shrink-0">
+                      {selectedProduct.image ? (
+                        <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                      ) : (
+                        <span className="text-8xl">{selectedProduct.emoji}</span>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 space-y-6">
+                      <div>
+                        <h2 className="text-3xl font-black text-slate-900 mb-1">{selectedProduct.name}</h2>
+                        <p className="text-emerald-600 font-black text-xl">{formatCurrency(selectedProduct.price, currency)}</p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Tag Number</p>
+                          <p className="text-lg font-black text-slate-900">{selectedProduct.tagNumber || 'N/A'}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Breed / Uzao</p>
+                          <p className="text-lg font-black text-slate-900">{selectedProduct.breed || 'N/A'}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Umri</p>
+                          <p className="text-lg font-black text-slate-900">{selectedProduct.age || 'N/A'}</p>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl">
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Uzito</p>
+                          <p className="text-lg font-black text-slate-900">{selectedProduct.weight ? `${selectedProduct.weight} Kg` : 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mb-10 relative z-10">
+                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-widest mb-4 border-b-2 border-slate-100 pb-2">Historia ya Afya & Chanjo</h3>
+                    {livestockHealthRecords.filter(r => r.productId === selectedProduct.id).length === 0 ? (
+                      <p className="text-slate-500 italic">Hakuna rekodi za afya zilizopatikana.</p>
+                    ) : (
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b-2 border-slate-200">
+                            <th className="py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Tarehe</th>
+                            <th className="py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Aina</th>
+                            <th className="py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Maelezo</th>
+                            <th className="py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Daktari</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {livestockHealthRecords
+                            .filter(r => r.productId === selectedProduct.id)
+                            .map(record => (
+                              <tr key={record.id} className="border-b border-slate-100">
+                                <td className="py-3 font-bold text-slate-900">{record.date}</td>
+                                <td className="py-3">
+                                  <span className={cn(
+                                    "px-3 py-1 rounded-full text-xs font-black uppercase",
+                                    record.type === 'vaccination' ? "bg-emerald-100 text-emerald-700" :
+                                    record.type === 'treatment' ? "bg-rose-100 text-rose-700" : "bg-blue-100 text-blue-700"
+                                  )}>
+                                    {record.type}
+                                  </span>
+                                </td>
+                                <td className="py-3 text-sm text-slate-600">{record.title}</td>
+                                <td className="py-3 text-sm font-bold text-slate-900">{record.performedBy || '-'}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-end pt-6 border-t-2 border-slate-100 relative z-10">
+                    <div>
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Mmiliki / Muuzaji</p>
+                      <p className="text-xl font-black text-slate-900">{selectedProduct.vendorName}</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="bg-white p-2 rounded-xl border-2 border-slate-200 inline-block mb-2">
+                        <QRCode 
+                          value={`${window.location.origin}?productId=${selectedProduct.id}`}
+                          size={100}
+                          level="M"
+                        />
+                      </div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Scan for Verification</p>
+                    </div>
                   </div>
                 </div>
               </div>
