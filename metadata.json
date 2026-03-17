@@ -1,5 +1,5 @@
 {
-  "name": "FarmConnect",
-  "description": "Premium Agricultural & Livestock Marketplace with Real-time Tracking and Vendor Management.",
+  "name": "Digital Livestock Market Live",
+  "description": "Premium Agricultural & Livestock Marketplace with Real-time Tracking, Live Auctions, and Vendor Management.",
   "requestFramePermissions": ["camera", "geolocation"]
 }

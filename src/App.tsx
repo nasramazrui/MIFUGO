@@ -64,7 +64,7 @@ const AppContent: React.FC = () => {
                   </div>
                   <div className="flex flex-col items-center gap-2">
                     <h1 className="text-4xl font-black text-amber-900 tracking-tighter">
-                      {systemSettings?.app_name || 'FarmConnect'}
+                      {systemSettings?.app_name || 'Digital Livestock Market Live'}
                     </h1>
                     <div className="flex gap-1">
                       {[0, 1, 2].map((i) => (
@@ -92,7 +92,7 @@ const AppContent: React.FC = () => {
                   </div>
                   <h1 className="text-3xl font-black text-slate-900 mb-4">Mfumo Uko Kwenye Matengenezo</h1>
                   <p className="text-slate-500 mb-8 leading-relaxed">
-                    Tunaomba radhi, {systemSettings?.app_name || 'FarmConnect'} iko kwenye matengenezo kwa sasa ili kuboresha huduma zetu. Tafadhali rudi baadae.
+                    Tunaomba radhi, {systemSettings?.app_name || 'Digital Livestock Market Live'} iko kwenye matengenezo kwa sasa ili kuboresha huduma zetu. Tafadhali rudi baadae.
                   </p>
                   <div className="flex gap-2 justify-center mb-8">
                     {[0, 1, 2].map((i) => (

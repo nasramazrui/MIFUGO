@@ -991,7 +991,7 @@ export const AdminPanel: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">Muhtasari wa Mfumo</h2>
-                <p className="text-sm text-slate-500">Hali ya sasa ya {systemSettings?.app_name || 'FarmConnect'} Tanzania</p>
+                <p className="text-sm text-slate-500">Hali ya sasa ya {systemSettings?.app_name || 'Digital Livestock Market Live'} Tanzania</p>
               </div>
               <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-4 py-2 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm self-start">
                 <motion.div
@@ -2382,7 +2382,7 @@ export const AdminPanel: React.FC = () => {
                       value={localSettings.app_name}
                       onChange={(e) => setLocalSettings(prev => ({ ...prev, app_name: e.target.value }))}
                       className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
-                      placeholder="FarmConnect"
+                      placeholder="Digital Livestock Market Live"
                     />
                   </div>
                   <div className="space-y-2">

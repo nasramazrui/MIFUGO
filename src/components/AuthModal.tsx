@@ -116,7 +116,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         <div className="text-center py-6">
           <div className="w-24 h-24 bg-amber-50 dark:bg-amber-900/20 rounded-[32px] flex items-center justify-center text-5xl mx-auto mb-8 shadow-inner">🐔</div>
           <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-3 tracking-tight leading-tight">
-            {t('welcome')} <span className="text-amber-600">{systemSettings?.app_name || 'FarmConnect'}</span>!
+            {t('welcome')} <span className="text-amber-600">{systemSettings?.app_name || 'Digital Livestock Market Live'}</span>!
           </h2>
           <p className="text-slate-500 dark:text-slate-400 text-sm mb-10 max-w-[280px] mx-auto leading-relaxed">
             Unahitaji akaunti ili uweze kununua bidhaa na kufurahia huduma zetu.

@@ -250,11 +250,13 @@ export const AuctionPage: React.FC = () => {
     <div className="pb-20">
       <div className="w-full">
         {/* Section Title */}
-        <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-[24px] sm:rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
-          <div className="w-10 h-10 sm:w-14 h-14 bg-[#F59E0B] rounded-xl sm:rounded-2xl flex items-center justify-center text-white shadow-lg shadow-amber-200 dark:shadow-none">
+        <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-[24px] sm:rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
+          <div className="w-10 h-10 sm:w-14 sm:h-14 bg-gradient-to-br from-[#F59E0B] to-red-500 rounded-xl sm:rounded-2xl flex items-center justify-center text-white shadow-lg shadow-amber-200 dark:shadow-none relative">
             <Gavel size={20} className="sm:w-7 sm:h-7" />
+            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border-2 border-white dark:border-slate-900"></span>
           </div>
-          <h2 className="text-xl sm:text-3xl font-black text-[#0F172A] dark:text-white tracking-tight">Minada ya Mifugo</h2>
+          <h2 className="text-xl sm:text-3xl font-black text-[#0F172A] dark:text-white tracking-tight">Minada Live ya Mifugo</h2>
         </div>
 
         {auctions.length === 0 ? (

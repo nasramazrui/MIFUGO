@@ -678,7 +678,7 @@ export const ShopPage: React.FC = () => {
       }
       
       const phoneForMsg = user ? vendorFormData.phone : (isEmail(vendorFormData.identifier) ? vendorFormData.phone : vendorFormData.identifier);
-      const msg = `*Maombi ya Muuzaji — ${systemSettings?.app_name || 'FarmConnect'}*\n\nJina la Duka: ${vendorFormData.shopName}\nMmiliki: ${user?.name || vendorFormData.ownerName}\nSimu: ${phoneForMsg}\n\nTafadhali nihakikie.`;
+      const msg = `*Maombi ya Muuzaji — ${systemSettings?.app_name || 'Digital Livestock Market Live'}*\n\nJina la Duka: ${vendorFormData.shopName}\nMmiliki: ${user?.name || vendorFormData.ownerName}\nSimu: ${phoneForMsg}\n\nTafadhali nihakikie.`;
       window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
       
       setIsVendorRegModalOpen(false);
@@ -1380,7 +1380,7 @@ export const ShopPage: React.FC = () => {
                       )}
                     </div>
                     <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                      {systemSettings?.app_name || 'Kuku Market'}
+                      {systemSettings?.app_name || 'Digital Livestock Market Live'}
                     </h1>
                   </div>
                   <button onClick={() => setIsMobileMenuOpen(false)} className="w-10 h-10 flex items-center justify-center text-slate-400">
@@ -1421,6 +1421,11 @@ export const ShopPage: React.FC = () => {
                     >
                       <item.icon size={20} className={cn("transition-transform group-hover:scale-110", activeTab === item.id ? "text-white" : "text-slate-300")} />
                       {item.label}
+                      {item.id === 'auctions' && (
+                        <span className="ml-auto bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest animate-pulse">
+                          Live
+                        </span>
+                      )}
                       {item.id === 'cart' && cart.length > 0 && (
                         <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">
                           {cart.reduce((sum, i) => sum + i.qty, 0)}
@@ -1490,7 +1495,7 @@ export const ShopPage: React.FC = () => {
               )}
             </div>
             <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
-              {systemSettings?.app_name || 'Kuku Market'}
+              {systemSettings?.app_name || 'Digital Livestock Market Live'}
             </h1>
           </div>
 
@@ -1526,6 +1531,11 @@ export const ShopPage: React.FC = () => {
               >
                 <item.icon size={20} className={cn("transition-transform group-hover:scale-110", activeTab === item.id ? "text-white" : "text-slate-300")} />
                 {item.label}
+                {item.id === 'auctions' && (
+                  <span className="ml-auto bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest animate-pulse">
+                    Live
+                  </span>
+                )}
                 {item.id === 'cart' && cart.length > 0 && (
                   <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse">
                     {cart.reduce((sum, i) => sum + i.qty, 0)}
@@ -2116,10 +2126,13 @@ export const ShopPage: React.FC = () => {
           
           <button 
             onClick={() => setActiveTab('auctions')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'auctions' ? "text-amber-500" : "text-slate-500")}
+            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1 relative", activeTab === 'auctions' ? "text-amber-500" : "text-slate-500")}
           >
-            <Gavel size={22} strokeWidth={2.5} />
-            <span className="text-[9px] font-black uppercase tracking-[0.15em]">MINADA</span>
+            <div className="relative">
+              <Gavel size={22} strokeWidth={2.5} />
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border-2 border-[#050A18]"></span>
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-[0.15em]">LIVE</span>
           </button>
 
           <button 
@@ -2409,7 +2422,7 @@ export const ShopPage: React.FC = () => {
           <div className="bg-green-50 p-4 rounded-2xl border border-green-100 flex items-start gap-3 mb-4">
             <span className="text-2xl">🏪</span>
             <p className="text-xs text-green-800 leading-relaxed">
-              {t('welcome')} {systemSettings?.app_name || 'FarmConnect'}! Ili kuanza kuuza, tunahitaji maelezo ya biashara yako. 
+              {t('welcome')} {systemSettings?.app_name || 'Digital Livestock Market Live'}! Ili kuanza kuuza, tunahitaji maelezo ya biashara yako. 
               Admin atahakiki maelezo haya kabla ya duka lako kuwa hewani.
             </p>
           </div>
@@ -3068,7 +3081,7 @@ export const ShopPage: React.FC = () => {
 
             <button 
               onClick={() => {
-                const msg = `Habari ${selectedVendor.shopName || selectedVendor.name}, nimeona duka lenu ${systemSettings?.app_name || 'FarmConnect'} na ningependa kuuliza kuhusu bidhaa zenu.`;
+                const msg = `Habari ${selectedVendor.shopName || selectedVendor.name}, nimeona duka lenu ${systemSettings?.app_name || 'Digital Livestock Market Live'} na ningependa kuuliza kuhusu bidhaa zenu.`;
                 window.open(`https://wa.me/${(selectedVendor.phone || '').replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
               }}
               className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
