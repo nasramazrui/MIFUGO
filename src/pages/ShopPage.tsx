@@ -8,7 +8,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell, BookOpen, Tag, FileText, Syringe, QrCode, CheckCircle2, MessageCircle } from 'lucide-react';
+import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell, BookOpen, Tag, FileText, Syringe, QrCode, CheckCircle2, MessageCircle, Video } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth } from '../services/firebase';
 import { getAuthEmail, isEmail } from '../utils/authUtils';
@@ -23,6 +23,7 @@ import { QRScanner } from '../components/QRScanner';
 import QRCode from 'react-qr-code';
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
+import LiveStreamModal from '../components/LiveStreamModal';
 
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -31,7 +32,7 @@ import { NotificationsModal } from '../components/NotificationsModal';
 import { AcademyPage } from './AcademyPage';
 
 export const ShopPage: React.FC = () => {
-  const { products, user, vendors, orders, setOrders, addActivity, addNotification, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty, notifications, academyPosts, offers, livestockHealthRecords } = useApp();
+  const { products, user, vendors, orders, setOrders, addActivity, addNotification, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty, notifications, academyPosts, offers, livestockHealthRecords, liveSessions } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const unreadNotifications = notifications.filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
   const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'auctions' | 'academy' | 'forum' | 'vaccination' | 'chat'>('browse');
@@ -42,6 +43,7 @@ export const ShopPage: React.FC = () => {
   const [qrPaymentData, setQrPaymentData] = useState<{ vendor: User | null, amount: string }>({ vendor: null, amount: '' });
   const [isProcessingQRPayment, setIsProcessingQRPayment] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
+  const [activeLiveRoomId, setActiveLiveRoomId] = useState<string | null>(null);
   const [viewedStatuses, setViewedStatuses] = useState<string[]>(() => {
     const saved = localStorage.getItem('viewed_statuses');
     return saved ? JSON.parse(saved) : [];
@@ -1876,6 +1878,40 @@ export const ShopPage: React.FC = () => {
               </div>
 
               <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                {/* Live Sessions */}
+                {liveSessions.map(session => (
+                  <button 
+                    key={session.id}
+                    onClick={() => setActiveLiveRoomId(session.roomId)}
+                    className="flex-shrink-0 w-32 h-52 rounded-[24px] overflow-hidden relative group shadow-lg transition-all hover:scale-[1.02] active:scale-95 border-2 border-red-500"
+                  >
+                    <div className="absolute inset-0 bg-slate-800">
+                      {session.hostAvatar ? (
+                        <img src={session.hostAvatar} alt="" className="w-full h-full object-cover blur-[2px] opacity-60" />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-red-500 to-red-900" />
+                      )}
+                    </div>
+                    <div className="absolute inset-0 bg-black/40" />
+                    <div className="absolute top-3 left-3 z-10">
+                      <div className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                        <div className="w-1.5 h-1.5 bg-white rounded-full" /> LIVE
+                      </div>
+                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center z-10">
+                      <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white">
+                        <Video size={24} />
+                      </div>
+                    </div>
+                    <div className="absolute bottom-4 left-3 right-3 z-10">
+                      <p className="text-[11px] font-black text-white leading-tight line-clamp-2">{session.hostName}</p>
+                      <p className="text-[9px] font-bold text-red-200 uppercase tracking-widest mt-0.5">
+                        {session.type === 'shopping' ? 'Live Shopping' : 'Mnada Live'}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+
                 {/* Add Status Card */}
                 {(user?.role === 'vendor' || user?.role === 'admin') && (
                   <button 
@@ -4567,6 +4603,14 @@ export const ShopPage: React.FC = () => {
             // Admin panel handled by parent App.tsx
           }
         }}
+      />
+      <LiveStreamModal 
+        isOpen={!!activeLiveRoomId} 
+        onClose={() => setActiveLiveRoomId(null)} 
+        roomId={activeLiveRoomId || ''} 
+        isHost={false} 
+        userId={user?.id || `guest_${Math.floor(Math.random() * 10000)}`} 
+        userName={user?.name || 'Mteja'} 
       />
     </div>
   );

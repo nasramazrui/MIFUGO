@@ -5,6 +5,7 @@ import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
 import { Modal } from '../components/Modal';
 import { NotificationsModal } from '../components/NotificationsModal';
+import LiveStreamModal from '../components/LiveStreamModal';
 import { DAYS, ADMIN_WA } from '../constants';
 import { formatCurrency, generateId } from '../utils';
 import QRCode from 'react-qr-code';
@@ -57,7 +58,9 @@ import {
   FileText,
   ShoppingBag,
   QrCode,
-  Syringe
+  Syringe,
+  Video,
+  Trophy
 } from 'lucide-react';
 import { cn } from '../utils';
 
@@ -136,6 +139,7 @@ export const VendorPortal: React.FC = () => {
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [isAuctionModalOpen, setIsAuctionModalOpen] = useState(false);
   const [isAuctionEditModalOpen, setIsAuctionEditModalOpen] = useState(false);
+  const [liveStreamAuctionId, setLiveStreamAuctionId] = useState<string | null>(null);
   const [editingAuction, setEditingAuction] = useState<Auction | null>(null);
   const [productImageSource, setProductImageSource] = useState<'upload' | 'link'>('link');
   const [auctionImageSource, setAuctionImageSource] = useState<'upload' | 'link'>('link');
@@ -2158,6 +2162,15 @@ export const VendorPortal: React.FC = () => {
                       '🐄'
                     )}
                     <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      {a.status === 'active' && (
+                        <button 
+                          onClick={() => setLiveStreamAuctionId(a.id)}
+                          className="w-10 h-10 bg-emerald-500 shadow-lg rounded-xl flex items-center justify-center text-white hover:bg-emerald-600 transition-colors"
+                          title="Nenda Live"
+                        >
+                          <Video size={18} />
+                        </button>
+                      )}
                       <button 
                         onClick={() => {
                           setEditingAuction(a);
@@ -2282,12 +2295,20 @@ export const VendorPortal: React.FC = () => {
                 <h2 className="text-3xl font-black text-slate-900">{t('status')}</h2>
                 <p className="text-slate-500 font-bold">Manage your store updates and stories</p>
               </div>
-              <button 
-                onClick={() => setIsStatusModalOpen(true)}
-                className="bg-amber-600 text-white px-6 py-3 rounded-2xl font-black text-sm shadow-xl shadow-amber-100 hover:scale-105 transition-transform active:scale-95"
-              >
-                {t('post_status')} +
-              </button>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setLiveStreamAuctionId(`live_shopping_${user.id}`)}
+                  className="bg-red-600 text-white px-6 py-3 rounded-2xl font-black text-sm shadow-xl shadow-red-100 hover:scale-105 transition-transform active:scale-95 flex items-center gap-2 animate-pulse"
+                >
+                  <Video size={18} /> LIVE SHOPPING
+                </button>
+                <button 
+                  onClick={() => setIsStatusModalOpen(true)}
+                  className="bg-amber-600 text-white px-6 py-3 rounded-2xl font-black text-sm shadow-xl shadow-amber-100 hover:scale-105 transition-transform active:scale-95"
+                >
+                  {t('post_status')} +
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -3897,6 +3918,16 @@ export const VendorPortal: React.FC = () => {
           </Modal>
         )}
       </AnimatePresence>
+
+      <LiveStreamModal 
+        isOpen={!!liveStreamAuctionId} 
+        onClose={() => setLiveStreamAuctionId(null)} 
+        roomId={liveStreamAuctionId || ''} 
+        isHost={true} 
+        userId={user?.id || ''} 
+        userName={user?.name || 'Muuzaji'} 
+        vendorAvatar={user?.avatar}
+      />
     </div>
   );
 };

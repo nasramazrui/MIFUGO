@@ -2,16 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Auction, Bid } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Gavel, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2, Wallet, Send, CreditCard, Smartphone, Search, Globe, Trash2 } from 'lucide-react';
+import { Gavel, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2, Wallet, Send, CreditCard, Smartphone, Search, Globe, Trash2, Video } from 'lucide-react';
 import { formatCurrency, cn } from '../utils';
 import { db } from '../services/firebase';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, query, where, orderBy, onSnapshot, increment, getDoc, deleteDoc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
+import LiveStreamModal from '../components/LiveStreamModal';
 
 export const AuctionPage: React.FC = () => {
-  const { user, auctions, systemSettings, t, language } = useApp();
+  const { user, auctions, systemSettings, t, language, liveSessions } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
+  const [liveStreamAuctionId, setLiveStreamAuctionId] = useState<string | null>(null);
   const [bidAmount, setBidAmount] = useState<string>('');
   const [isBidding, setIsBidding] = useState(false);
   const [auctionBids, setAuctionBids] = useState<Bid[]>([]);
@@ -23,6 +25,8 @@ export const AuctionPage: React.FC = () => {
     senderPhone: user?.contact || '',
     senderName: user?.name || ''
   });
+
+  const isLive = selectedAuction && liveSessions.some(s => s.roomId === selectedAuction.id);
 
   useEffect(() => {
     if (selectedAuction) {
@@ -384,6 +388,15 @@ export const AuctionPage: React.FC = () => {
                 <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-4">{selectedAuction.productName}</h2>
                 <p className="text-slate-500 dark:text-slate-400 font-bold leading-relaxed mb-6 sm:mb-8 text-sm sm:text-base">{selectedAuction.description}</p>
 
+                {selectedAuction.status === 'active' && isLive && (
+                  <button
+                    onClick={() => setLiveStreamAuctionId(selectedAuction.id)}
+                    className="w-full bg-red-500 text-white py-3 rounded-[24px] font-black text-sm uppercase tracking-widest hover:bg-red-600 transition-all shadow-md active:scale-95 mb-6 flex items-center justify-center gap-2 animate-pulse"
+                  >
+                    <Video size={18} /> TAZAMA LIVE
+                  </button>
+                )}
+
                 {/* Winner Status */}
                 {selectedAuction.status === 'ended' && (
                   <div className={cn(
@@ -667,6 +680,15 @@ export const AuctionPage: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      <LiveStreamModal 
+        isOpen={!!liveStreamAuctionId} 
+        onClose={() => setLiveStreamAuctionId(null)} 
+        roomId={liveStreamAuctionId || ''} 
+        isHost={false} 
+        userId={user?.id || `guest_${Math.floor(Math.random() * 10000)}`} 
+        userName={user?.name || 'Mteja'} 
+      />
     </div>
   );
 };

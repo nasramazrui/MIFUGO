@@ -59,7 +59,8 @@ import {
   FileText,
   Award,
   Sparkles,
-  QrCode
+  QrCode,
+  Video
 } from 'lucide-react';
 import { cn } from '../utils';
 import { CATEGORIES } from '../constants';
@@ -288,7 +289,9 @@ export const AdminPanel: React.FC = () => {
     maintenanceMode: false,
     themeColor: 'amber',
     qrColor: '#000000',
-    qrLogo: ''
+    qrLogo: '',
+    zego_app_id: '',
+    zego_server_secret: ''
   });
 
   useEffect(() => {
@@ -317,7 +320,9 @@ export const AdminPanel: React.FC = () => {
         maintenanceMode: systemSettings.maintenanceMode || false,
         themeColor: systemSettings.themeColor || 'amber',
         qrColor: systemSettings.qrColor || '#000000',
-        qrLogo: systemSettings.qrLogo || ''
+        qrLogo: systemSettings.qrLogo || '',
+        zego_app_id: systemSettings.zego_app_id || '',
+        zego_server_secret: systemSettings.zego_server_secret || ''
       });
     }
   }, [systemSettings]);
@@ -2519,6 +2524,43 @@ export const AdminPanel: React.FC = () => {
                         )} />
                       </button>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Streaming & Shopping Settings */}
+              <div className="bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800 p-6 md:p-10 shadow-sm">
+                <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                  <div className="w-8 h-8 bg-red-100 rounded-xl flex items-center justify-center text-red-600">
+                    <Video size={18} />
+                  </div>
+                  Live Streaming & Shopping (ZegoCloud)
+                </h3>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">ZegoCloud App ID</label>
+                    <input 
+                      type="text"
+                      value={localSettings.zego_app_id}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, zego_app_id: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="e.g. 123456789"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">ZegoCloud Server Secret</label>
+                    <input 
+                      type="password"
+                      value={localSettings.zego_server_secret}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, zego_server_secret: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="Weka Server Secret hapa"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-xs text-slate-400 italic">
+                      * Funguo hizi zinahitajika kwa ajili ya Live Shopping na Live Auction Streaming. Unaweza kuzipata kwenye ZegoCloud Console.
+                    </p>
                   </div>
                 </div>
               </div>

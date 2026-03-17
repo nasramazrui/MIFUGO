@@ -103,6 +103,7 @@ interface AppContextType {
   vaccinationRecords: VaccinationRecord[];
   recurringOrders: RecurringOrder[];
   livestockHealthRecords: LivestockHealthRecord[];
+  liveSessions: any[];
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -140,6 +141,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [vaccinationRecords, setVaccinationRecords] = useState<VaccinationRecord[]>([]);
   const [recurringOrders, setRecurringOrders] = useState<RecurringOrder[]>([]);
   const [livestockHealthRecords, setLivestockHealthRecords] = useState<LivestockHealthRecord[]>([]);
+  const [liveSessions, setLiveSessions] = useState<any[]>([]);
   const [lastNotificationCount, setLastNotificationCount] = useState(0);
 
   const playNotificationSound = () => {
@@ -449,6 +451,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setRecurringOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as RecurringOrder)));
     });
 
+    // Live Sessions
+    const unsubLive = onSnapshot(collection(db, 'kuku_live_sessions'), (snap) => {
+      setLiveSessions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     return () => {
       unsubProducts();
       unsubOrders();
@@ -470,6 +477,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubChat();
       unsubVaccination();
       unsubRecurring();
+      unsubLive();
     };
   }, []);
 
@@ -616,6 +624,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       vaccinationRecords,
       recurringOrders,
       livestockHealthRecords,
+      liveSessions,
       handleReferral
     }}>
       {children}
