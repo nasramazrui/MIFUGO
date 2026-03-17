@@ -2150,14 +2150,14 @@ export const VendorPortal: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {myAuctions.map(a => (
-                <div key={a.id} className="bg-white rounded-[28px] border border-slate-100 overflow-hidden shadow-sm group">
-                  <div className="aspect-video bg-slate-50 flex items-center justify-center text-5xl relative overflow-hidden">
+                <div key={a.id} className="bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[40px] border border-slate-100 dark:border-slate-800/50 overflow-hidden shadow-sm hover:shadow-xl transition-all group flex flex-col">
+                  <div className="aspect-square sm:aspect-[4/3] bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-5xl relative overflow-hidden">
                     {a.image ? (
-                      <img src={a.image} alt="" className="w-full h-full object-cover" />
+                      <img src={a.image} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                     ) : (
                       '🐄'
                     )}
-                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                       <button 
                         onClick={() => {
                           setEditingAuction(a);
@@ -2172,38 +2172,56 @@ export const VendorPortal: React.FC = () => {
                           });
                           setIsAuctionEditModalOpen(true);
                         }}
-                        className="w-10 h-10 bg-white shadow-lg rounded-xl flex items-center justify-center text-blue-500 hover:bg-blue-50 transition-colors"
+                        className="w-10 h-10 bg-white dark:bg-slate-800 shadow-lg rounded-xl flex items-center justify-center text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                       >
                         <Edit2 size={18} />
                       </button>
                       <button 
                         onClick={() => handleDeleteAuction(a.id)}
-                        className="w-10 h-10 bg-white shadow-lg rounded-xl flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors"
+                        className="w-10 h-10 bg-white dark:bg-slate-800 shadow-lg rounded-xl flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                       >
                         <Trash2 size={18} />
                       </button>
                     </div>
-                    <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm">
-                      {a.status}
+                    <div className="absolute top-4 left-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
+                      <Clock size={12} className="text-[#F59E0B]" />
+                      <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                        {a.status === 'active' ? 'ACTIVE' : 'ENDED'}
+                      </span>
                     </div>
                   </div>
-                  <div className="p-6">
-                    <h4 className="font-black text-slate-900 mb-1">{a.productName}</h4>
-                    <p className="text-xs text-slate-400 mb-4 line-clamp-2">{a.description}</p>
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Current Bid</p>
-                        <p className="text-sm font-black text-emerald-700">{formatCurrency(a.currentBid, currency)}</p>
+                  <div className="p-5 sm:p-6 flex flex-col flex-1">
+                    <h3 className="text-xl sm:text-2xl font-black text-[#0F172A] dark:text-white mb-1 line-clamp-1">{a.productName}</h3>
+                    <p className="text-slate-400 dark:text-slate-500 text-xs font-bold mb-6 line-clamp-1">{a.description}</p>
+
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                      <div className="bg-[#F8FAFC] dark:bg-slate-800/50 p-4 sm:p-5 rounded-[24px] border border-slate-100 dark:border-slate-800 flex flex-col justify-center">
+                        <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">BEI YA KUANZIA</p>
+                        <p className="text-xs font-black text-[#0F172A] dark:text-white uppercase mb-1">{currency}</p>
+                        <p className="text-lg sm:text-xl font-black text-[#0F172A] dark:text-white leading-none">{formatCurrency(a.startingPrice, currency).replace(currency, '').trim()}</p>
                       </div>
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                          {a.status === 'ended' ? 'Winner' : 'Highest Bidder'}
-                        </p>
-                        <p className="text-sm font-black text-slate-900">
-                          {a.status === 'ended' ? (a.winnerName || 'No winner') : (a.highestBidderName || 'No bids')}
-                        </p>
+                      <div className="bg-[#FFFBEB] dark:bg-amber-900/10 p-4 sm:p-5 rounded-[24px] border border-amber-100 dark:border-amber-900/20 flex flex-col justify-center">
+                        <p className="text-[9px] font-black text-[#D97706] uppercase tracking-widest mb-2">DAU LA SASA</p>
+                        <p className="text-xs font-black text-[#92400E] dark:text-amber-500 uppercase mb-1">{currency}</p>
+                        <p className="text-lg sm:text-xl font-black text-[#92400E] dark:text-amber-500 leading-none">{formatCurrency(a.currentBid, currency).replace(currency, '').trim()}</p>
                       </div>
                     </div>
+
+                    {(a.highestBidderName || a.winnerName) && (
+                      <div className="flex items-center gap-3 bg-[#E6F9F0] dark:bg-emerald-900/10 p-3 sm:p-4 rounded-[20px] sm:rounded-[24px] border border-emerald-100 dark:border-emerald-900/20 mt-auto">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#10B981] rounded-full flex items-center justify-center text-white shadow-sm shrink-0">
+                          <Trophy size={14} className="sm:w-5 sm:h-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[9px] font-black text-[#059669] uppercase tracking-widest mb-0.5">
+                            {a.status === 'ended' ? 'MSHINDI' : 'MWENYE DAU LA JUU'}
+                          </p>
+                          <p className="text-xs sm:text-sm font-black text-[#064E3B] dark:text-emerald-500 truncate">
+                            {a.status === 'ended' ? (a.winnerName || 'No winner') : (a.highestBidderName || 'No bids')}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
