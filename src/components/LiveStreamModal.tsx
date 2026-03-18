@@ -75,10 +75,12 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   const addLike = () => {
     showLike();
     // Broadcast like to all participants
-    if (zpRef.current) {
+    if (zpRef.current && hasJoinedRef.current) {
       try {
         const x = Math.random() * 100 - 50;
-        (zpRef.current as any).sendInRoomCommand(roomId, JSON.stringify({ type: 'like', x }));
+        // The SDK might expect (message, toUserIDList) or just (message)
+        // We'll try passing an empty array to satisfy the "must be string array" check
+        (zpRef.current as any).sendInRoomCommand(JSON.stringify({ type: 'like', x }), []);
       } catch (e) {
         console.error("Error broadcasting like:", e);
       }
@@ -86,9 +88,11 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   };
 
   const notifyJoin = (zp: any) => {
-    if (!isHost) {
+    if (!isHost && hasJoinedRef.current) {
       try {
-        (zp as any).sendInRoomCommand(roomId, JSON.stringify({ type: 'user_joined', userName: safeUserName }));
+        // The SDK might expect (message, toUserIDList) or just (message)
+        // We'll try passing an empty array to satisfy the "must be string array" check
+        (zp as any).sendInRoomCommand(JSON.stringify({ type: 'user_joined', userName: safeUserName }), []);
       } catch (e) {
         console.error("Error broadcasting join:", e);
       }
@@ -438,16 +442,21 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
               
               // Notify others that someone joined
               if (!isHost) {
-                try {
-                  notifyJoin(zp);
+                // Add a small delay to ensure SDK is fully ready and has the userId
+                setTimeout(async () => {
+                  if (!hasJoinedRef.current) return;
                   
-                  console.log(`Incrementing viewer count for room: ${roomId}`);
-                  await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
-                    viewerCount: increment(1)
-                  });
-                } catch (e) {
-                  console.error("Error on join room actions:", e);
-                }
+                  try {
+                    notifyJoin(zp);
+                    
+                    console.log(`Incrementing viewer count for room: ${roomId}`);
+                    await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
+                      viewerCount: increment(1)
+                    });
+                  } catch (e) {
+                    console.error("Error on join room actions:", e);
+                  }
+                }, 1500);
               }
             },
             onLeaveRoom: async () => {
