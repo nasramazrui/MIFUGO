@@ -40,8 +40,6 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   const [auctionData, setAuctionData] = useState<any>(null);
   const [viewerCount, setViewerCount] = useState(0);
   const [isEnding, setIsEnding] = useState(false);
-  const [showCameraSelect, setShowCameraSelect] = useState(false);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const currentRoomIdRef = useRef(roomId);
   const initInProgressRoomIdRef = useRef<string | null>(null);
   const initializedRoomIdRef = useRef<string | null>(null);
@@ -153,14 +151,14 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     }
   };
 
-  const handleRestartLive = () => {
-    if (!isHost || !roomId) return;
+  const [showCameraSelect, setShowCameraSelect] = useState(false);
+
+  const handleRestartLiveClick = () => {
     setShowCameraSelect(true);
   };
 
-  const confirmRestartLive = async (selectedFacingMode: "user" | "environment") => {
-    setShowCameraSelect(false);
-    setFacingMode(selectedFacingMode);
+  const confirmRestartLive = async (facingMode: 'user' | 'environment') => {
+    if (!isHost || !roomId) return;
     try {
       // Delete old messages
       const messagesRef = collection(db, 'kuku_live_chats', roomId, 'messages');
@@ -174,12 +172,37 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         startTime: serverTimestamp(),
         viewerCount: 0
       });
-      toast.success("Live imeanza tena!");
+      
+      // Set flag to auto-reopen modal and reload page to completely reset Zego SDK state
+      sessionStorage.setItem('autoRestartLive', roomId);
+      sessionStorage.setItem('autoRestartCamera', facingMode);
+      window.location.reload();
     } catch (e) {
       console.error("Error restarting live:", e);
       toast.error("Imeshindwa kuanza tena live");
     }
   };
+
+  useEffect(() => {
+    const handleError = (e: ErrorEvent) => {
+      if (e.message && e.message.includes('createSpan')) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    const handleRejection = (e: PromiseRejectionEvent) => {
+      if (e.reason && e.reason.message && e.reason.message.includes('createSpan')) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isOpen || !container || !systemSettings) return;
@@ -198,7 +221,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     }
 
     currentRoomIdRef.current = roomId;
-    let isMounted = true;
+    let shouldAbortInit = false;
     initInProgressRoomIdRef.current = roomId;
 
     const initLiveStream = async () => {
@@ -210,12 +233,12 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
 
       // Wait for the modal to be fully rendered and container to have dimensions
       let attempts = 0;
-      while (isMounted && container && (container.offsetWidth === 0 || container.offsetHeight === 0) && attempts < 40) {
+      while (!shouldAbortInit && container && (container.offsetWidth === 0 || container.offsetHeight === 0) && attempts < 40) {
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
       }
 
-      if (!isMounted || !container || container.offsetWidth === 0 || container.offsetHeight === 0) {
+      if (shouldAbortInit || !container || container.offsetWidth === 0 || container.offsetHeight === 0) {
         console.warn("Zego container not ready or hidden after waiting");
         if (initInProgressRoomIdRef.current === roomId) {
           initInProgressRoomIdRef.current = null;
@@ -228,7 +251,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
       const serverSecret = systemSettings?.zego_server_secret || import.meta.env.VITE_ZEGO_SERVER_SECRET || '';
 
       if (!appID || !serverSecret) {
-        if (isMounted) {
+        if (!shouldAbortInit) {
           toast.error("ZegoCloud credentials are not configured. Please set them in Admin Panel.");
           onClose();
         }
@@ -257,7 +280,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
           safeUserName
         );
 
-        if (!isMounted) {
+        if (shouldAbortInit) {
           if (initInProgressRoomIdRef.current === roomId) {
             initInProgressRoomIdRef.current = null;
           }
@@ -271,7 +294,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         initInProgressRoomIdRef.current = null;
 
         // If host, create a live session record in Firestore
-        if (isHost && isMounted) {
+        if (isHost && !shouldAbortInit) {
           await setDoc(doc(db, 'kuku_live_sessions', roomId), {
             hostId: safeUserId,
             hostName: safeUserName,
@@ -284,7 +307,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
           });
         }
 
-        if (!isMounted || !container) {
+        if (shouldAbortInit || !container) {
           if (zp) {
             const timeSinceCreation = Date.now() - creationTimeRef.current;
             const delay = Math.max(0, 1000 - timeSinceCreation);
@@ -320,14 +343,17 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         }
 
         try {
+          const savedCamera = sessionStorage.getItem('autoRestartCamera');
+          const useFrontCamera = savedCamera === 'environment' ? false : true;
+          
           zp.joinRoom({
             container: container,
             showPreJoinView: false, // Start immediately without pre-join screen
             showUserList: false,
             turnOnMicrophoneWhenJoining: isHost,
             turnOnCameraWhenJoining: isHost,
+            useFrontFacingCamera: useFrontCamera,
             showAudioVideoSettingsButton: isHost,
-            useFrontFacingCamera: facingMode === "user",
             scenario: {
               mode: ZegoUIKitPrebuilt.LiveStreaming,
               config: {
@@ -335,7 +361,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
               },
             },
             onJoinRoom: async () => {
-              if (!isHost && isMounted) {
+              if (!isHost && !shouldAbortInit) {
                 try {
                   await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
                     viewerCount: increment(1)
@@ -366,14 +392,14 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
           });
         } catch (joinError) {
           console.error("Zego joinRoom error:", joinError);
-          if (isMounted) {
+          if (!shouldAbortInit) {
             toast.error("Tatizo la kiufundi limetokea. Tafadhali jaribu tena.");
             onClose();
           }
         }
       } catch (error) {
         console.error("Error initializing ZegoCloud:", error);
-        if (isMounted) {
+        if (!shouldAbortInit) {
           toast.error("Imeshindwa kuanzisha Live Stream.");
           onClose();
         }
@@ -383,14 +409,13 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     initLiveStream();
 
     return () => {
-      isMounted = false;
-      
       // Only destroy Zego if the modal is closing, we are changing rooms, or the container is being removed, or session ended
       // This prevents re-initializing on every sessionData update but ensures we re-init if the container changes
       const isSessionEnded = sessionData && sessionData.status === 'ended';
       const shouldDestroy = !isOpen || currentRoomIdRef.current !== roomId || !container || isSessionEnded;
       
       if (shouldDestroy) {
+        shouldAbortInit = true;
         console.log("Cleaning up Zego for room:", roomId, "Reason:", !isOpen ? "Modal closed" : currentRoomIdRef.current !== roomId ? "Room changed" : !container ? "Container removed" : "Session ended");
         initInProgressRoomIdRef.current = null;
         initializedRoomIdRef.current = null;
@@ -465,7 +490,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
           <div className="flex flex-col gap-3 w-full max-w-xs mt-8">
             {isHost && (
               <button 
-                onClick={handleRestartLive}
+                onClick={handleRestartLiveClick}
                 className="bg-amber-500 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-amber-600 transition-all active:scale-95 shadow-lg shadow-amber-500/20"
               >
                 ANZA TENA LIVE

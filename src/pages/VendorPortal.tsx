@@ -206,6 +206,14 @@ export const VendorPortal: React.FC = () => {
   const [lastOrderCount, setLastOrderCount] = useState(0);
 
   useEffect(() => {
+    const autoRestartRoomId = sessionStorage.getItem('autoRestartLive');
+    if (autoRestartRoomId) {
+      sessionStorage.removeItem('autoRestartLive');
+      setLiveStreamAuctionId(autoRestartRoomId);
+    }
+  }, []);
+
+  useEffect(() => {
     const vendorOrders = orders.filter(o => o.vendorId === user?.id);
     if (vendorOrders.length > lastOrderCount && lastOrderCount !== 0) {
       const latestOrder = vendorOrders[0];
