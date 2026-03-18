@@ -98,6 +98,17 @@ export const ShopPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const liveRoomId = params.get('live');
+    if (liveRoomId) {
+      setActiveLiveRoomId(liveRoomId);
+      // Clean up URL
+      const newUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, []);
+
   const handleQRScan = async (decodedText: string) => {
     try {
       const data = JSON.parse(decodedText);
@@ -143,6 +154,10 @@ export const ShopPage: React.FC = () => {
         } else {
           toast.error('Bidhaa haijapatikana');
         }
+      } else if (data.type === 'live' && data.roomId) {
+        setActiveLiveRoomId(data.roomId);
+        setIsQRScannerOpen(false);
+        toast.success('Umeingia kwenye Live!');
       } else {
         toast.success(`Scanned: ${decodedText}`);
         setIsQRScannerOpen(false);
@@ -152,6 +167,15 @@ export const ShopPage: React.FC = () => {
       try {
         const url = new URL(decodedText);
         const productId = url.searchParams.get('productId');
+        const liveRoomId = url.searchParams.get('live');
+        
+        if (liveRoomId) {
+          setActiveLiveRoomId(liveRoomId);
+          setIsQRScannerOpen(false);
+          toast.success('Umeingia kwenye Live!');
+          return;
+        }
+
         if (productId) {
           let product = products.find(p => p.id === productId);
           if (!product) {

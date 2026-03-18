@@ -63,13 +63,36 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   }, [userName]);
 
   // Floating hearts logic
-  const addLike = () => {
+  const showLike = (xOffset?: number) => {
     const id = Date.now();
-    const x = Math.random() * 100 - 50; // Random horizontal offset
+    const x = xOffset ?? (Math.random() * 100 - 50);
     setLikes(prev => [...prev, { id, x }]);
     setTimeout(() => {
       setLikes(prev => prev.filter(l => l.id !== id));
     }, 2000);
+  };
+
+  const addLike = () => {
+    showLike();
+    // Broadcast like to all participants
+    if (zpRef.current) {
+      try {
+        const x = Math.random() * 100 - 50;
+        (zpRef.current as any).sendInRoomCommand(roomId, JSON.stringify({ type: 'like', x }));
+      } catch (e) {
+        console.error("Error broadcasting like:", e);
+      }
+    }
+  };
+
+  const notifyJoin = (zp: any) => {
+    if (!isHost) {
+      try {
+        (zp as any).sendInRoomCommand(roomId, JSON.stringify({ type: 'user_joined', userName: safeUserName }));
+      } catch (e) {
+        console.error("Error broadcasting join:", e);
+      }
+    }
   };
 
   useEffect(() => {
@@ -307,18 +330,42 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         initializedRoomIdRef.current = roomId;
         initInProgressRoomIdRef.current = null;
 
-        // If host, create a live session record in Firestore
+        // If host, create or update a live session record in Firestore
         if (isHost && !shouldAbortInit) {
-          await setDoc(doc(db, 'kuku_live_sessions', roomId), {
-            hostId: safeUserId,
-            hostName: safeUserName,
-            hostAvatar: vendorAvatar || '',
-            roomId: roomId,
-            type: roomId.startsWith('live_shopping_') ? 'shopping' : 'auction',
-            startTime: serverTimestamp(),
-            status: 'live',
-            viewerCount: 0
-          });
+          const sessionRef = doc(db, 'kuku_live_sessions', roomId);
+          const sessionSnap = await getDoc(sessionRef);
+          
+          if (sessionSnap.exists() && sessionSnap.data().status === 'live') {
+            // Just update host info if needed, don't reset viewerCount
+            await updateDoc(sessionRef, {
+              hostName: safeUserName,
+              hostAvatar: vendorAvatar || '',
+              lastSeen: serverTimestamp()
+            });
+          } else {
+            // New session or restarting ended session
+            // Clear past chat messages
+            try {
+              const chatRef = collection(db, 'kuku_live_chats', roomId, 'messages');
+              const chatSnap = await getDocs(chatRef);
+              const deletePromises = chatSnap.docs.map(d => deleteDoc(d.ref));
+              await Promise.all(deletePromises);
+              console.log("Cleared past chat messages for new session");
+            } catch (chatErr) {
+              console.error("Error clearing past chat:", chatErr);
+            }
+
+            await setDoc(sessionRef, {
+              hostId: safeUserId,
+              hostName: safeUserName,
+              hostAvatar: vendorAvatar || '',
+              roomId: roomId,
+              type: roomId.startsWith('live_shopping_') ? 'shopping' : 'auction',
+              startTime: serverTimestamp(),
+              status: 'live',
+              viewerCount: 0
+            });
+          }
         }
 
         if (shouldAbortInit || !container) {
@@ -365,28 +412,46 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
             container: container,
             showPreJoinView: false, // Start immediately without pre-join screen
             showUserList: false,
+            showMyCameraControls: isHost,
+            showMyMicrophoneControls: isHost,
+            showAudioVideoSettingsButton: isHost,
             turnOnMicrophoneWhenJoining: isHost,
             turnOnCameraWhenJoining: isHost,
             useFrontFacingCamera: useFrontCamera,
-            showAudioVideoSettingsButton: isHost,
             scenario: {
               mode: ZegoUIKitPrebuilt.LiveStreaming,
               config: {
                 role: isHost ? ZegoUIKitPrebuilt.Host : ZegoUIKitPrebuilt.Audience,
               },
             },
+            onInRoomCommandReceived: (commandData: any) => {
+              try {
+                const data = JSON.parse(commandData.content);
+                if (data.type === 'like') {
+                  showLike(data.x);
+                } else if (data.type === 'user_joined') {
+                  toast.success(`${data.userName} ameingia kwenye live!`, { icon: '👋', duration: 2000 });
+                }
+              } catch (e) {
+                console.error("Error parsing custom command:", e);
+              }
+            },
             onJoinRoom: async () => {
               console.log(`Successfully joined room: ${roomId} as ${isHost ? 'Host' : 'Audience'}`);
               hasJoinedRef.current = true;
               hasDecrementedRef.current = false;
-              if (!isHost && !shouldAbortInit) {
+              
+              // Notify others that someone joined
+              if (!isHost) {
                 try {
+                  notifyJoin(zp);
+                  
                   console.log(`Incrementing viewer count for room: ${roomId}`);
                   await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
                     viewerCount: increment(1)
                   });
                 } catch (e) {
-                  console.error("Error incrementing viewer count:", e);
+                  console.error("Error on join room actions:", e);
                 }
               }
             },
@@ -416,7 +481,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
                 onClose();
               }
             },
-          });
+          } as any);
         } catch (joinError: any) {
           console.error("Zego joinRoom error:", joinError);
           if (!shouldAbortInit) {
@@ -508,7 +573,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     );
   }
 
-  const currentUrl = `${window.location.origin}/stream/${roomId}`;
+  const currentUrl = `${window.location.origin}/?live=${roomId}`;
 
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col overflow-hidden">
