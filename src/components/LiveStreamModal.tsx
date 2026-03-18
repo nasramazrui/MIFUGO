@@ -202,6 +202,12 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     initInProgressRoomIdRef.current = roomId;
 
     const initLiveStream = async () => {
+      // Wait for any pending destroy from previous session to finish
+      const timeSinceCreation = Date.now() - creationTimeRef.current;
+      if (timeSinceCreation < 1500 && creationTimeRef.current > 0) {
+        await new Promise(resolve => setTimeout(resolve, 1500 - timeSinceCreation));
+      }
+
       // Wait for the modal to be fully rendered and container to have dimensions
       let attempts = 0;
       while (isMounted && container && (container.offsetWidth === 0 || container.offsetHeight === 0) && attempts < 40) {
@@ -281,7 +287,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         if (!isMounted || !container) {
           if (zp) {
             const timeSinceCreation = Date.now() - creationTimeRef.current;
-            const delay = Math.max(1000, 1000 - timeSinceCreation);
+            const delay = Math.max(0, 1000 - timeSinceCreation);
             setTimeout(() => {
               try { 
                 if (zp && typeof zp.destroy === 'function') {
@@ -299,7 +305,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
           console.warn("Zego container detached before joinRoom");
           if (zp) {
             const timeSinceCreation = Date.now() - creationTimeRef.current;
-            const delay = Math.max(1000, 1000 - timeSinceCreation);
+            const delay = Math.max(0, 1000 - timeSinceCreation);
             setTimeout(() => {
               try { 
                 if (zp && typeof zp.destroy === 'function') {
@@ -316,7 +322,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         try {
           zp.joinRoom({
             container: container,
-            showPreJoinView: isHost, // Enable pre-join for host to check camera/mic
+            showPreJoinView: false, // Start immediately without pre-join screen
             showUserList: false,
             turnOnMicrophoneWhenJoining: isHost,
             turnOnCameraWhenJoining: isHost,
@@ -397,7 +403,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
             // Increased delay to ensure any pending internal Zego tasks can settle
             // before we hard-destroy the instance, which can cause the binaryType or createSpan error
             // We ensure at least 1 second has passed since creation to avoid race conditions in SDK tracing
-            const delay = Math.max(1000, 1000 - timeSinceCreation);
+            const delay = Math.max(0, 1000 - timeSinceCreation);
             setTimeout(() => {
               try {
                 if (zpToDestroy && typeof zpToDestroy.destroy === 'function') {
