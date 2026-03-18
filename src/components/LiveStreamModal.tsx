@@ -408,16 +408,11 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
           const useFrontCamera = savedCamera === 'environment' ? false : true;
           
           console.log(`Joining Zego room: ${roomId}`);
-          await zp.joinRoom({
+          
+          const zegoConfig: any = {
             container: container,
             showPreJoinView: false, // Start immediately without pre-join screen
             showUserList: false,
-            showMyCameraControls: isHost,
-            showMyMicrophoneControls: isHost,
-            showAudioVideoSettingsButton: isHost,
-            turnOnMicrophoneWhenJoining: isHost,
-            turnOnCameraWhenJoining: isHost,
-            useFrontFacingCamera: useFrontCamera,
             scenario: {
               mode: ZegoUIKitPrebuilt.LiveStreaming,
               config: {
@@ -481,7 +476,19 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
                 onClose();
               }
             },
-          } as any);
+          };
+
+          // Only add camera/mic controls if host, as audience cannot configure these in LiveStreaming scenario
+          if (isHost) {
+            zegoConfig.showMyCameraControls = true;
+            zegoConfig.showMyMicrophoneControls = true;
+            zegoConfig.showAudioVideoSettingsButton = true;
+            zegoConfig.turnOnMicrophoneWhenJoining = true;
+            zegoConfig.turnOnCameraWhenJoining = true;
+            zegoConfig.useFrontFacingCamera = useFrontCamera;
+          }
+
+          await zp.joinRoom(zegoConfig);
         } catch (joinError: any) {
           console.error("Zego joinRoom error:", joinError);
           if (!shouldAbortInit) {
