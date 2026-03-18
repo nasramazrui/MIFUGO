@@ -3,7 +3,7 @@ import { ZegoUIKitPrebuilt } from '@zegocloud/zego-uikit-prebuilt';
 import { X, Heart, MessageSquare, Send, Users, QrCode, Gavel, ShoppingBag, MapPin, Clock, Video } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { db } from '../services/firebase';
-import { doc, setDoc, deleteDoc, serverTimestamp, onSnapshot, collection, addDoc, query, orderBy, limit, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, serverTimestamp, onSnapshot, collection, addDoc, query, orderBy, limit, getDoc, getDocs, updateDoc, increment } from 'firebase/firestore';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'motion/react';
 import QRCode from 'react-qr-code';
@@ -40,6 +40,8 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   const [auctionData, setAuctionData] = useState<any>(null);
   const [viewerCount, setViewerCount] = useState(0);
   const [isEnding, setIsEnding] = useState(false);
+  const [showCameraSelect, setShowCameraSelect] = useState(false);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const currentRoomIdRef = useRef(roomId);
   const initInProgressRoomIdRef = useRef<string | null>(null);
   const initializedRoomIdRef = useRef<string | null>(null);
@@ -151,9 +153,22 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     }
   };
 
-  const handleRestartLive = async () => {
+  const handleRestartLive = () => {
     if (!isHost || !roomId) return;
+    setShowCameraSelect(true);
+  };
+
+  const confirmRestartLive = async (selectedFacingMode: "user" | "environment") => {
+    setShowCameraSelect(false);
+    setFacingMode(selectedFacingMode);
     try {
+      // Delete old messages
+      const messagesRef = collection(db, 'kuku_live_chats', roomId, 'messages');
+      const q = query(messagesRef);
+      const snapshot = await getDocs(q);
+      const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(deletePromises);
+
       await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
         status: 'live',
         startTime: serverTimestamp(),
@@ -306,6 +321,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
             turnOnMicrophoneWhenJoining: isHost,
             turnOnCameraWhenJoining: isHost,
             showAudioVideoSettingsButton: isHost,
+            useFrontFacingCamera: facingMode === "user",
             scenario: {
               mode: ZegoUIKitPrebuilt.LiveStreaming,
               config: {
@@ -394,8 +410,8 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
           } catch (e) {}
         }
 
-        // If host is leaving, make sure session is ended
-        if (isHost && roomId) {
+        // If host is leaving (modal closing or room changing), make sure session is ended
+        if (isHost && roomId && (!isOpen || currentRoomIdRef.current !== roomId)) {
           updateDoc(doc(db, 'kuku_live_sessions', roomId), {
             status: 'ended',
             endedAt: serverTimestamp(),
@@ -659,6 +675,54 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         </div>
       </div>
     )}
+
+      {/* Camera Selection Modal */}
+      <AnimatePresence>
+        {showCameraSelect && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-6"
+            onClick={() => setShowCameraSelect(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              className="bg-slate-900 p-8 rounded-[40px] flex flex-col items-center gap-6 border border-white/10 w-full max-w-sm"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-20 h-20 bg-amber-500/20 rounded-full flex items-center justify-center">
+                <Video size={40} className="text-amber-500" />
+              </div>
+              <div className="text-center">
+                <h3 className="text-white font-black text-2xl mb-2">Chagua Kamera</h3>
+                <p className="text-slate-400 text-sm">Unataka kutumia kamera gani kuanza live?</p>
+              </div>
+              <div className="flex flex-col gap-3 w-full">
+                <button 
+                  onClick={() => confirmRestartLive("user")}
+                  className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black hover:bg-slate-700 transition-colors"
+                >
+                  KAMERA YA MBELE (FRONT)
+                </button>
+                <button 
+                  onClick={() => confirmRestartLive("environment")}
+                  className="w-full bg-amber-500 text-white py-4 rounded-2xl font-black hover:bg-amber-600 transition-colors shadow-lg shadow-amber-500/20"
+                >
+                  KAMERA YA NYUMA (BACK)
+                </button>
+              </div>
+              <button 
+                onClick={() => setShowCameraSelect(false)}
+                className="text-slate-500 font-bold text-sm mt-2 hover:text-white transition-colors"
+              >
+                Ghairi
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* QR Code Modal Overlay */}
       <AnimatePresence>
