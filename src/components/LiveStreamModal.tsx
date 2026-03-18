@@ -44,6 +44,8 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   const initInProgressRoomIdRef = useRef<string | null>(null);
   const initializedRoomIdRef = useRef<string | null>(null);
   const creationTimeRef = useRef<number>(0);
+  const hasJoinedRef = useRef(false);
+  const hasDecrementedRef = useRef(false);
 
   useEffect(() => {
     currentRoomIdRef.current = roomId;
@@ -184,23 +186,35 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   };
 
   useEffect(() => {
+    const isCreateSpanError = (err: any) => {
+      if (!err) return false;
+      const msg = typeof err === 'string' ? err : (err.message || '');
+      const stack = err.stack || '';
+      return msg.includes('createSpan') || stack.includes('createSpan') || 
+             msg.includes('binaryType') || stack.includes('binaryType');
+    };
+
     const handleError = (e: ErrorEvent) => {
-      if (e.message && e.message.includes('createSpan')) {
+      if (isCreateSpanError(e.error) || isCreateSpanError(e.message)) {
         e.preventDefault();
         e.stopPropagation();
+        return true;
       }
     };
+
     const handleRejection = (e: PromiseRejectionEvent) => {
-      if (e.reason && e.reason.message && e.reason.message.includes('createSpan')) {
+      if (isCreateSpanError(e.reason)) {
         e.preventDefault();
         e.stopPropagation();
+        return true;
       }
     };
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', handleRejection);
+
+    window.addEventListener('error', handleError, true);
+    window.addEventListener('unhandledrejection', handleRejection, true);
     return () => {
-      window.removeEventListener('error', handleError);
-      window.removeEventListener('unhandledrejection', handleRejection);
+      window.removeEventListener('error', handleError, true);
+      window.removeEventListener('unhandledrejection', handleRejection, true);
     };
   }, []);
 
@@ -346,7 +360,8 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
           const savedCamera = sessionStorage.getItem('autoRestartCamera');
           const useFrontCamera = savedCamera === 'environment' ? false : true;
           
-          zp.joinRoom({
+          console.log(`Joining Zego room: ${roomId}`);
+          await zp.joinRoom({
             container: container,
             showPreJoinView: false, // Start immediately without pre-join screen
             showUserList: false,
@@ -361,15 +376,22 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
               },
             },
             onJoinRoom: async () => {
+              console.log(`Successfully joined room: ${roomId} as ${isHost ? 'Host' : 'Audience'}`);
+              hasJoinedRef.current = true;
+              hasDecrementedRef.current = false;
               if (!isHost && !shouldAbortInit) {
                 try {
+                  console.log(`Incrementing viewer count for room: ${roomId}`);
                   await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
                     viewerCount: increment(1)
                   });
-                } catch (e) {}
+                } catch (e) {
+                  console.error("Error incrementing viewer count:", e);
+                }
               }
             },
             onLeaveRoom: async () => {
+              console.log(`Leaving room: ${roomId}`);
               if (isHost) {
                 try {
                   await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
@@ -378,22 +400,32 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
                     viewerCount: 0
                   });
                 } catch (e) {
-                  console.error("Error ending session:", e);
+                  console.error("Error ending session on leave:", e);
                 }
               } else {
-                try {
-                  await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
-                    viewerCount: increment(-1)
-                  });
-                } catch (e) {}
+                if (!hasDecrementedRef.current) {
+                  try {
+                    await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
+                      viewerCount: increment(-1)
+                    });
+                    hasDecrementedRef.current = true;
+                  } catch (e) {
+                    console.error("Error decrementing viewer count:", e);
+                  }
+                }
                 onClose();
               }
             },
           });
-        } catch (joinError) {
+        } catch (joinError: any) {
           console.error("Zego joinRoom error:", joinError);
           if (!shouldAbortInit) {
-            toast.error("Tatizo la kiufundi limetokea. Tafadhali jaribu tena.");
+            // Handle specific Zego error codes
+            if (joinError?.errorCode === 1100002 || (joinError?.message && joinError.message.includes('timeout'))) {
+              toast.error("Mtandao wako ni dhaifu. Tafadhali jaribu tena baada ya kuimarisha mtandao.");
+            } else {
+              toast.error("Tatizo la kiufundi limetokea. Tafadhali jaribu tena.");
+            }
             onClose();
           }
         }
@@ -422,6 +454,18 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         
         if (zpRef.current) {
           const zpToDestroy = zpRef.current;
+          const rId = roomId;
+          const wasHost = isHost;
+          const joined = hasJoinedRef.current;
+          const decremented = hasDecrementedRef.current;
+
+          // Cleanup viewer count if needed
+          if (!wasHost && joined && !decremented && rId) {
+            updateDoc(doc(db, 'kuku_live_sessions', rId), {
+              viewerCount: increment(-1)
+            }).catch(() => {});
+          }
+
           const timeSinceCreation = Date.now() - creationTimeRef.current;
           zpRef.current = null;
           try {
@@ -432,6 +476,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
             setTimeout(() => {
               try {
                 if (zpToDestroy && typeof zpToDestroy.destroy === 'function') {
+                  console.log("Destroying Zego instance in cleanup");
                   zpToDestroy.destroy();
                 }
               } catch (e) {

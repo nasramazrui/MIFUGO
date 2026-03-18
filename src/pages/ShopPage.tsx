@@ -4653,7 +4653,7 @@ export const ShopPage: React.FC = () => {
         isOpen={!!activeLiveRoomId} 
         onClose={() => setActiveLiveRoomId(null)} 
         roomId={activeLiveRoomId || ''} 
-        isHost={activeLiveRoomId ? liveSessions.find(s => s.roomId === activeLiveRoomId)?.hostId === user?.id : false} 
+        isHost={activeLiveRoomId && user?.id ? liveSessions.find(s => s.roomId === activeLiveRoomId)?.hostId === user.id : false} 
         userId={user?.id || `guest_${Math.floor(Math.random() * 10000)}`} 
         userName={user?.name || 'Mteja'} 
       />
