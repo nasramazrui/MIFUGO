@@ -244,6 +244,14 @@ export interface Auction {
   senderName?: string;
   totalAmount?: number;
   createdAt: any;
+  // Livestock specific
+  tagNumber?: string;
+  breed?: string;
+  age?: string;
+  weight?: number;
+  gender?: 'male' | 'female' | 'other';
+  healthStatus?: 'healthy' | 'sick' | 'recovered';
+  birthDate?: string;
 }
 
 export interface CartItem {

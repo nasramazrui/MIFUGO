@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ZegoUIKitPrebuilt } from '@zegocloud/zego-uikit-prebuilt';
-import { X, Heart, MessageSquare, Send, Users, QrCode, Gavel, ShoppingBag, MapPin, Clock, Video } from 'lucide-react';
+import { X, Heart, MessageSquare, Send, Users, QrCode, Gavel, ShoppingBag, MapPin, Clock, Video, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { db } from '../services/firebase';
 import { doc, setDoc, deleteDoc, serverTimestamp, onSnapshot, collection, addDoc, query, orderBy, limit, getDoc, getDocs, updateDoc, increment } from 'firebase/firestore';
@@ -40,6 +40,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   const [auctionData, setAuctionData] = useState<any>(null);
   const [viewerCount, setViewerCount] = useState(0);
   const [isEnding, setIsEnding] = useState(false);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const currentRoomIdRef = useRef(roomId);
   const initInProgressRoomIdRef = useRef<string | null>(null);
   const initializedRoomIdRef = useRef<string | null>(null);
@@ -78,9 +79,8 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     if (zpRef.current && hasJoinedRef.current) {
       try {
         const x = Math.random() * 100 - 50;
-        // The SDK might expect (message, toUserIDList) or just (message)
-        // We'll try passing an empty array to satisfy the "must be string array" check
-        (zpRef.current as any).sendInRoomCommand(JSON.stringify({ type: 'like', x }), []);
+        // Ensure toUserIDList is an array of strings
+        (zpRef.current as any).sendInRoomCommand(JSON.stringify({ type: 'like', x }), [] as string[]);
       } catch (e) {
         console.error("Error broadcasting like:", e);
       }
@@ -90,9 +90,8 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   const notifyJoin = (zp: any) => {
     if (!isHost && hasJoinedRef.current) {
       try {
-        // The SDK might expect (message, toUserIDList) or just (message)
-        // We'll try passing an empty array to satisfy the "must be string array" check
-        (zp as any).sendInRoomCommand(JSON.stringify({ type: 'user_joined', userName: safeUserName }), []);
+        // Ensure toUserIDList is an array of strings
+        (zp as any).sendInRoomCommand(JSON.stringify({ type: 'user_joined', userName: safeUserName }), [] as string[]);
       } catch (e) {
         console.error("Error broadcasting join:", e);
       }
@@ -143,13 +142,15 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     if (!chatInput.trim()) return;
 
     try {
+      const text = replyTo ? `@${replyTo.userName} ${chatInput}` : chatInput;
       await addDoc(collection(db, 'kuku_live_chats', roomId, 'messages'), {
         userId: safeUserId,
         userName: safeUserName,
-        text: chatInput,
+        text: text,
         createdAt: serverTimestamp()
       });
       setChatInput('');
+      setReplyTo(null);
     } catch (error) {
       console.error("Error sending message:", error);
     }
@@ -425,14 +426,18 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
             },
             onInRoomCommandReceived: (commandData: any) => {
               try {
+                if (!commandData.content || commandData.content === 'undefined' || typeof commandData.content !== 'string') return;
                 const data = JSON.parse(commandData.content);
                 if (data.type === 'like') {
                   showLike(data.x);
                 } else if (data.type === 'user_joined') {
                   toast.success(`${data.userName} ameingia kwenye live!`, { icon: '👋', duration: 2000 });
+                } else if (data.type === 'remove_user' && data.targetUserId === safeUserId) {
+                  toast.error("Umetolewa kwenye live hii na muuzaji.");
+                  onClose();
                 }
               } catch (e) {
-                console.error("Error parsing custom command:", e);
+                console.error("Error parsing custom command:", e, "Raw content:", commandData.content);
               }
             },
             onJoinRoom: async () => {
@@ -449,10 +454,15 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
                   try {
                     notifyJoin(zp);
                     
-                    console.log(`Incrementing viewer count for room: ${roomId}`);
-                    await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
-                      viewerCount: increment(1)
-                    });
+                    // Unique viewer tracking per session
+                    const sessionJoinedKey = `joined_live_${roomId}`;
+                    if (!sessionStorage.getItem(sessionJoinedKey)) {
+                      console.log(`Incrementing unique viewer count for room: ${roomId}`);
+                      await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
+                        viewerCount: increment(1)
+                      });
+                      sessionStorage.setItem(sessionJoinedKey, 'true');
+                    }
                   } catch (e) {
                     console.error("Error on join room actions:", e);
                   }
@@ -578,6 +588,34 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
       }
     };
   }, [isOpen, roomId, isHost, safeUserId, safeUserName, onClose, vendorAvatar, systemSettings, container, sessionData?.status, !!sessionData]);
+
+  const handleRemoveUser = (targetUserId: string, targetUserName: string) => {
+    if (!isHost || !zpRef.current || !hasJoinedRef.current) return;
+    if (window.confirm(`Je, una uhakika unataka kumtoa ${targetUserName} kwenye live?`)) {
+      try {
+        zpRef.current.sendInRoomCommand(JSON.stringify({ 
+          type: 'remove_user', 
+          targetUserId 
+        }), [] as string[]);
+        toast.success(`${targetUserName} ametolewa.`);
+      } catch (e) {
+        console.error("Error removing user:", e);
+      }
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!isHost || !roomId) return;
+    if (window.confirm('Je, una uhakika unataka kufuta ujumbe huu?')) {
+      try {
+        await deleteDoc(doc(db, 'kuku_live_chats', roomId, 'messages', messageId));
+        toast.success('Ujumbe umefutwa');
+      } catch (e) {
+        console.error("Error deleting message:", e);
+        toast.error('Imeshindwa kufuta ujumbe');
+      }
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -736,11 +774,42 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
                 key={msg.id || idx}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="flex items-start gap-2"
+                className="flex items-start gap-2 group"
               >
-                <div className="bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/5 max-w-[80%]">
-                  <span className="text-amber-400 font-black text-xs mr-2">{msg.userName}:</span>
-                  <span className="text-white text-xs">{msg.text}</span>
+                <div className="bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/5 max-w-[80%] flex items-center gap-2">
+                  <div className="flex-1">
+                    <span className="text-amber-400 font-black text-xs mr-2">{msg.userName}:</span>
+                    <span className="text-white text-xs">{msg.text}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {isHost && (
+                      <button 
+                        onClick={() => setReplyTo(msg)}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-amber-500 hover:bg-amber-500/20 rounded-lg transition-all"
+                        title="Jibu"
+                      >
+                        <MessageSquare size={12} />
+                      </button>
+                    )}
+                    {isHost && (
+                      <button 
+                        onClick={() => handleDeleteMessage(msg.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:bg-red-500/20 rounded-lg transition-all"
+                        title="Futa"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                    {isHost && msg.userId !== safeUserId && (
+                      <button 
+                        onClick={() => handleRemoveUser(msg.userId, msg.userName)}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:bg-red-500/20 rounded-lg transition-all"
+                        title="Ondoa huyu"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -766,8 +835,15 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
           )}
 
           {/* Input & Actions */}
-          <div className="flex items-center gap-3 pointer-events-auto">
-            <form onSubmit={handleSendMessage} className="flex-1 flex items-center gap-2 bg-black/40 backdrop-blur-md px-4 py-3 rounded-full border border-white/10">
+          <div className="flex flex-col gap-2 pointer-events-auto">
+            {replyTo && (
+              <div className="flex items-center justify-between bg-amber-500/20 backdrop-blur-md px-3 py-1 rounded-lg border border-amber-500/30">
+                <p className="text-[10px] text-amber-400 font-bold">Unajibu kwa @{replyTo.userName}</p>
+                <button onClick={() => setReplyTo(null)} className="text-amber-400"><X size={12} /></button>
+              </div>
+            )}
+            <div className="flex items-center gap-3">
+              <form onSubmit={handleSendMessage} className="flex-1 flex items-center gap-2 bg-black/40 backdrop-blur-md px-4 py-3 rounded-full border border-white/10">
               <input 
                 type="text"
                 value={chatInput}
@@ -787,6 +863,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
               <Heart fill="white" size={24} />
             </button>
           </div>
+        </div>
 
           {/* Main Action Buttons */}
           {auctionData && (

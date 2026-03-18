@@ -386,6 +386,52 @@ export const AuctionPage: React.FC = () => {
                 </div>
 
                 <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-4">{selectedAuction.productName}</h2>
+                
+                {/* Livestock Details Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+                  {selectedAuction.tagNumber && (
+                    <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Tag ID</p>
+                      <p className="text-xs font-black text-slate-900 dark:text-white">{selectedAuction.tagNumber}</p>
+                    </div>
+                  )}
+                  {selectedAuction.breed && (
+                    <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Uzao</p>
+                      <p className="text-xs font-black text-slate-900 dark:text-white">{selectedAuction.breed}</p>
+                    </div>
+                  )}
+                  {selectedAuction.age && (
+                    <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Umri</p>
+                      <p className="text-xs font-black text-slate-900 dark:text-white">{selectedAuction.age}</p>
+                    </div>
+                  )}
+                  {selectedAuction.weight && (
+                    <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Uzito</p>
+                      <p className="text-xs font-black text-slate-900 dark:text-white">{selectedAuction.weight} Kg</p>
+                    </div>
+                  )}
+                  {selectedAuction.gender && (
+                    <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Jinsia</p>
+                      <p className="text-xs font-black text-slate-900 dark:text-white capitalize">{selectedAuction.gender === 'male' ? 'Dume' : selectedAuction.gender === 'female' ? 'Jike' : 'Nyingine'}</p>
+                    </div>
+                  )}
+                  {selectedAuction.healthStatus && (
+                    <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Afya</p>
+                      <p className={cn(
+                        "text-xs font-black",
+                        selectedAuction.healthStatus === 'healthy' ? "text-emerald-500" : "text-amber-500"
+                      )}>
+                        {selectedAuction.healthStatus === 'healthy' ? 'Mzima' : selectedAuction.healthStatus === 'sick' ? 'Mgonjwa' : 'Amepona'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <p className="text-slate-500 dark:text-slate-400 font-bold leading-relaxed mb-6 sm:mb-8 text-sm sm:text-base">{selectedAuction.description}</p>
 
                 {selectedAuction.status === 'active' && isLive && (

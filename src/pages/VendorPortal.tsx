@@ -166,7 +166,16 @@ export const VendorPortal: React.FC = () => {
     minIncrement: '20000',
     durationHours: '24',
     location: user.location || '',
-    image: ''
+    image: '',
+    // New fields
+    tagNumber: '',
+    breed: '',
+    age: '',
+    weight: '',
+    gender: 'male' as 'male' | 'female' | 'other',
+    healthStatus: 'healthy' as 'healthy' | 'sick' | 'recovered',
+    birthDate: '',
+    isGoLive: false
   });
 
   // Compute wallet data directly from context
@@ -630,13 +639,26 @@ export const VendorPortal: React.FC = () => {
         location: auctionForm.location,
         image: auctionForm.image,
         status: 'active' as const,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        // New livestock fields
+        tagNumber: auctionForm.tagNumber,
+        breed: auctionForm.breed,
+        age: auctionForm.age,
+        weight: Number(auctionForm.weight) || 0,
+        gender: auctionForm.gender,
+        healthStatus: auctionForm.healthStatus,
+        birthDate: auctionForm.birthDate
       };
       
-      await addDoc(collection(db, 'kuku_auctions'), auctionData);
+      const auctionRef = await addDoc(collection(db, 'kuku_auctions'), auctionData);
       
       toast.success('Mnada umeanza rasmi!');
       setIsAuctionModalOpen(false);
+      
+      if (auctionForm.isGoLive) {
+        setLiveStreamAuctionId(auctionRef.id);
+      }
+
       setAuctionForm({
         productName: '',
         description: '',
@@ -644,7 +666,15 @@ export const VendorPortal: React.FC = () => {
         minIncrement: '20000',
         durationHours: '24',
         location: user.location || '',
-        image: ''
+        image: '',
+        tagNumber: '',
+        breed: '',
+        age: '',
+        weight: '',
+        gender: 'male',
+        healthStatus: 'healthy',
+        birthDate: '',
+        isGoLive: false
       });
       addActivity('🐄', `Umeanzisha mnada wa ${auctionForm.productName}`);
     } catch (err: any) {
@@ -3605,8 +3635,97 @@ export const VendorPortal: React.FC = () => {
               onChange={e => setAuctionForm({...auctionForm, location: e.target.value})}
             />
           </div>
+
+          {/* Livestock Details Section */}
+          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl space-y-4">
+            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Taarifa za Mfugo</h4>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tag Number / ID</label>
+                <input 
+                  type="text" 
+                  className="input-field text-sm"
+                  placeholder="Mf: TZ-001"
+                  value={auctionForm.tagNumber}
+                  onChange={e => setAuctionForm({...auctionForm, tagNumber: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Uzao / Breed</label>
+                <input 
+                  type="text" 
+                  className="input-field text-sm"
+                  placeholder="Mf: Boran"
+                  value={auctionForm.breed}
+                  onChange={e => setAuctionForm({...auctionForm, breed: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Umri</label>
+                <input 
+                  type="text" 
+                  className="input-field text-sm"
+                  placeholder="Mf: Miezi 6"
+                  value={auctionForm.age}
+                  onChange={e => setAuctionForm({...auctionForm, age: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Uzito (Kg)</label>
+                <input 
+                  type="number" 
+                  className="input-field text-sm"
+                  placeholder="Mf: 250"
+                  value={auctionForm.weight}
+                  onChange={e => setAuctionForm({...auctionForm, weight: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Jinsia</label>
+                <select 
+                  className="input-field text-sm"
+                  value={auctionForm.gender}
+                  onChange={e => setAuctionForm({...auctionForm, gender: e.target.value as any})}
+                >
+                  <option value="male">Dume (Male)</option>
+                  <option value="female">Jike (Female)</option>
+                  <option value="other">Nyingine</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Hali ya Afya</label>
+                <select 
+                  className="input-field text-sm"
+                  value={auctionForm.healthStatus}
+                  onChange={e => setAuctionForm({...auctionForm, healthStatus: e.target.value as any})}
+                >
+                  <option value="healthy">Mzima (Healthy)</option>
+                  <option value="sick">Mgonjwa (Sick)</option>
+                  <option value="recovered">Amepona (Recovered)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tarehe ya Kuzaliwa</label>
+              <input 
+                type="date" 
+                className="input-field text-sm"
+                value={auctionForm.birthDate}
+                onChange={e => setAuctionForm({...auctionForm, birthDate: e.target.value})}
+              />
+            </div>
+          </div>
+
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Maelezo</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Maelezo ya Ziada</label>
             <textarea 
               className="input-field resize-none"
               rows={3}
@@ -3722,6 +3841,31 @@ export const VendorPortal: React.FC = () => {
               </div>
             </div>
           </div>
+
+          <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-900/30 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
+                <Video size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Anza Live Stream</h4>
+                <p className="text-[10px] text-slate-500 font-bold">Tangaza mnada huu moja kwa moja</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setAuctionForm({...auctionForm, isGoLive: !auctionForm.isGoLive})}
+              className={cn(
+                "w-12 h-6 rounded-full transition-all relative",
+                auctionForm.isGoLive ? "bg-amber-500" : "bg-slate-200 dark:bg-slate-700"
+              )}
+            >
+              <div className={cn(
+                "absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm",
+                auctionForm.isGoLive ? "left-7" : "left-1"
+              )} />
+            </button>
+          </div>
+
           <button 
             onClick={handleStartAuction}
             disabled={loading}
