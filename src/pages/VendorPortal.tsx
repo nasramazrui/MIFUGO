@@ -1618,7 +1618,7 @@ export const VendorPortal: React.FC = () => {
                   <TrendingUp size={20} className="text-emerald-500" /> Uchambuzi wa Mauzo
                 </h3>
                 <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <AreaChart data={myOrders.slice(-7).map(o => ({ date: o.date.split('-').slice(1).join('/'), amount: o.total }))}>
                       <defs>
                         <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
@@ -3925,7 +3925,7 @@ export const VendorPortal: React.FC = () => {
         onClose={() => setLiveStreamAuctionId(null)} 
         roomId={liveStreamAuctionId || ''} 
         isHost={true} 
-        userId={user?.id || ''} 
+        userId={user?.id || `vendor_${Math.floor(Math.random() * 10000)}`} 
         userName={user?.name || 'Muuzaji'} 
         vendorAvatar={user?.avatar}
       />

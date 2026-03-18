@@ -1125,7 +1125,7 @@ export const AdminPanel: React.FC = () => {
                   </h3>
                 </div>
                 <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <BarChart data={salesHistoryData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                       <XAxis 
@@ -1153,7 +1153,7 @@ export const AdminPanel: React.FC = () => {
                   </h3>
                 </div>
                 <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <BarChart data={topSellers} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                       <XAxis type="number" hide />
@@ -1183,7 +1183,7 @@ export const AdminPanel: React.FC = () => {
                 </h3>
                 <div className="flex flex-col sm:flex-row items-center gap-10">
                   <div className="h-[200px] w-[200px] flex-shrink-0">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                       <PieChart>
                         <Pie
                           data={dynamicRegionData}
