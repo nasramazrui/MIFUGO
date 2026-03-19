@@ -46,7 +46,10 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   const initializedRoomIdRef = useRef<string | null>(null);
   const creationTimeRef = useRef<number>(0);
   const hasJoinedRef = useRef(false);
+  const hasLeftRef = useRef(false);
+  const isZegoReadyRef = useRef(false);
   const hasDecrementedRef = useRef(false);
+  const lastLikeTimeRef = useRef(0);
 
   useEffect(() => {
     currentRoomIdRef.current = roomId;
@@ -74,12 +77,16 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   };
 
   const addLike = () => {
+    const now = Date.now();
+    if (now - lastLikeTimeRef.current < 200) return; // Throttle likes
+    lastLikeTimeRef.current = now;
+
     showLike();
     // Broadcast like to all participants
-    if (zpRef.current && hasJoinedRef.current) {
+    if (zpRef.current && hasJoinedRef.current && isZegoReadyRef.current && !hasLeftRef.current) {
       try {
         const x = Math.random() * 100 - 50;
-        // Ensure toUserIDList is an array of strings
+        // Ensure room is still joined and ready
         (zpRef.current as any).sendInRoomCommand(JSON.stringify({ type: 'like', x }), [] as string[]);
       } catch (e) {
         console.error("Error broadcasting like:", e);
@@ -88,9 +95,8 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   };
 
   const notifyJoin = (zp: any) => {
-    if (!isHost && hasJoinedRef.current) {
+    if (!isHost && hasJoinedRef.current && isZegoReadyRef.current && zpRef.current === zp && !hasLeftRef.current) {
       try {
-        // Ensure toUserIDList is an array of strings
         (zp as any).sendInRoomCommand(JSON.stringify({ type: 'user_joined', userName: safeUserName }), [] as string[]);
       } catch (e) {
         console.error("Error broadcasting join:", e);
@@ -440,16 +446,25 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
                 console.error("Error parsing custom command:", e, "Raw content:", commandData.content);
               }
             },
-            onJoinRoom: async () => {
+            onJoinRoom: () => {
+              if (hasJoinedRef.current) return;
               console.log(`Successfully joined room: ${roomId} as ${isHost ? 'Host' : 'Audience'}`);
               hasJoinedRef.current = true;
+              hasLeftRef.current = false;
               hasDecrementedRef.current = false;
               
+              // Set ready flag after a small delay to ensure SDK internal state is settled
+              setTimeout(() => {
+                if (hasJoinedRef.current && !hasLeftRef.current) {
+                  isZegoReadyRef.current = true;
+                }
+              }, 1000);
+
               // Notify others that someone joined
               if (!isHost) {
                 // Add a small delay to ensure SDK is fully ready and has the userId
                 setTimeout(async () => {
-                  if (!hasJoinedRef.current) return;
+                  if (!hasJoinedRef.current || hasLeftRef.current || !isZegoReadyRef.current) return;
                   
                   try {
                     notifyJoin(zp);
@@ -466,31 +481,27 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
                   } catch (e) {
                     console.error("Error on join room actions:", e);
                   }
-                }, 1500);
+                }, 2000);
               }
             },
-            onLeaveRoom: async () => {
+            onLeaveRoom: () => {
               console.log(`Leaving room: ${roomId}`);
+              hasJoinedRef.current = false;
+              hasLeftRef.current = true;
+              isZegoReadyRef.current = false;
               if (isHost) {
-                try {
-                  await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
-                    status: 'ended',
-                    endedAt: serverTimestamp(),
-                    viewerCount: 0
-                  });
-                } catch (e) {
-                  console.error("Error ending session on leave:", e);
-                }
+                updateDoc(doc(db, 'kuku_live_sessions', roomId), {
+                  status: 'ended',
+                  endedAt: serverTimestamp(),
+                  viewerCount: 0
+                }).catch(e => console.error("Error ending session on leave:", e));
               } else {
                 if (!hasDecrementedRef.current) {
-                  try {
-                    await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
-                      viewerCount: increment(-1)
-                    });
+                  updateDoc(doc(db, 'kuku_live_sessions', roomId), {
+                    viewerCount: increment(-1)
+                  }).then(() => {
                     hasDecrementedRef.current = true;
-                  } catch (e) {
-                    console.error("Error decrementing viewer count:", e);
-                  }
+                  }).catch(e => console.error("Error decrementing viewer count:", e));
                 }
                 onClose();
               }
@@ -539,6 +550,9 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
       
       if (shouldDestroy) {
         shouldAbortInit = true;
+        hasJoinedRef.current = false;
+        hasLeftRef.current = true;
+        isZegoReadyRef.current = false;
         console.log("Cleaning up Zego for room:", roomId, "Reason:", !isOpen ? "Modal closed" : currentRoomIdRef.current !== roomId ? "Room changed" : !container ? "Container removed" : "Session ended");
         initInProgressRoomIdRef.current = null;
         initializedRoomIdRef.current = null;
@@ -590,10 +604,11 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   }, [isOpen, roomId, isHost, safeUserId, safeUserName, onClose, vendorAvatar, systemSettings, container, sessionData?.status, !!sessionData]);
 
   const handleRemoveUser = (targetUserId: string, targetUserName: string) => {
-    if (!isHost || !zpRef.current || !hasJoinedRef.current) return;
+    if (!isHost || !zpRef.current || !hasJoinedRef.current || !isZegoReadyRef.current || hasLeftRef.current) return;
     if (window.confirm(`Je, una uhakika unataka kumtoa ${targetUserName} kwenye live?`)) {
+      if (!zpRef.current || !hasJoinedRef.current || !isZegoReadyRef.current || hasLeftRef.current) return;
       try {
-        zpRef.current.sendInRoomCommand(JSON.stringify({ 
+        (zpRef.current as any).sendInRoomCommand(JSON.stringify({ 
           type: 'remove_user', 
           targetUserId 
         }), [] as string[]);
