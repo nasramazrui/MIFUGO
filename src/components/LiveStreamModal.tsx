@@ -48,8 +48,18 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   const hasJoinedRef = useRef(false);
   const hasLeftRef = useRef(false);
   const isZegoReadyRef = useRef(false);
+  const isJoiningRef = useRef(false);
   const hasDecrementedRef = useRef(false);
   const lastLikeTimeRef = useRef(0);
+  const zegoInstanceIdRef = useRef<number>(0);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     currentRoomIdRef.current = roomId;
@@ -270,23 +280,28 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
 
     currentRoomIdRef.current = roomId;
     let shouldAbortInit = false;
+    const instanceId = ++zegoInstanceIdRef.current;
     initInProgressRoomIdRef.current = roomId;
 
     const initLiveStream = async () => {
+      if (!isMountedRef.current) return;
+
       // Wait for any pending destroy from previous session to finish
       const timeSinceCreation = Date.now() - creationTimeRef.current;
       if (timeSinceCreation < 1500 && creationTimeRef.current > 0) {
         await new Promise(resolve => setTimeout(resolve, 1500 - timeSinceCreation));
       }
 
+      if (shouldAbortInit || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current) return;
+
       // Wait for the modal to be fully rendered and container to have dimensions
       let attempts = 0;
-      while (!shouldAbortInit && container && (container.offsetWidth === 0 || container.offsetHeight === 0) && attempts < 40) {
+      while (!shouldAbortInit && zegoInstanceIdRef.current === instanceId && isMountedRef.current && container && (container.offsetWidth === 0 || container.offsetHeight === 0) && attempts < 40) {
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
       }
 
-      if (shouldAbortInit || !container || container.offsetWidth === 0 || container.offsetHeight === 0) {
+      if (shouldAbortInit || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current || !container || container.offsetWidth === 0 || container.offsetHeight === 0) {
         console.warn("Zego container not ready or hidden after waiting");
         if (initInProgressRoomIdRef.current === roomId) {
           initInProgressRoomIdRef.current = null;
@@ -336,10 +351,15 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         }
 
         const zp = ZegoUIKitPrebuilt.create(kitToken);
+        if (shouldAbortInit || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current) {
+          try { (zp as any).destroy(); } catch(e) {}
+          return;
+        }
+        
         zpRef.current = zp;
         creationTimeRef.current = Date.now();
         initializedRoomIdRef.current = roomId;
-        initInProgressRoomIdRef.current = null;
+        // Do NOT set initInProgressRoomIdRef.current = null here, wait until joinRoom finishes or fails
 
         // If host, create or update a live session record in Firestore
         if (isHost && !shouldAbortInit) {
@@ -447,32 +467,33 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
               }
             },
             onJoinRoom: () => {
+              if (shouldAbortInit || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current) return;
               if (hasJoinedRef.current) return;
+              
               console.log(`Successfully joined room: ${roomId} as ${isHost ? 'Host' : 'Audience'}`);
               hasJoinedRef.current = true;
               hasLeftRef.current = false;
               hasDecrementedRef.current = false;
+              isJoiningRef.current = false;
+              initInProgressRoomIdRef.current = null;
               
-              // Set ready flag after a small delay to ensure SDK internal state is settled
+              // Set ready flag after a more conservative delay
               setTimeout(() => {
-                if (hasJoinedRef.current && !hasLeftRef.current) {
+                if (hasJoinedRef.current && !hasLeftRef.current && zegoInstanceIdRef.current === instanceId && isMountedRef.current) {
                   isZegoReadyRef.current = true;
                 }
-              }, 1000);
+              }, 2000);
 
               // Notify others that someone joined
               if (!isHost) {
-                // Add a small delay to ensure SDK is fully ready and has the userId
                 setTimeout(async () => {
-                  if (!hasJoinedRef.current || hasLeftRef.current || !isZegoReadyRef.current) return;
+                  if (!hasJoinedRef.current || hasLeftRef.current || !isZegoReadyRef.current || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current) return;
                   
                   try {
                     notifyJoin(zp);
                     
-                    // Unique viewer tracking per session
                     const sessionJoinedKey = `joined_live_${roomId}`;
                     if (!sessionStorage.getItem(sessionJoinedKey)) {
-                      console.log(`Incrementing unique viewer count for room: ${roomId}`);
                       await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
                         viewerCount: increment(1)
                       });
@@ -481,14 +502,18 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
                   } catch (e) {
                     console.error("Error on join room actions:", e);
                   }
-                }, 2000);
+                }, 3500);
               }
             },
             onLeaveRoom: () => {
+              if (zegoInstanceIdRef.current !== instanceId) return;
+              
               console.log(`Leaving room: ${roomId}`);
               hasJoinedRef.current = false;
               hasLeftRef.current = true;
               isZegoReadyRef.current = false;
+              isJoiningRef.current = false;
+              
               if (isHost) {
                 updateDoc(doc(db, 'kuku_live_sessions', roomId), {
                   status: 'ended',
@@ -496,14 +521,14 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
                   viewerCount: 0
                 }).catch(e => console.error("Error ending session on leave:", e));
               } else {
-                if (!hasDecrementedRef.current) {
+                if (!hasDecrementedRef.current && isMountedRef.current) {
                   updateDoc(doc(db, 'kuku_live_sessions', roomId), {
                     viewerCount: increment(-1)
                   }).then(() => {
                     hasDecrementedRef.current = true;
                   }).catch(e => console.error("Error decrementing viewer count:", e));
                 }
-                onClose();
+                if (isMountedRef.current) onClose();
               }
             },
           };
@@ -518,24 +543,36 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
             zegoConfig.useFrontFacingCamera = useFrontCamera;
           }
 
+          if (hasJoinedRef.current || hasLeftRef.current || isJoiningRef.current || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current) {
+            console.warn("Skipping joinRoom: already joined, joining, leaving, or aborted");
+            initInProgressRoomIdRef.current = null;
+            return;
+          }
+
+          isJoiningRef.current = true;
           await zp.joinRoom(zegoConfig);
         } catch (joinError: any) {
-          console.error("Zego joinRoom error:", joinError);
-          if (!shouldAbortInit) {
-            // Handle specific Zego error codes
-            if (joinError?.errorCode === 1100002 || (joinError?.message && joinError.message.includes('timeout'))) {
-              toast.error("Mtandao wako ni dhaifu. Tafadhali jaribu tena baada ya kuimarisha mtandao.");
-            } else {
-              toast.error("Tatizo la kiufundi limetokea. Tafadhali jaribu tena.");
+          if (zegoInstanceIdRef.current === instanceId) {
+            console.error("Zego joinRoom error:", joinError);
+            isJoiningRef.current = false;
+            initInProgressRoomIdRef.current = null;
+            if (!shouldAbortInit && isMountedRef.current) {
+              if (joinError?.errorCode === 1100002 || (joinError?.message && joinError.message.includes('timeout'))) {
+                toast.error("Mtandao wako ni dhaifu. Tafadhali jaribu tena baada ya kuimarisha mtandao.");
+              } else {
+                toast.error("Tatizo la kiufundi limetokea. Tafadhali jaribu tena.");
+              }
+              onClose();
             }
-            onClose();
           }
         }
       } catch (error) {
-        console.error("Error initializing ZegoCloud:", error);
-        if (!shouldAbortInit) {
-          toast.error("Imeshindwa kuanzisha Live Stream.");
-          onClose();
+        if (zegoInstanceIdRef.current === instanceId) {
+          console.error("Error initializing ZegoCloud:", error);
+          if (!shouldAbortInit && isMountedRef.current) {
+            toast.error("Imeshindwa kuanzisha Live Stream.");
+            onClose();
+          }
         }
       }
     };
@@ -543,40 +580,38 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     initLiveStream();
 
     return () => {
-      // Only destroy Zego if the modal is closing, we are changing rooms, or the container is being removed, or session ended
-      // This prevents re-initializing on every sessionData update but ensures we re-init if the container changes
       const isSessionEnded = sessionData && sessionData.status === 'ended';
       const shouldDestroy = !isOpen || currentRoomIdRef.current !== roomId || !container || isSessionEnded;
       
       if (shouldDestroy) {
+        const joinedAtCleanup = hasJoinedRef.current;
+        const decrementedAtCleanup = hasDecrementedRef.current;
         shouldAbortInit = true;
         hasJoinedRef.current = false;
         hasLeftRef.current = true;
         isZegoReadyRef.current = false;
-        console.log("Cleaning up Zego for room:", roomId, "Reason:", !isOpen ? "Modal closed" : currentRoomIdRef.current !== roomId ? "Room changed" : !container ? "Container removed" : "Session ended");
+        isJoiningRef.current = false;
         initInProgressRoomIdRef.current = null;
         initializedRoomIdRef.current = null;
+        
+        console.log("Cleaning up Zego for room:", roomId);
         
         if (zpRef.current) {
           const zpToDestroy = zpRef.current;
           const rId = roomId;
           const wasHost = isHost;
-          const joined = hasJoinedRef.current;
-          const decremented = hasDecrementedRef.current;
+          const timeSinceCreation = Date.now() - creationTimeRef.current;
+          
+          zpRef.current = null;
 
           // Cleanup viewer count if needed
-          if (!wasHost && joined && !decremented && rId) {
+          if (!wasHost && joinedAtCleanup && !decrementedAtCleanup && rId) {
             updateDoc(doc(db, 'kuku_live_sessions', rId), {
               viewerCount: increment(-1)
             }).catch(() => {});
           }
 
-          const timeSinceCreation = Date.now() - creationTimeRef.current;
-          zpRef.current = null;
           try {
-            // Increased delay to ensure any pending internal Zego tasks can settle
-            // before we hard-destroy the instance, which can cause the binaryType or createSpan error
-            // We ensure at least 1 second has passed since creation to avoid race conditions in SDK tracing
             const delay = Math.max(0, 1000 - timeSinceCreation);
             setTimeout(() => {
               try {
@@ -591,7 +626,6 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
           } catch (e) {}
         }
 
-        // If host is leaving (modal closing or room changing), make sure session is ended
         if (isHost && roomId && (!isOpen || currentRoomIdRef.current !== roomId)) {
           updateDoc(doc(db, 'kuku_live_sessions', roomId), {
             status: 'ended',
