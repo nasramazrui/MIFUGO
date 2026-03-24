@@ -53,10 +53,10 @@ export const DAYS = [
 
 export const TRANSLATIONS: any = {
   sw: {
-    market: 'Soko',
-    stores: 'Maduka',
-    orders: 'Oda',
-    profile: 'Wasifu',
+    market: 'SOKO',
+    stores: 'MADUKA',
+    orders: 'ODA',
+    profile: 'WASIFU',
     search: 'Tafuta kuku, mayai, chakula...',
     categories: 'KATEGORIA',
     all: 'Zote',
@@ -125,7 +125,7 @@ export const TRANSLATIONS: any = {
     sungura_kufuga: 'Sungura wa Kufuga',
     kanga_kufuga: 'Kanga wa Kufuga',
     paka: 'Paka (Cat)',
-    auctions: 'Minada Live',
+    auctions: 'LIVE',
     auction_title: 'Minada Live ya Mifugo',
     starting_price: 'Bei ya Kuanzia',
     current_bid: 'Dau la Sasa',

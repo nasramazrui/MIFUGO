@@ -2,8 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ZegoUIKitPrebuilt } from '@zegocloud/zego-uikit-prebuilt';
 import { X, Heart, MessageSquare, Send, Users, QrCode, Gavel, ShoppingBag, MapPin, Clock, Video, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { db } from '../services/firebase';
-import { doc, setDoc, deleteDoc, serverTimestamp, onSnapshot, collection, addDoc, query, orderBy, limit, getDoc, getDocs, updateDoc, increment } from 'firebase/firestore';
+import { db, doc, setDoc, deleteDoc, serverTimestamp, onSnapshot, collection, addDoc, query, orderBy, limit, getDoc, getDocs, updateDoc, increment, where, handleFirestoreError, OperationType } from '../services/firebase';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'motion/react';
 import QRCode from 'react-qr-code';
@@ -39,6 +38,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   const [showQR, setShowQR] = useState(false);
   const [auctionData, setAuctionData] = useState<any>(null);
   const [viewerCount, setViewerCount] = useState(0);
+  const [totalLikes, setTotalLikes] = useState(0);
   const [isEnding, setIsEnding] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const currentRoomIdRef = useRef(roomId);
@@ -47,8 +47,11 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
   const creationTimeRef = useRef<number>(0);
   const hasJoinedRef = useRef(false);
   const hasLeftRef = useRef(false);
+  const [isZegoReady, setIsZegoReady] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
+  const [retryTrigger, setRetryTrigger] = useState(0);
   const isZegoReadyRef = useRef(false);
-  const isJoiningRef = useRef(false);
+  const joiningInstanceIdRef = useRef<number | null>(null);
   const hasDecrementedRef = useRef(false);
   const lastLikeTimeRef = useRef(0);
   const zegoInstanceIdRef = useRef<number>(0);
@@ -92,6 +95,14 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     lastLikeTimeRef.current = now;
 
     showLike();
+    
+    // Update global like count in Firestore
+    if (roomId) {
+      updateDoc(doc(db, 'kuku_live_sessions', roomId), {
+        likeCount: increment(1)
+      }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `kuku_live_sessions/${roomId}`));
+    }
+
     // Broadcast like to all participants
     if (zpRef.current && hasJoinedRef.current && isZegoReadyRef.current && !hasLeftRef.current) {
       try {
@@ -120,31 +131,42 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     // Listen for session data (viewer count, etc)
     const unsubSession = onSnapshot(doc(db, 'kuku_live_sessions', roomId), (doc) => {
       if (doc.exists()) {
-        setSessionData(doc.data());
-        setViewerCount(doc.data().viewerCount || 0);
+        const data = doc.data();
+        setSessionData(data);
+        setViewerCount(data.viewerCount || 0);
+        setTotalLikes(data.likeCount || 0);
       }
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, `kuku_live_sessions/${roomId}`);
     });
 
     // Listen for chat
-    const q = query(
-      collection(db, 'kuku_live_chats', roomId, 'messages'),
-      orderBy('createdAt', 'desc'),
-      limit(20)
-    );
-    const unsubChat = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage));
+    const unsubChat = onSnapshot(collection(db, 'kuku_live_chats'), (snapshot) => {
+      const msgs = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(m => m.roomId === roomId)
+        .sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        })
+        .slice(0, 20);
       setMessages(msgs.reverse());
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, 'kuku_live_chats');
     });
 
     // If it's an auction, fetch auction data
-    const auction = auctions.find(a => a.id === roomId);
+    const auction = Array.isArray(auctions) ? auctions.find(a => a.id === roomId) : undefined;
     if (auction) {
       setAuctionData(auction);
     } else if (!roomId.startsWith('live_shopping_')) {
       // Try fetching if not in context
-      getDoc(doc(db, 'kuku_auctions', roomId)).then(d => {
-        if (d.exists()) setAuctionData({ id: d.id, ...d.data() });
-      });
+      getDoc(doc(db, 'kuku_auctions', roomId))
+        .then(d => {
+          if (d.exists()) setAuctionData({ id: d.id, ...d.data() });
+        })
+        .catch(e => handleFirestoreError(e, OperationType.GET, `kuku_auctions/${roomId}`));
     }
 
     return () => {
@@ -153,13 +175,58 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     };
   }, [isOpen, roomId, auctions]);
 
+  const [timeLeft, setTimeLeft] = useState<string>('N/A');
+
+  // Countdown timer for auctions
+  useEffect(() => {
+    if (!auctionData?.endTime || !isOpen) return;
+
+    const updateTimer = () => {
+      const end = auctionData.endTime.toDate ? auctionData.endTime.toDate().getTime() : new Date(auctionData.endTime).getTime();
+      const now = Date.now();
+      const diff = end - now;
+
+      if (diff <= 0) {
+        setTimeLeft('00:00:00');
+        return false;
+      } else {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        setTimeLeft(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+        return true;
+      }
+    };
+
+    // Initial update
+    const isRunning = updateTimer();
+    if (!isRunning) {
+      toast.success("Mnada umekwisha!");
+      setTimeout(() => onClose(), 2000);
+      return;
+    }
+
+    const timer = setInterval(() => {
+      const isRunning = updateTimer();
+      if (!isRunning) {
+        clearInterval(timer);
+        toast.success("Mnada umekwisha!");
+        setTimeout(() => onClose(), 2000);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [auctionData?.endTime, isOpen, onClose]);
+
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!chatInput.trim()) return;
 
     try {
       const text = replyTo ? `@${replyTo.userName} ${chatInput}` : chatInput;
-      await addDoc(collection(db, 'kuku_live_chats', roomId, 'messages'), {
+      await addDoc(collection(db, 'kuku_live_chats'), {
+        roomId,
         userId: safeUserId,
         userName: safeUserName,
         text: text,
@@ -168,7 +235,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
       setChatInput('');
       setReplyTo(null);
     } catch (error) {
-      console.error("Error sending message:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_live_chats');
     }
   };
 
@@ -177,14 +244,34 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     
     try {
       console.log("Explicitly ending live session:", roomId);
-      await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
-        status: 'ended',
-        endedAt: serverTimestamp(),
-        viewerCount: 0
-      });
+      const sessionRef = doc(db, 'kuku_live_sessions', roomId);
+      const snap = await getDoc(sessionRef);
+      if (snap.exists()) {
+        await setDoc(sessionRef, {
+          status: 'ended',
+          endedAt: serverTimestamp(),
+          viewerCount: 0
+        }, { merge: true });
+      }
+
+      // Also update the auction if this roomId is an auctionId
+      if (!roomId.startsWith('live_shopping_')) {
+        const auctionRef = doc(db, 'kuku_auctions', roomId);
+        const auctionSnap = await getDoc(auctionRef);
+        if (auctionSnap.exists()) {
+          await updateDoc(auctionRef, {
+            status: 'ended',
+            liveEnded: true,
+            endedAt: serverTimestamp()
+          });
+        }
+      }
+
       toast.success("Live imemalizika!");
-    } catch (e) {
-      console.error("Error explicitly ending session:", e);
+    } catch (e: any) {
+      if (e?.code !== 'not-found' && !e?.message?.includes('No document to update')) {
+        handleFirestoreError(e, OperationType.UPDATE, `kuku_live_sessions/${roomId}`);
+      }
     }
   };
 
@@ -207,39 +294,40 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     if (!isHost || !roomId) return;
     try {
       // Delete old messages
-      const messagesRef = collection(db, 'kuku_live_chats', roomId, 'messages');
-      const q = query(messagesRef);
-      const snapshot = await getDocs(q);
-      const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+      const snapshot = await getDocs(collection(db, 'kuku_live_chats'));
+      const deletePromises = snapshot.docs
+        .filter(d => d.data().roomId === roomId)
+        .map(d => deleteDoc(doc(db, 'kuku_live_chats', d.id)));
       await Promise.all(deletePromises);
 
-      await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
+      await setDoc(doc(db, 'kuku_live_sessions', roomId), {
         status: 'live',
         startTime: serverTimestamp(),
         viewerCount: 0
-      });
+      }, { merge: true });
       
       // Set flag to auto-reopen modal and reload page to completely reset Zego SDK state
       sessionStorage.setItem('autoRestartLive', roomId);
       sessionStorage.setItem('autoRestartCamera', facingMode);
       window.location.reload();
     } catch (e) {
-      console.error("Error restarting live:", e);
+      handleFirestoreError(e, OperationType.WRITE, `kuku_live_sessions/${roomId}`);
       toast.error("Imeshindwa kuanza tena live");
     }
   };
 
   useEffect(() => {
-    const isCreateSpanError = (err: any) => {
+    const isZegoInternalError = (err: any) => {
       if (!err) return false;
       const msg = typeof err === 'string' ? err : (err.message || '');
       const stack = err.stack || '';
       return msg.includes('createSpan') || stack.includes('createSpan') || 
-             msg.includes('binaryType') || stack.includes('binaryType');
+             msg.includes('binaryType') || stack.includes('binaryType') ||
+             msg.includes('.find is not a function') || msg.includes('e2.find');
     };
 
     const handleError = (e: ErrorEvent) => {
-      if (isCreateSpanError(e.error) || isCreateSpanError(e.message)) {
+      if (isZegoInternalError(e.error) || isZegoInternalError(e.message)) {
         e.preventDefault();
         e.stopPropagation();
         return true;
@@ -247,7 +335,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     };
 
     const handleRejection = (e: PromiseRejectionEvent) => {
-      if (isCreateSpanError(e.reason)) {
+      if (isZegoInternalError(e.reason)) {
         e.preventDefault();
         e.stopPropagation();
         return true;
@@ -266,8 +354,8 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     if (!isOpen || !container || !systemSettings) return;
 
     // If already initialized or initializing for this room, don't do it again
-    if (initializedRoomIdRef.current === roomId && zpRef.current) return;
-    if (initInProgressRoomIdRef.current === roomId) return;
+    if (initializedRoomIdRef.current === roomId && zpRef.current && !initError) return;
+    if (initInProgressRoomIdRef.current === roomId && !initError) return;
 
     // Viewers must wait for session data to check status
     if (!isHost && !sessionData) return;
@@ -282,38 +370,57 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     let shouldAbortInit = false;
     const instanceId = ++zegoInstanceIdRef.current;
     initInProgressRoomIdRef.current = roomId;
+    setInitError(null);
 
     const initLiveStream = async () => {
       if (!isMountedRef.current) return;
+      try {
+        console.log(`[LiveStream] Starting init for room: ${roomId}, isHost: ${isHost}`);
 
       // Wait for any pending destroy from previous session to finish
       const timeSinceCreation = Date.now() - creationTimeRef.current;
       if (timeSinceCreation < 1500 && creationTimeRef.current > 0) {
+        console.log("[LiveStream] Waiting for previous session cleanup...");
         await new Promise(resolve => setTimeout(resolve, 1500 - timeSinceCreation));
       }
 
-      if (shouldAbortInit || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current) return;
+      if (shouldAbortInit || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current) {
+        console.log("[LiveStream] Init aborted before container check");
+        return;
+      }
 
       // Wait for the modal to be fully rendered and container to have dimensions
       let attempts = 0;
-      while (!shouldAbortInit && zegoInstanceIdRef.current === instanceId && isMountedRef.current && container && (container.offsetWidth === 0 || container.offsetHeight === 0) && attempts < 40) {
+      console.log("[LiveStream] Waiting for container dimensions...");
+      while (!shouldAbortInit && zegoInstanceIdRef.current === instanceId && isMountedRef.current && container && (container.offsetWidth === 0 || container.offsetHeight === 0) && attempts < 50) {
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
       }
 
       if (shouldAbortInit || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current || !container || container.offsetWidth === 0 || container.offsetHeight === 0) {
-        console.warn("Zego container not ready or hidden after waiting");
+        console.warn("[LiveStream] Zego container not ready or hidden after waiting", {
+          shouldAbortInit,
+          instanceMatch: zegoInstanceIdRef.current === instanceId,
+          isMounted: isMountedRef.current,
+          hasContainer: !!container,
+          width: container?.offsetWidth,
+          height: container?.offsetHeight,
+          attempts
+        });
         if (initInProgressRoomIdRef.current === roomId) {
           initInProgressRoomIdRef.current = null;
         }
         return;
       }
 
+      console.log("[LiveStream] Container ready, fetching credentials...");
+
       // Try to get from systemSettings first, then fallback to env
       const appID = parseInt(systemSettings?.zego_app_id || import.meta.env.VITE_ZEGO_APP_ID || '0', 10);
       const serverSecret = systemSettings?.zego_server_secret || import.meta.env.VITE_ZEGO_SERVER_SECRET || '';
 
       if (!appID || !serverSecret) {
+        console.error("[LiveStream] Missing ZegoCloud credentials", { appID: !!appID, serverSecret: !!serverSecret });
         if (!shouldAbortInit) {
           toast.error("ZegoCloud credentials are not configured. Please set them in Admin Panel.");
           onClose();
@@ -325,15 +432,14 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
       }
 
       if (!safeUserId || safeUserId.trim() === '') {
-        console.error("Zego initialization aborted: empty safeUserId");
+        console.error("[LiveStream] Zego initialization aborted: empty safeUserId");
         if (initInProgressRoomIdRef.current === roomId) {
           initInProgressRoomIdRef.current = null;
         }
         return;
       }
 
-      try {
-        console.log(`Initializing Zego: Room=${roomId}, User=${safeUserId}, AppID=${appID}`);
+      console.log(`[LiveStream] Generating kit token: Room=${roomId}, User=${safeUserId}, AppID=${appID}`);
         
         const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
           appID,
@@ -344,12 +450,14 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         );
 
         if (shouldAbortInit) {
+          console.log("[LiveStream] Init aborted after token generation");
           if (initInProgressRoomIdRef.current === roomId) {
             initInProgressRoomIdRef.current = null;
           }
           return;
         }
 
+        console.log("[LiveStream] Creating Zego instance...");
         const zp = ZegoUIKitPrebuilt.create(kitToken);
         if (shouldAbortInit || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current) {
           try { (zp as any).destroy(); } catch(e) {}
@@ -368,22 +476,23 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
           
           if (sessionSnap.exists() && sessionSnap.data().status === 'live') {
             // Just update host info if needed, don't reset viewerCount
-            await updateDoc(sessionRef, {
+            await setDoc(sessionRef, {
               hostName: safeUserName,
               hostAvatar: vendorAvatar || '',
               lastSeen: serverTimestamp()
-            });
+            }, { merge: true });
           } else {
             // New session or restarting ended session
             // Clear past chat messages
             try {
-              const chatRef = collection(db, 'kuku_live_chats', roomId, 'messages');
-              const chatSnap = await getDocs(chatRef);
-              const deletePromises = chatSnap.docs.map(d => deleteDoc(d.ref));
+              const chatSnap = await getDocs(collection(db, 'kuku_live_chats'));
+              const deletePromises = chatSnap.docs
+                .filter(d => d.data().roomId === roomId)
+                .map(d => deleteDoc(doc(db, 'kuku_live_chats', d.id)));
               await Promise.all(deletePromises);
               console.log("Cleared past chat messages for new session");
             } catch (chatErr) {
-              console.error("Error clearing past chat:", chatErr);
+              handleFirestoreError(chatErr, OperationType.DELETE, 'kuku_live_chats');
             }
 
             await setDoc(sessionRef, {
@@ -438,17 +547,29 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
           const savedCamera = sessionStorage.getItem('autoRestartCamera');
           const useFrontCamera = savedCamera === 'environment' ? false : true;
           
-          console.log(`Joining Zego room: ${roomId}`);
+          console.log(`[LiveStream] Joining Zego room: ${roomId} as ${isHost ? 'Host' : 'Audience'}`);
           
           const zegoConfig: any = {
             container: container,
             showPreJoinView: false, // Start immediately without pre-join screen
-            showUserList: false,
             scenario: {
               mode: ZegoUIKitPrebuilt.LiveStreaming,
               config: {
                 role: isHost ? ZegoUIKitPrebuilt.Host : ZegoUIKitPrebuilt.Audience,
               },
+            },
+            showMyCameraControls: isHost,
+            showMyMicrophoneControls: isHost,
+            showAudioVideoSettingsButton: true,
+            showScreenSharingButton: false,
+            showLayoutButton: false,
+            showNonVideoUser: false,
+            showUserList: false,
+            showTextChat: false,
+            showInRoomMessageButton: false,
+            videoViewConfig: {
+              showOnlySelf: false,
+              objectFit: 'cover'
             },
             onInRoomCommandReceived: (commandData: any) => {
               try {
@@ -463,24 +584,29 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
                   onClose();
                 }
               } catch (e) {
-                console.error("Error parsing custom command:", e, "Raw content:", commandData.content);
+                console.error("[LiveStream] Error parsing custom command:", e, "Raw content:", commandData.content);
               }
             },
             onJoinRoom: () => {
-              if (shouldAbortInit || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current) return;
+              if (shouldAbortInit || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current) {
+                console.log("[LiveStream] onJoinRoom: aborted or instance mismatch");
+                return;
+              }
               if (hasJoinedRef.current) return;
               
-              console.log(`Successfully joined room: ${roomId} as ${isHost ? 'Host' : 'Audience'}`);
+              console.log(`[LiveStream] Successfully joined room: ${roomId}`);
               hasJoinedRef.current = true;
               hasLeftRef.current = false;
               hasDecrementedRef.current = false;
-              isJoiningRef.current = false;
+              joiningInstanceIdRef.current = null;
               initInProgressRoomIdRef.current = null;
               
               // Set ready flag after a more conservative delay
               setTimeout(() => {
                 if (hasJoinedRef.current && !hasLeftRef.current && zegoInstanceIdRef.current === instanceId && isMountedRef.current) {
+                  console.log("[LiveStream] Zego is now fully ready");
                   isZegoReadyRef.current = true;
+                  setIsZegoReady(true);
                 }
               }, 2000);
 
@@ -494,13 +620,13 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
                     
                     const sessionJoinedKey = `joined_live_${roomId}`;
                     if (!sessionStorage.getItem(sessionJoinedKey)) {
-                      await updateDoc(doc(db, 'kuku_live_sessions', roomId), {
+                      await setDoc(doc(db, 'kuku_live_sessions', roomId), {
                         viewerCount: increment(1)
-                      });
+                      }, { merge: true });
                       sessionStorage.setItem(sessionJoinedKey, 'true');
                     }
                   } catch (e) {
-                    console.error("Error on join room actions:", e);
+                    handleFirestoreError(e, OperationType.UPDATE, `kuku_live_sessions/${roomId}`);
                   }
                 }, 3500);
               }
@@ -508,25 +634,26 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
             onLeaveRoom: () => {
               if (zegoInstanceIdRef.current !== instanceId) return;
               
-              console.log(`Leaving room: ${roomId}`);
+              console.log(`[LiveStream] Leaving room: ${roomId}`);
               hasJoinedRef.current = false;
               hasLeftRef.current = true;
               isZegoReadyRef.current = false;
-              isJoiningRef.current = false;
+              setIsZegoReady(false);
+              joiningInstanceIdRef.current = null;
               
               if (isHost) {
-                updateDoc(doc(db, 'kuku_live_sessions', roomId), {
+                setDoc(doc(db, 'kuku_live_sessions', roomId), {
                   status: 'ended',
                   endedAt: serverTimestamp(),
                   viewerCount: 0
-                }).catch(e => console.error("Error ending session on leave:", e));
+                }, { merge: true }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `kuku_live_sessions/${roomId}`));
               } else {
                 if (!hasDecrementedRef.current && isMountedRef.current) {
-                  updateDoc(doc(db, 'kuku_live_sessions', roomId), {
+                  setDoc(doc(db, 'kuku_live_sessions', roomId), {
                     viewerCount: increment(-1)
-                  }).then(() => {
+                  }, { merge: true }).then(() => {
                     hasDecrementedRef.current = true;
-                  }).catch(e => console.error("Error decrementing viewer count:", e));
+                  }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `kuku_live_sessions/${roomId}`));
                 }
                 if (isMountedRef.current) onClose();
               }
@@ -543,26 +670,30 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
             zegoConfig.useFrontFacingCamera = useFrontCamera;
           }
 
-          if (hasJoinedRef.current || hasLeftRef.current || isJoiningRef.current || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current) {
+          if (hasJoinedRef.current || hasLeftRef.current || (joiningInstanceIdRef.current === instanceId) || zegoInstanceIdRef.current !== instanceId || !isMountedRef.current) {
             console.warn("Skipping joinRoom: already joined, joining, leaving, or aborted");
             initInProgressRoomIdRef.current = null;
             return;
           }
 
-          isJoiningRef.current = true;
+          joiningInstanceIdRef.current = instanceId;
           await zp.joinRoom(zegoConfig);
+          if (joiningInstanceIdRef.current === instanceId) {
+            joiningInstanceIdRef.current = null;
+          }
         } catch (joinError: any) {
           if (zegoInstanceIdRef.current === instanceId) {
             console.error("Zego joinRoom error:", joinError);
-            isJoiningRef.current = false;
+            joiningInstanceIdRef.current = null;
             initInProgressRoomIdRef.current = null;
             if (!shouldAbortInit && isMountedRef.current) {
-              if (joinError?.errorCode === 1100002 || (joinError?.message && joinError.message.includes('timeout'))) {
-                toast.error("Mtandao wako ni dhaifu. Tafadhali jaribu tena baada ya kuimarisha mtandao.");
-              } else {
-                toast.error("Tatizo la kiufundi limetokea. Tafadhali jaribu tena.");
-              }
-              onClose();
+              const errorMsg = (joinError?.errorCode === 1100002 || (joinError?.message && joinError.message.includes('timeout')))
+                ? "Mtandao wako ni dhaifu. Tafadhali jaribu tena baada ya kuimarisha mtandao."
+                : "Tatizo la kiufundi limetokea. Tafadhali jaribu tena.";
+              
+              setInitError(errorMsg);
+              toast.error(errorMsg);
+              // Don't close immediately, let user retry
             }
           }
         }
@@ -570,9 +701,12 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         if (zegoInstanceIdRef.current === instanceId) {
           console.error("Error initializing ZegoCloud:", error);
           if (!shouldAbortInit && isMountedRef.current) {
+            setInitError("Imeshindwa kuanzisha Live Stream.");
             toast.error("Imeshindwa kuanzisha Live Stream.");
-            onClose();
           }
+        }
+        if (initInProgressRoomIdRef.current === roomId) {
+          initInProgressRoomIdRef.current = null;
         }
       }
     };
@@ -581,7 +715,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
 
     return () => {
       const isSessionEnded = sessionData && sessionData.status === 'ended';
-      const shouldDestroy = !isOpen || currentRoomIdRef.current !== roomId || !container || isSessionEnded;
+      const shouldDestroy = !isOpen || currentRoomIdRef.current !== roomId || !container || isSessionEnded || !!initError;
       
       if (shouldDestroy) {
         const joinedAtCleanup = hasJoinedRef.current;
@@ -590,7 +724,8 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         hasJoinedRef.current = false;
         hasLeftRef.current = true;
         isZegoReadyRef.current = false;
-        isJoiningRef.current = false;
+        setIsZegoReady(false);
+        joiningInstanceIdRef.current = null;
         initInProgressRoomIdRef.current = null;
         initializedRoomIdRef.current = null;
         
@@ -606,9 +741,9 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
 
           // Cleanup viewer count if needed
           if (!wasHost && joinedAtCleanup && !decrementedAtCleanup && rId) {
-            updateDoc(doc(db, 'kuku_live_sessions', rId), {
+            setDoc(doc(db, 'kuku_live_sessions', rId), {
               viewerCount: increment(-1)
-            }).catch(() => {});
+            }, { merge: true }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `kuku_live_sessions/${rId}`));
           }
 
           try {
@@ -627,15 +762,15 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         }
 
         if (isHost && roomId && (!isOpen || currentRoomIdRef.current !== roomId)) {
-          updateDoc(doc(db, 'kuku_live_sessions', roomId), {
+          setDoc(doc(db, 'kuku_live_sessions', roomId), {
             status: 'ended',
             endedAt: serverTimestamp(),
             viewerCount: 0
-          }).catch(e => console.error("Cleanup error ending session:", e));
+          }, { merge: true }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `kuku_live_sessions/${roomId}`));
         }
       }
     };
-  }, [isOpen, roomId, isHost, safeUserId, safeUserName, onClose, vendorAvatar, systemSettings, container, sessionData?.status, !!sessionData]);
+  }, [isOpen, roomId, isHost, safeUserId, safeUserName, onClose, vendorAvatar, systemSettings, container, sessionData?.status, !!sessionData, retryTrigger]);
 
   const handleRemoveUser = (targetUserId: string, targetUserName: string) => {
     if (!isHost || !zpRef.current || !hasJoinedRef.current || !isZegoReadyRef.current || hasLeftRef.current) return;
@@ -657,10 +792,10 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     if (!isHost || !roomId) return;
     if (window.confirm('Je, una uhakika unataka kufuta ujumbe huu?')) {
       try {
-        await deleteDoc(doc(db, 'kuku_live_chats', roomId, 'messages', messageId));
+        await deleteDoc(doc(db, 'kuku_live_chats', messageId));
         toast.success('Ujumbe umefutwa');
       } catch (e) {
-        console.error("Error deleting message:", e);
+        handleFirestoreError(e, OperationType.DELETE, `kuku_live_chats/${messageId}`);
         toast.error('Imeshindwa kufuta ujumbe');
       }
     }
@@ -682,12 +817,58 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
     <div className="fixed inset-0 z-[100] bg-black flex flex-col overflow-hidden">
       {/* Zego Container */}
       {sessionData?.status !== 'ended' ? (
-        <div 
-          key="zego-container"
-          ref={setContainer}
-          className="flex-1 w-full h-full" 
-          style={{ width: '100%', height: '100%' }}
-        />
+        <div className="relative flex-1 w-full h-full">
+          {!isZegoReady && (
+            <div className="absolute inset-0 z-10 bg-slate-900 flex flex-col items-center justify-center text-white p-6 text-center">
+              {initError ? (
+                <>
+                  <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-6">
+                    <X size={32} className="text-red-500" />
+                  </div>
+                  <h3 className="text-xl font-black uppercase tracking-widest mb-2">Tatizo Limetokea</h3>
+                  <p className="text-slate-400 font-bold max-w-xs mb-8">{initError}</p>
+                  
+                  <div className="flex flex-col gap-3 w-full max-w-xs">
+                    <button 
+                      onClick={() => {
+                        setInitError(null);
+                        setRetryTrigger(prev => prev + 1);
+                      }}
+                      className="bg-amber-500 text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-600 transition-all active:scale-95"
+                    >
+                      JARIBU TENA
+                    </button>
+                    <button 
+                      onClick={onClose}
+                      className="bg-white/10 hover:bg-white/20 text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                    >
+                      ONDOKA
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-6"></div>
+                  <h3 className="text-xl font-black uppercase tracking-widest mb-2">Inaunganisha...</h3>
+                  <p className="text-slate-400 font-bold max-w-xs">Tafadhali subiri kidogo wakati tunatayarisha matangazo ya moja kwa moja.</p>
+                  
+                  <button 
+                    onClick={onClose}
+                    className="mt-8 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                  >
+                    GHAIRISHA
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          <div 
+            key="zego-container"
+            ref={setContainer}
+            className="w-full h-full" 
+            style={{ width: '100%', height: '100%' }}
+          />
+        </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center bg-slate-900 p-8 text-center">
           <div className="w-24 h-24 bg-red-600/20 rounded-full flex items-center justify-center mb-6">
@@ -733,7 +914,11 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
               </div>
               <div className="bg-black/40 backdrop-blur-md text-white px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1">
                 <Users size={12} />
-                {viewerCount > 1000 ? `${(viewerCount/1000).toFixed(1)}K` : viewerCount} WATCHING
+                {viewerCount > 1000 ? `${(viewerCount/1000).toFixed(1)}K` : viewerCount}
+              </div>
+              <div className="bg-black/40 backdrop-blur-md text-white px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1">
+                <Heart size={12} className="text-red-500 fill-red-500" />
+                {totalLikes > 1000 ? `${(totalLikes/1000).toFixed(1)}K` : totalLikes}
               </div>
             </div>
 
@@ -772,29 +957,34 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
           </div>
 
           <div className="flex flex-col gap-3">
-            {isHost && (
-              <button 
-                onClick={handleEndLive}
-                disabled={isEnding}
-                className="bg-red-600 text-white px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-red-600/20 active:scale-95 transition-all disabled:opacity-50"
-              >
-                {isEnding ? 'ENDING...' : 'END LIVE'}
-              </button>
-            )}
-            <button 
-              onClick={onClose} 
-              className="bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
-            >
-              <X size={24} />
-            </button>
             <button 
               onClick={() => setShowQR(!showQR)}
-              className="bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
+              className="bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors pointer-events-auto"
             >
               <QrCode size={24} />
             </button>
+            <button 
+              onClick={onClose} 
+              className="bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors pointer-events-auto"
+            >
+              <X size={24} />
+            </button>
           </div>
         </div>
+
+        {/* Top Center - END LIVE for Host */}
+        {isHost && sessionData?.status !== 'ended' && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[102] pointer-events-auto">
+            <button 
+              onClick={handleEndLive}
+              disabled={isEnding}
+              className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-full font-black text-xs uppercase tracking-widest shadow-xl shadow-red-600/40 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
+            >
+              <Video size={16} />
+              {isEnding ? 'ENDING...' : 'END LIVE'}
+            </button>
+          </div>
+        )}
 
         {/* Middle Section - Floating Hearts */}
         <div className="flex-1 relative overflow-hidden">
@@ -815,7 +1005,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
         </div>
 
         {/* Bottom Section */}
-        <div className="space-y-4">
+        <div className="space-y-4 pb-16 md:pb-20">
           {/* Chat Messages */}
           <div className="max-h-[200px] overflow-y-auto flex flex-col gap-2 pointer-events-auto scrollbar-hide">
             {messages.map((msg, idx) => (
@@ -871,7 +1061,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
                 <p className="text-white/60 text-[10px] uppercase font-black tracking-widest mb-1">Time Left</p>
                 <div className="flex items-center gap-2 text-white font-black text-xl">
                   <Clock size={18} className="text-amber-500" />
-                  {auctionData.endTime ? '00:22' : 'N/A'}
+                  {timeLeft}
                 </div>
               </div>
               <div className="text-right">
@@ -907,9 +1097,14 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
 
             <button 
               onClick={addLike}
-              className="w-12 h-12 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-red-500/30 hover:scale-110 transition-transform"
+              className="relative w-12 h-12 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-red-500/30 hover:scale-110 transition-transform active:scale-95"
             >
               <Heart fill="white" size={24} />
+              {totalLikes > 0 && (
+                <div className="absolute -top-1 -right-1 bg-white text-red-600 text-[10px] font-black px-1.5 py-0.5 rounded-full border border-red-500 min-w-[20px] text-center">
+                  {totalLikes > 999 ? '999+' : totalLikes}
+                </div>
+              )}
             </button>
           </div>
         </div>
@@ -934,6 +1129,7 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
                     toast.success(`Dau lako la ${formatCurrency(bidAmount, systemSettings?.currency || 'TZS')} limewekwa!`);
                     addActivity('🔨', `Uliweka dau la ${formatCurrency(bidAmount, systemSettings?.currency || 'TZS')} kwenye mnada: ${auctionData.title}`);
                   } catch (e) {
+                    handleFirestoreError(e, OperationType.UPDATE, `kuku_auctions/${auctionData.id}`);
                     toast.error("Imeshindwa kuweka dau");
                   }
                 }}

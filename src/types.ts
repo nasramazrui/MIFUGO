@@ -43,7 +43,7 @@ export interface Product {
   unit: ProductUnit;
   emoji: string;
   image?: string;
-  desc: string;
+  description: string;
   location: string;
   region: string;
   vendorId: string;
@@ -234,6 +234,7 @@ export interface Auction {
   endTime: any;
   location: string;
   status: 'active' | 'ended';
+  liveEnded?: boolean;
   image?: string;
   winnerId?: string;
   winnerName?: string;
@@ -298,12 +299,86 @@ export interface ChatMessage {
 export interface VaccinationRecord {
   id: string;
   userId: string;
-  birdType: string;
+  livestockId?: string; // Link to specific animal
+  birdType?: string; // For poultry
   vaccineName: string;
   date: string;
   nextDueDate: string;
   notes?: string;
   completed: boolean;
+  cost?: number;
+  createdAt: any;
+}
+
+export interface MedicalRecord {
+  id: string;
+  livestockId: string;
+  disease: string;
+  medicine: string;
+  date: string;
+  cost: number;
+  notes?: string;
+  createdAt: any;
+}
+
+export interface BreedingRecord {
+  id: string;
+  livestockId: string;
+  matingDate: string;
+  sireId?: string;
+  damId?: string;
+  birthDate?: string;
+  offspringCount?: number;
+  femaleOffspring?: number;
+  maleOffspring?: number;
+  notes?: string;
+  createdAt: any;
+}
+
+export interface ProductionRecord {
+  id: string;
+  livestockId: string;
+  date: string;
+  milkLiters?: number;
+  eggCount?: number;
+  createdAt: any;
+}
+
+export interface NutritionRecord {
+  id: string;
+  livestockId: string;
+  feedType: string;
+  amountPerDay: number;
+  costPerDay: number;
+  date: string;
+  createdAt: any;
+}
+
+export interface Livestock {
+  id: string;
+  vendorId: string;
+  tagNumber: string;
+  name?: string;
+  species: string;
+  breed: string;
+  gender: 'male' | 'female';
+  birthDate: string;
+  weight?: number;
+  age?: string;
+  colorMarkings?: string;
+  healthStatus: 'Healthy' | 'Sick' | 'Injured';
+  vaccinationStatus: 'Vaccinated' | 'Not Vaccinated';
+  lastTreatmentDate?: string;
+  notes?: string;
+  pregnancyStatus?: 'Pregnant' | 'Not Pregnant';
+  expectedDeliveryDate?: string;
+  location: string;
+  farmSection?: string;
+  status: 'alive' | 'sold' | 'dead' | 'moved';
+  image?: string;
+  ownerName: string;
+  ownerPhone: string;
+  hasBeenLive?: boolean;
   createdAt: any;
 }
 

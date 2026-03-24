@@ -4,8 +4,7 @@ import { Auction, Bid } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Gavel, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2, Wallet, Send, CreditCard, Smartphone, Search, Globe, Trash2, Video } from 'lucide-react';
 import { formatCurrency, cn } from '../utils';
-import { db } from '../services/firebase';
-import { collection, addDoc, updateDoc, doc, serverTimestamp, query, where, orderBy, onSnapshot, increment, getDoc, deleteDoc } from 'firebase/firestore';
+import { db, collection, addDoc, updateDoc, doc, serverTimestamp, query, where, orderBy, onSnapshot, increment, getDoc, deleteDoc, handleFirestoreError, OperationType } from '../services/firebase';
 import { toast } from 'react-hot-toast';
 import LiveStreamModal from '../components/LiveStreamModal';
 
@@ -39,6 +38,8 @@ export const AuctionPage: React.FC = () => {
         // Sort by amount descending on client side to avoid index requirement
         bids.sort((a, b) => b.amount - a.amount);
         setAuctionBids(bids);
+      }, (err) => {
+        handleFirestoreError(err, OperationType.GET, 'kuku_bids');
       });
       return unsub;
     }
@@ -114,18 +115,23 @@ export const AuctionPage: React.FC = () => {
   };
 
   const getTimeRemaining = (endTime: any) => {
-    if (!endTime) return '...';
-    const end = endTime.toDate ? endTime.toDate() : new Date(endTime);
-    const now = new Date();
-    const diff = end.getTime() - now.getTime();
+    if (!endTime) return 'N/A';
+    try {
+      const end = endTime.toDate ? endTime.toDate() : new Date(endTime);
+      const now = new Date();
+      const diff = end.getTime() - now.getTime();
 
-    if (diff <= 0) return 'Ended';
+      if (diff <= 0) return 'Ended';
 
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const secs = Math.floor((diff % (1000 * 60)) / 1000);
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((diff % (1000 * 60)) / 1000);
 
-    return `${hours}h ${mins}m ${secs}s`;
+      return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } catch (e) {
+      console.error("Error calculating time remaining:", e);
+      return 'N/A';
+    }
   };
 
   const [timers, setTimers] = useState<Record<string, string>>({});

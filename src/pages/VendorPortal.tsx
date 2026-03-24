@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { User, Product, Order, Activity, Withdrawal, ProductUnit, WithdrawalStatus, Auction } from '../types';
 import { IKContext, IKUpload } from 'imagekitio-react';
@@ -64,27 +65,17 @@ import {
 } from 'lucide-react';
 import { cn } from '../utils';
 
-import { db, auth } from '../services/firebase';
-import { updatePassword } from 'firebase/auth';
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  serverTimestamp,
-  increment,
-  getDoc,
-  setDoc
-} from 'firebase/firestore';
+import { db, auth, updatePassword, collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, increment, getDoc, setDoc, handleFirestoreError, OperationType } from '../services/firebase';
 import { toast } from 'react-hot-toast';
+import LivestockManager from './LivestockManager';
 
 export const VendorPortal: React.FC = () => {
+  const navigate = useNavigate();
   const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, addNotification, systemSettings, theme, setTheme, language, setLanguage, setView, t, walletTransactions, notifications, offers, livestockHealthRecords } = useApp();
   const currency = systemSettings?.currency || 'TZS';
-  const unreadNotifications = notifications.filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
+  const unreadNotifications = (Array.isArray(notifications) ? notifications : []).filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status' | 'reviews' | 'auctions' | 'offers'>('dash');
+  const [activeTab, setActiveTab] = useState<'dash' | 'products' | 'orders' | 'wallet' | 'settings' | 'status' | 'reviews' | 'auctions' | 'offers' | 'livestock'>('dash');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
@@ -106,7 +97,7 @@ export const VendorPortal: React.FC = () => {
   const [offlinePaymentData, setOfflinePaymentData] = useState<{ userId: string, amount: number, timestamp: number } | null>(null);
 
   // Low Stock Alerts
-  const lowStockProducts = products.filter(p => p.vendorId === user?.id && p.stock <= (p.lowStockThreshold || 5));
+  const lowStockProducts = (Array.isArray(products) ? products : []).filter(p => p.vendorId === user?.id && p.stock <= (p.lowStockThreshold || 5));
 
   useEffect(() => {
     if (lowStockProducts.length > 0 && user) {
@@ -381,6 +372,7 @@ export const VendorPortal: React.FC = () => {
       });
     } catch (error) {
       console.error('Error sending offer:', error);
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_offers');
       toast.error('Imeshindwa kutuma ofa');
     } finally {
       setIsSendingOffer(false);
@@ -429,7 +421,7 @@ export const VendorPortal: React.FC = () => {
     }
   }, [user]);
 
-  if (!user || user.role !== 'vendor') return null;
+  if (!user || (user.role !== 'vendor' && user.role !== 'admin')) return null;
 
   if (user.status === 'pending') {
     return (
@@ -512,6 +504,7 @@ export const VendorPortal: React.FC = () => {
       });
       toast.success('Bidhaa imeongezwa!');
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_products');
       toast.error('Hitilafu wakati wa kuongeza bidhaa');
     } finally {
       setLoading(false);
@@ -545,6 +538,7 @@ export const VendorPortal: React.FC = () => {
       });
       toast.success('Rekodi imehifadhiwa!');
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_livestock_health');
       toast.error('Imeshindwa kuhifadhi rekodi');
     } finally {
       setLoading(false);
@@ -565,6 +559,7 @@ export const VendorPortal: React.FC = () => {
       setIsEditModalOpen(false);
       setEditingProduct(null);
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_products/${editingProduct.id}`);
       toast.error('Hitilafu wakati wa kusasisha');
     } finally {
       setLoading(false);
@@ -578,6 +573,7 @@ export const VendorPortal: React.FC = () => {
       toast.success('Mnada umefutwa!');
       addActivity('🗑️', 'Umefuta mnada');
     } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `kuku_auctions/${id}`);
       toast.error('Imeshindwa kufuta mnada');
     }
   };
@@ -610,6 +606,7 @@ export const VendorPortal: React.FC = () => {
       setIsAuctionEditModalOpen(false);
       setEditingAuction(null);
     } catch (err: any) {
+      handleFirestoreError(err, OperationType.UPDATE, `kuku_auctions/${editingAuction.id}`);
       toast.error('Imeshindwa kusasisha mnada');
     } finally {
       setLoading(false);
@@ -679,6 +676,7 @@ export const VendorPortal: React.FC = () => {
       addActivity('🐄', `Umeanzisha mnada wa ${auctionForm.productName}`);
     } catch (err: any) {
       console.error('Auction creation error:', err);
+      handleFirestoreError(err, OperationType.CREATE, 'kuku_auctions');
       toast.error(err.message || 'Imeshindwa kuanzisha mnada');
     } finally {
       setLoading(false);
@@ -722,6 +720,7 @@ export const VendorPortal: React.FC = () => {
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(template)}`);
       }
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_orders/${order.id}`);
       toast.error('Hitilafu wakati wa kubadilisha hali');
     }
   };
@@ -732,6 +731,7 @@ export const VendorPortal: React.FC = () => {
       await deleteDoc(doc(db, 'kuku_orders', orderId));
       toast.success('Agizo limefutwa');
     } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `kuku_orders/${orderId}`);
       toast.error('Imeshindwa kufuta agizo');
     }
   };
@@ -814,6 +814,7 @@ export const VendorPortal: React.FC = () => {
       fetchWallet(); // Refresh
       addActivity('💸', `Umeomba kutoa ${formatCurrency(amountNum, currency)}`);
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.WRITE, 'withdrawal_process');
       toast.error(error.message || 'Hitilafu wakati wa kutuma maombi');
     } finally {
       setLoading(false);
@@ -838,6 +839,7 @@ export const VendorPortal: React.FC = () => {
       await updateDoc(doc(db, 'kuku_users', user.id), settings);
       toast.success('Mipangilio imehifadhiwa!');
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_users/${user.id}`);
       toast.error('Hitilafu wakati wa kuhifadhi');
     }
   };
@@ -848,6 +850,7 @@ export const VendorPortal: React.FC = () => {
       await deleteDoc(doc(db, 'kuku_products', id));
       toast.success('Bidhaa imefutwa');
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.DELETE, `kuku_products/${id}`);
       toast.error('Hitilafu wakati wa kufuta');
     }
   };
@@ -878,6 +881,7 @@ export const VendorPortal: React.FC = () => {
       setStatusMediaType(null);
       setIsStatusModalOpen(false);
     } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_statuses');
       toast.error('Hitilafu wakati wa kuweka status');
     } finally {
       setIsStatusLoading(false);
@@ -890,6 +894,7 @@ export const VendorPortal: React.FC = () => {
       await deleteDoc(doc(db, 'kuku_statuses', statusId));
       toast.success('Status imefutwa');
     } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `kuku_statuses/${statusId}`);
       toast.error('Hitilafu wakati wa kufuta status');
     }
   };
@@ -1011,6 +1016,7 @@ export const VendorPortal: React.FC = () => {
       setOfflinePaymentData(null);
     } catch (error) {
       console.error('Offline Payment error:', error);
+      handleFirestoreError(error, OperationType.WRITE, 'offline_payment');
       toast.error('Hitilafu imetokea wakati wa malipo');
     } finally {
       setIsProcessingOfflinePayment(false);
@@ -1402,6 +1408,7 @@ export const VendorPortal: React.FC = () => {
             { id: 'wallet', label: 'Wallet', icon: Wallet },
             { id: 'reviews', label: 'Maoni (Reviews)', icon: MessageSquare },
             { id: 'status', label: t('status'), icon: Camera },
+            { id: 'livestock', label: 'Mifugo Yangu', icon: Syringe },
             { id: 'settings', label: 'Mipangilio', icon: Clock },
           ].map(item => (
             <button
@@ -1424,7 +1431,7 @@ export const VendorPortal: React.FC = () => {
         </nav>
         <div className="p-4 border-t border-slate-50 dark:border-slate-800">
           <button 
-            onClick={() => setView('shop')}
+            onClick={() => navigate('/')}
             className="w-full flex items-center justify-center gap-2 py-4 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-2xl text-sm font-black text-emerald-700 dark:text-emerald-500 transition-all border border-slate-100 dark:border-slate-800"
           >
             <ArrowLeft size={14} />
@@ -1489,7 +1496,7 @@ export const VendorPortal: React.FC = () => {
             </div>
           </div>
           <button 
-            onClick={() => setView('shop')}
+            onClick={() => navigate('/')}
             className="w-full flex items-center gap-2 px-4 py-3 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-2xl text-xs font-bold text-emerald-700 dark:text-emerald-500 transition-all border border-slate-100 dark:border-slate-800"
           >
             <ArrowLeft size={14} />
@@ -1507,6 +1514,7 @@ export const VendorPortal: React.FC = () => {
             { id: 'wallet', label: 'Wallet', icon: Wallet },
             { id: 'reviews', label: 'Maoni (Reviews)', icon: MessageSquare },
             { id: 'status', label: t('status'), icon: Camera },
+            { id: 'livestock', label: 'Mifugo Yangu', icon: Syringe },
             { id: 'settings', label: 'Mipangilio', icon: Clock },
           ].map(item => (
             <button
@@ -1926,8 +1934,13 @@ export const VendorPortal: React.FC = () => {
                           <button 
                             onClick={async () => {
                               if (confirm('Futa ofa hii?')) {
-                                await deleteDoc(doc(db, 'kuku_offers', offer.id));
-                                toast.success('Ofa imefutwa');
+                                try {
+                                  await deleteDoc(doc(db, 'kuku_offers', offer.id));
+                                  toast.success('Ofa imefutwa');
+                                } catch (error) {
+                                  handleFirestoreError(error, OperationType.DELETE, `kuku_offers/${offer.id}`);
+                                  toast.error('Imeshindwa kufuta ofa');
+                                }
                               }
                             }}
                             className="p-2 text-slate-300 hover:text-red-500 transition-colors"
@@ -2060,6 +2073,10 @@ export const VendorPortal: React.FC = () => {
               ))}
             </div>
           </motion.div>
+        )}
+
+        {activeTab === 'livestock' && (
+          <LivestockManager />
         )}
 
         {activeTab === 'wallet' && (
@@ -2200,7 +2217,7 @@ export const VendorPortal: React.FC = () => {
                       '🐄'
                     )}
                     <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                      {a.status === 'active' && (
+                      {a.status === 'active' && !a.liveEnded && (
                         <button 
                           onClick={() => setLiveStreamAuctionId(a.id)}
                           className="w-10 h-10 bg-emerald-500 shadow-lg rounded-xl flex items-center justify-center text-white hover:bg-emerald-600 transition-colors"
@@ -2235,9 +2252,9 @@ export const VendorPortal: React.FC = () => {
                       </button>
                     </div>
                     <div className="absolute top-4 left-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
-                      <Clock size={12} className="text-[#F59E0B]" />
+                      <Clock size={12} className={a.liveEnded ? "text-red-500" : "text-[#F59E0B]"} />
                       <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">
-                        {a.status === 'active' ? 'ACTIVE' : 'ENDED'}
+                        {a.liveEnded ? 'LIVE ENDED' : (a.status === 'active' ? 'ACTIVE' : 'ENDED')}
                       </span>
                     </div>
                   </div>
@@ -2589,8 +2606,17 @@ export const VendorPortal: React.FC = () => {
                     publicKey={systemSettings?.imagekit_public_key || IMAGEKIT_PUBLIC_KEY} 
                     urlEndpoint={systemSettings?.imagekit_url_endpoint || IMAGEKIT_URL_ENDPOINT} 
                     authenticator={async () => {
-                      const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
-                      return await res.json();
+                      try {
+                        const res = await fetch(IMAGEKIT_AUTH_ENDPOINT);
+                        if (!res.ok) {
+                          const errorData = await res.json();
+                          throw new Error(errorData.error || `Server returned ${res.status}`);
+                        }
+                        return await res.json();
+                      } catch (err: any) {
+                        console.error('Authenticator Error:', err);
+                        throw new Error(`Authentication failed: ${err.message}`);
+                      }
                     }}
                   >
                     <IKUpload

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { GoogleGenAI } from "@google/genai";
 import jsPDF from 'jspdf';
 import { generateInvoicePDF } from '../utils/invoice';
@@ -6,8 +7,7 @@ import { useApp } from '../context/AppContext';
 import { formatCurrency } from '../utils';
 import { Modal } from '../components/Modal';
 import { motion, AnimatePresence } from 'motion/react';
-import { db } from '../services/firebase';
-import { 
+import { db, 
   collection, 
   addDoc,
   updateDoc, 
@@ -19,8 +19,10 @@ import {
   getDoc,
   query,
   where,
-  limit
-} from 'firebase/firestore';
+  limit,
+  handleFirestoreError,
+  OperationType
+} from '../services/firebase';
 import { WalletTransaction } from '../types';
 import { QRScanner } from '../components/QRScanner';
 import { 
@@ -79,6 +81,7 @@ import {
 import { toast } from 'react-hot-toast';
 
 export const AdminPanel: React.FC = () => {
+  const navigate = useNavigate();
   const { 
     user,
     users, 
@@ -129,6 +132,7 @@ export const AdminPanel: React.FC = () => {
       await deleteDoc(doc(db, 'kuku_statuses', statusId));
       toast.success('Status imefutwa');
     } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `kuku_statuses/${statusId}`);
       toast.error('Hitilafu wakati wa kufuta status');
     }
   };
@@ -178,7 +182,7 @@ export const AdminPanel: React.FC = () => {
     // Logic to handle scanned text (e.g., find order or product)
     if (decodedText.startsWith('ORDER:')) {
       const orderId = decodedText.replace('ORDER:', '');
-      const order = orders.find(o => o.id === orderId);
+      const order = Array.isArray(orders) ? orders.find(o => o.id === orderId) : undefined;
       if (order) {
         setActiveTab('orders');
         // You could also open a modal for this order here
@@ -233,6 +237,7 @@ export const AdminPanel: React.FC = () => {
       setIsCatModalOpen(false);
       setCatForm({ id: '', label: '', emoji: '', image: '' });
     } catch (error) {
+      handleFirestoreError(error, isEditingCat ? OperationType.UPDATE : OperationType.CREATE, 'kuku_categories');
       toast.error('Hitilafu imetokea');
     }
   };
@@ -247,7 +252,7 @@ export const AdminPanel: React.FC = () => {
           emoji: cat.emoji,
           image: cat.image || '',
           createdAt: serverTimestamp()
-        });
+        }).catch(e => handleFirestoreError(e, OperationType.CREATE, 'kuku_categories'));
       }
       toast.success('Kategoria zimeingizwa!');
     } catch (error) {
@@ -261,6 +266,7 @@ export const AdminPanel: React.FC = () => {
       await deleteDoc(doc(db, 'kuku_categories', id));
       toast.success('Category imefutwa');
     } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `kuku_categories/${id}`);
       toast.error('Hitilafu imetokea');
     }
   };
@@ -342,7 +348,8 @@ export const AdminPanel: React.FC = () => {
           setIsSendingAnnouncement(false);
           return;
         }
-        const targetUser = users.find(u => u.id === announcementForm.target) || vendors.find(v => v.id === announcementForm.target);
+        const targetUser = (Array.isArray(users) ? users.find(u => u.id === announcementForm.target) : undefined) || 
+                          (Array.isArray(vendors) ? vendors.find(v => v.id === announcementForm.target) : undefined);
         if (targetUser && targetUser.contact) {
           let phone = targetUser.contact.replace(/\D/g, '');
           if (phone.startsWith('0')) phone = '255' + phone.substring(1);
@@ -372,6 +379,7 @@ export const AdminPanel: React.FC = () => {
         setAnnouncementForm({ ...announcementForm, title: '', message: '', image: '', link: '' });
       }
     } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_notifications');
       console.error(error);
       toast.error('Kosa: ' + (error as Error).message);
     } finally {
@@ -425,6 +433,7 @@ export const AdminPanel: React.FC = () => {
         target: 'all'
       });
     } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_offers');
       console.error(error);
       toast.error('Kosa: ' + (error as Error).message);
     } finally {
@@ -459,6 +468,7 @@ export const AdminPanel: React.FC = () => {
       setEditingPost(null);
       setAcademyForm({ title: '', content: '', image: '', category: 'livestock' });
     } catch (error) {
+      handleFirestoreError(error, editingPost ? OperationType.UPDATE : OperationType.CREATE, 'kuku_academy');
       toast.error('Hitilafu imetokea');
     } finally {
       setIsSendingAcademy(false);
@@ -471,6 +481,7 @@ export const AdminPanel: React.FC = () => {
       await deleteDoc(doc(db, 'kuku_academy', id));
       toast.success('Makala imefutwa');
     } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `kuku_academy/${id}`);
       toast.error('Hitilafu imetokea');
     }
   };
@@ -487,16 +498,16 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
-  const pendingVendors = vendors.filter(v => v.status === 'pending');
+  const pendingVendors = (Array.isArray(vendors) ? vendors : []).filter(v => v.status === 'pending');
   const COLORS = ['#d97706', '#059669', '#2563eb', '#7c3aed', '#db2777'];
 
   // Dynamic Analytics
-  const totalRevenue = orders.filter(o => o.status === 'delivered').reduce((s, o) => s + o.total, 0);
-  const totalAdminEarnings = orders
+  const totalRevenue = (Array.isArray(orders) ? orders : []).filter(o => o.status === 'delivered').reduce((s, o) => s + o.total, 0);
+  const totalAdminEarnings = (Array.isArray(orders) ? orders : [])
     .filter(o => o.status === 'delivered')
     .reduce((s, o) => s + (o.adminCommission || (o.total - (o.deliveryFee || 0)) * 0.06), 0);
   
-  const regionStats = vendors.reduce((acc: any, v) => {
+  const regionStats = (Array.isArray(vendors) ? vendors : []).reduce((acc: any, v) => {
     const reg = v.region || 'Unknown';
     acc[reg] = (acc[reg] || 0) + 1;
     return acc;
@@ -504,15 +515,15 @@ export const AdminPanel: React.FC = () => {
 
   const dynamicRegionData = Object.entries(regionStats).map(([name, value]) => ({ name, value }));
 
-  const topSellers = vendors
+  const topSellers = (Array.isArray(vendors) ? vendors : [])
     .map(v => ({
       name: v.shopName || v.name,
-      sales: orders.filter(o => o.vendorId === v.id && o.status === 'delivered').reduce((s, o) => s + o.total, 0)
+      sales: (Array.isArray(orders) ? orders : []).filter(o => o.vendorId === v.id && o.status === 'delivered').reduce((s, o) => s + o.total, 0)
     }))
     .sort((a, b) => b.sales - a.sales)
     .slice(0, 5);
 
-  const salesByDate = orders
+  const salesByDate = (Array.isArray(orders) ? orders : [])
     .filter(o => o.status === 'delivered')
     .reduce((acc: any, o) => {
       const date = o.date || 'Unknown';
@@ -525,10 +536,10 @@ export const AdminPanel: React.FC = () => {
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-7);
 
-  const popularProductsData = products
+  const popularProductsData = (Array.isArray(products) ? products : [])
     .map(p => ({
       name: p.name,
-      sales: orders.filter(o => o.productId === p.id && o.status === 'delivered').length,
+      sales: (Array.isArray(orders) ? orders : []).filter(o => o.productId === p.id && o.status === 'delivered').length,
       color: COLORS[Math.floor(Math.random() * COLORS.length)]
     }))
     .sort((a, b) => b.sales - a.sales)
@@ -562,6 +573,7 @@ export const AdminPanel: React.FC = () => {
 
       toast.success('Malipo yameidhinishwa');
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_withdrawals/${id}`);
       toast.error(error.message || 'Hitilafu wakati wa kuidhinisha');
     }
   };
@@ -597,6 +609,7 @@ export const AdminPanel: React.FC = () => {
       addActivity('✕', `Maombi ya malipo yamekataliwa (Rejected)`);
       toast.success('Maombi yamekataliwa');
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_withdrawals/${id}`);
       toast.error(error.message || 'Hitilafu wakati wa kukataa');
     }
   };
@@ -619,6 +632,7 @@ export const AdminPanel: React.FC = () => {
       toast.success('Deposit imethibitishwa na salio limeongezwa!');
       addActivity('💰', `Deposit ya ${formatCurrency(tx.amount, currency)} ya ${tx.userName} imethibitishwa`);
     } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `kuku_wallet/${tx.id}`);
       console.error(err);
       toast.error('Imeshindwa kuthibitisha deposit');
     }
@@ -629,6 +643,7 @@ export const AdminPanel: React.FC = () => {
       await updateDoc(doc(db, 'kuku_wallet', id), { status: 'rejected' });
       toast.success('Deposit imekataliwa');
     } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `kuku_wallet/${id}`);
       toast.error('Imeshindwa kukataa deposit');
     }
   };
@@ -647,7 +662,7 @@ export const AdminPanel: React.FC = () => {
       
       for (const order of completedOrders) {
         // Check if this order already has a 'sale' transaction in kuku_wallet
-        const existingTx = walletTransactions.find(t => t.orderId === order.id && t.type === 'sale');
+        const existingTx = Array.isArray(walletTransactions) ? walletTransactions.find(t => t.orderId === order.id && t.type === 'sale') : undefined;
         
         if (!existingTx) {
           // Missing sale transaction!
@@ -664,12 +679,12 @@ export const AdminPanel: React.FC = () => {
             description: `Mauzo ya #${order.id.substring(0,8)} (Sync Fix)`,
             date: order.date || new Date().toISOString().split('T')[0],
             createdAt: serverTimestamp()
-          });
+          }).catch(e => handleFirestoreError(e, OperationType.CREATE, 'kuku_wallet'));
           
           // Update vendor balance
           await updateDoc(doc(db, 'kuku_users', order.vendorId), {
             walletBalance: increment(amountToRelease)
-          });
+          }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `kuku_users/${order.vendorId}`));
           
           fixedCount++;
         }
@@ -702,6 +717,7 @@ export const AdminPanel: React.FC = () => {
 
       toast.success('Muuzaji ameidhinishwa');
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_users/${id}`);
       toast.error('Hitilafu wakati wa kuidhinisha');
     }
   };
@@ -712,6 +728,7 @@ export const AdminPanel: React.FC = () => {
       addActivity('✕', `Maombi ya muuzaji yamekataliwa`);
       toast.success('Maombi yamekataliwa');
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_users/${id}`);
       toast.error('Hitilafu wakati wa kukataa');
     }
   };
@@ -722,6 +739,7 @@ export const AdminPanel: React.FC = () => {
       await deleteDoc(doc(db, 'kuku_users', id));
       toast.success('Mtumiaji amefutwa');
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.DELETE, `kuku_users/${id}`);
       toast.error('Hitilafu wakati wa kufuta');
     }
   };
@@ -732,6 +750,7 @@ export const AdminPanel: React.FC = () => {
       await deleteDoc(doc(db, 'kuku_orders', id));
       toast.success('Agizo limefutwa');
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.DELETE, `kuku_orders/${id}`);
       toast.error('Hitilafu wakati wa kufuta');
     }
   };
@@ -854,7 +873,7 @@ export const AdminPanel: React.FC = () => {
         </nav>
         <div className="p-4 border-t border-white/5">
           <button 
-            onClick={() => setView('shop')}
+            onClick={() => navigate('/')}
             className="w-full flex items-center justify-center gap-2 py-4 bg-white/5 hover:bg-white/10 rounded-2xl text-sm font-black text-amber-400 transition-all border border-white/5"
           >
             <ArrowLeft size={16} />
@@ -908,7 +927,7 @@ export const AdminPanel: React.FC = () => {
             </div>
           </div>
           <button 
-            onClick={() => setView('shop')}
+            onClick={() => navigate('/')}
             className="w-full flex items-center gap-2 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold text-amber-400 transition-all border border-white/5"
           >
             <ArrowLeft size={14} />
@@ -1058,7 +1077,7 @@ export const AdminPanel: React.FC = () => {
                       <button 
                         onClick={async () => {
                           if (confirm('Futa shughuli hii?')) {
-                            await deleteDoc(doc(db, 'kuku_activity', act.id));
+                            await deleteDoc(doc(db, 'kuku_activity', act.id)).catch(e => handleFirestoreError(e, OperationType.DELETE, `kuku_activity/${act.id}`));
                             toast.success('Imefutwa');
                           }
                         }}

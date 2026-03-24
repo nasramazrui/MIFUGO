@@ -1,28 +1,123 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
-import { getDatabase } from "firebase/database";
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  onAuthStateChanged, 
+  signOut, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  updateProfile, 
+  deleteUser, 
+  updatePassword, 
+  GoogleAuthProvider, 
+  signInWithPopup 
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  query, 
+  orderBy, 
+  where, 
+  limit, 
+  onSnapshot, 
+  addDoc, 
+  setDoc, 
+  updateDoc, 
+  getDoc, 
+  getDocs, 
+  deleteDoc, 
+  serverTimestamp, 
+  increment, 
+  arrayUnion, 
+  arrayRemove,
+  or
+} from 'firebase/firestore';
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBOijqeFnF5bFBHIvIulAGusp4OVuVGg88",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "fleet-a4a43.firebaseapp.com",
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://fleet-a4a43-default-rtdb.firebaseio.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "fleet-a4a43",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "fleet-a4a43.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "763957167114",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:763957167114:web:dd7a26ed4ada24c74c0bf3",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-SQXZWLKRQZ"
-};
+import firebaseConfig from '../../firebase-applet-config.json';
 
-console.log("Initializing Firebase with project:", firebaseConfig.projectId);
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const googleProvider = new GoogleAuthProvider();
 
-// Initialize Firestore with long polling to fix connection issues in restricted environments
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-});
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
 
-export const rtdb = getDatabase(app);
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+export {
+  onAuthStateChanged,
+  signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+  deleteUser,
+  updatePassword,
+  signInWithPopup,
+  collection,
+  doc,
+  query,
+  orderBy,
+  where,
+  limit,
+  onSnapshot,
+  addDoc,
+  setDoc,
+  updateDoc,
+  getDoc,
+  getDocs,
+  deleteDoc,
+  serverTimestamp,
+  increment,
+  arrayUnion,
+  arrayRemove,
+  or
+};
+
 export default app;

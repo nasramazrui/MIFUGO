@@ -1,532 +1,351 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
+import { WebSocketServer, WebSocket } from 'ws';
 import ImageKit from 'imagekit';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import admin from 'firebase-admin';
+import db from './db.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Process-level error handlers
-process.on('uncaughtException', (err) => {
-  console.error('[CRASH] Uncaught Exception:', err);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('[CRASH] Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
 dotenv.config();
-
-// Initialize Firebase Admin
-let db: admin.firestore.Firestore;
-
-try {
-  if (!admin.apps.length) {
-    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-    let projectId = process.env.VITE_FIREBASE_PROJECT_ID || 'fleet-a4a43';
-    
-    if (serviceAccount) {
-      console.log("[Firebase] Found FIREBASE_SERVICE_ACCOUNT, length:", serviceAccount.length);
-      try {
-        const cert = JSON.parse(serviceAccount);
-        projectId = cert.project_id || projectId;
-        
-        console.log(`[Firebase] Initializing with Service Account for project: ${projectId}`);
-        admin.initializeApp({
-          credential: admin.credential.cert(cert),
-          projectId
-        });
-      } catch (parseErr: any) {
-        console.error('[Firebase] JSON Parse Error for Service Account:', parseErr.message);
-        console.log('[Firebase] Attempting default initialization as fallback...');
-        admin.initializeApp({ projectId });
-      }
-    } else {
-      console.log("[Firebase] No FIREBASE_SERVICE_ACCOUNT found, using default initialization...");
-      admin.initializeApp({ projectId });
-    }
-  }
-  
-  db = admin.firestore();
-  db.settings({ ignoreUndefinedProperties: true });
-  console.log(`[Firebase] Admin initialized. Project: ${admin.app().options.projectId}`);
-} catch (err: any) {
-  console.error('[Firebase] Fatal Initialization Error:', err.message);
-  // We still need to define db to avoid crashes later, even if it's broken
-  // @ts-ignore
-  db = {
-    collection: () => ({
-      doc: () => ({
-        get: () => Promise.reject(new Error('Firebase not initialized: ' + err.message)),
-        set: () => Promise.reject(new Error('Firebase not initialized: ' + err.message)),
-        update: () => Promise.reject(new Error('Firebase not initialized: ' + err.message)),
-      }),
-      where: () => ({
-        get: () => Promise.reject(new Error('Firebase not initialized: ' + err.message)),
-      }),
-      listCollections: () => Promise.reject(new Error('Firebase not initialized: ' + err.message)),
-    })
-  } as any;
-}
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- Wallet & Withdrawal API ---
-
-// Get Wallet Balance & Transactions
-app.get('/api/wallet/:vendorId', async (req, res) => {
-  const { vendorId } = req.params;
-  console.log(`[Wallet] Fetching data for vendor: ${vendorId}`);
-  
-  try {
-    if (!db || typeof db.collection !== 'function') {
-      console.error('[Wallet] Database not properly initialized!');
-      return res.status(500).json({ error: 'Database not initialized' });
-    }
-
-    if (!vendorId || vendorId === 'undefined') {
-      return res.status(400).json({ error: 'Invalid vendor ID' });
-    }
-
-    // Get balance
-    const walletDoc = await db.collection('kuku_users').doc(vendorId).get();
-    let walletData = walletDoc.exists ? walletDoc.data() : null;
-    
-    if (!walletDoc.exists) {
-      console.log(`[Wallet] User doc not found for: ${vendorId}`);
-      // Return 0 balance instead of initializing with demo data to avoid confusion
-      walletData = { 
-        walletBalance: 0, 
-        shopName: 'Mtumiaji Mpya', 
-        role: 'user'
-      };
-    }
-
-    // Get transactions
-    const transactionsSnapshot = await db.collection('kuku_wallet')
-      .where('userId', '==', vendorId)
-      .get();
-    
-    let transactions = transactionsSnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        // Ensure createdAt is serializable
-        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || data.date || new Date().toISOString())
-      };
-    });
-
-    // Sort and limit
-    transactions.sort((a: any, b: any) => {
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
-      return dateB - dateA;
-    });
-    transactions = transactions.slice(0, 50);
-
-    res.json({
-      balance: walletData?.walletBalance || 0,
-      vendorName: walletData?.shopName || walletData?.name || 'Mtumiaji',
-      transactions
-    });
-  } catch (err: any) {
-    console.error('[Wallet] Error:', err);
-    res.status(500).json({ 
-      error: 'Failed to fetch wallet data', 
-      details: err.message,
-      code: err.code 
-    });
-  }
+// --- WebSocket Setup ---
+const server = app.listen(3000, '0.0.0.0', () => {
+  console.log(`Server running on http://localhost:3000`);
 });
 
-// Create Withdrawal Request
-app.post('/api/withdraw', async (req, res) => {
-  try {
-    const { vendorId, amount, method, phone } = req.body;
-    
-    if (!vendorId || !amount || !method || !phone) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
+const wss = new WebSocketServer({ noServer: true });
 
-    const amountNum = Number(amount);
-    
-    // Fetch settings for fee
-    const settingsDoc = await db.collection('kuku_config').doc('settings').get();
-    const settings = settingsDoc.data() || {};
-    const feeType = settings.withdrawalFeeType || 'fixed';
-    const feeValue = Number(settings.withdrawalFeeValue) || 0;
-    
-    let fee = 0;
-    if (feeType === 'fixed') {
-      fee = feeValue;
-    } else {
-      fee = (amountNum * feeValue) / 100;
-    }
-    
-    const netAmount = amountNum - fee;
-
-    // Check balance
-    const walletDoc = await db.collection('kuku_users').doc(vendorId).get();
-    if (!walletDoc.exists || (walletDoc.data()?.walletBalance || 0) < amountNum) {
-      return res.status(400).json({ error: 'Insufficient balance' });
-    }
-
-    const vendorName = walletDoc.data()?.shopName || walletDoc.data()?.name || 'Vendor';
-
-    // Create request
-    const withdrawRef = await db.collection('kuku_withdrawals').add({
-      vendorId,
-      vendorName,
-      amount: amountNum,
-      fee,
-      netAmount,
-      method,
-      phoneNumber: phone,
-      status: 'Pending',
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    // Create transaction record in kuku_wallet
-    await db.collection('kuku_wallet').add({
-      userId: vendorId,
-      userName: vendorName,
-      type: 'withdrawal',
-      amount: -amountNum,
-      status: 'Pending',
-      description: `Withdrawal to ${method} (${phone})`,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      withdrawalId: withdrawRef.id
-    });
-
-    // Deduct balance immediately
-    await db.collection('kuku_users').doc(vendorId).update({
-      walletBalance: admin.firestore.FieldValue.increment(-amountNum)
-    });
-
-    res.json({ id: withdrawRef.id, status: 'Pending' });
-  } catch (err: any) {
-    console.error('Withdraw Error Details:', {
-      message: err.message,
-      code: err.code,
-      details: err.details,
-      vendorId: req.body.vendorId
-    });
-    res.status(500).json({ error: 'Failed to process withdrawal', details: err.message });
-  }
-});
-
-// Admin: Get all withdrawal requests
-app.get('/api/admin/withdrawals', async (req, res) => {
-  try {
-    const snapshot = await db.collection('kuku_withdrawals')
-      .orderBy('createdAt', 'desc')
-      .get();
-    
-    const withdrawals = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-
-    res.json(withdrawals);
-  } catch (err: any) {
-    console.error('Admin Withdrawals Error Details:', {
-      message: err.message,
-      code: err.code,
-      details: err.details
-    });
-    res.status(500).json({ error: 'Failed to fetch withdrawals', details: err.message });
-  }
-});
-
-// Admin: Approve/Reject Withdrawal
-app.post('/api/admin/withdrawals/:id/update', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body; // 'Completed' or 'Rejected'
-
-    if (!['Completed', 'Rejected'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
-    }
-
-    const withdrawDoc = await db.collection('kuku_withdrawals').doc(id).get();
-    if (!withdrawDoc.exists) {
-      return res.status(404).json({ error: 'Request not found' });
-    }
-
-    const data = withdrawDoc.data();
-    if (data?.status !== 'Pending') {
-      return res.status(400).json({ error: 'Request already processed' });
-    }
-
-    // Update status
-    await db.collection('kuku_withdrawals').doc(id).update({
-      status,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    // Update transaction status in kuku_wallet
-    const transSnapshot = await db.collection('kuku_wallet')
-      .where('withdrawalId', '==', id)
-      .limit(1)
-      .get();
-    
-    if (!transSnapshot.empty) {
-      await transSnapshot.docs[0].ref.update({ status });
-    }
-
-    // If rejected, refund balance
-    if (status === 'Rejected') {
-      await db.collection('kuku_users').doc(data.vendorId).update({
-        walletBalance: admin.firestore.FieldValue.increment(data.amount)
-      });
-    }
-
-    res.json({ success: true, status });
-  } catch (err: any) {
-    console.error('Update Withdrawal Error Details:', {
-      message: err.message,
-      code: err.code,
-      details: err.details,
-      id: req.params.id
-    });
-    res.status(500).json({ error: 'Failed to update withdrawal', details: err.message });
-  }
-});
-
-// --- Existing Endpoints ---
-
-// ImageKit Auth Endpoint
-app.get('/api/imagekit/auth', async (req, res) => {
-  try {
-    let publicKey = process.env.VITE_IMAGEKIT_PUBLIC_KEY;
-    let privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
-    let urlEndpoint = process.env.VITE_IMAGEKIT_URL_ENDPOINT;
-
-    // Try to get from Firestore if env vars are missing
-    if (!publicKey || !privateKey) {
-      try {
-        const configDoc = await db.collection('kuku_config').doc('settings').get().catch(() => null);
-        if (configDoc && configDoc.exists) {
-          const config = configDoc.data();
-          publicKey = publicKey || config?.imagekit_public_key;
-          privateKey = privateKey || config?.imagekit_private_key;
-          urlEndpoint = urlEndpoint || config?.imagekit_url_endpoint;
-        }
-      } catch (dbErr) {
-        console.warn('Firestore config fetch failed, using env vars only');
-      }
-    }
-
-    if (!publicKey || !privateKey) {
-      console.error('ImageKit Configuration Missing:', { publicKey: !!publicKey, privateKey: !!privateKey });
-      return res.status(503).json({ 
-        error: 'ImageKit not configured. Please add IMAGEKIT_PRIVATE_KEY and VITE_IMAGEKIT_PUBLIC_KEY to your Secrets.' 
-      });
-    }
-
-    const ik = new ImageKit({
-      publicKey,
-      privateKey,
-      urlEndpoint: urlEndpoint || '',
-    });
-
-    const result = ik.getAuthenticationParameters();
-    res.send(result);
-  } catch (err: any) {
-    console.error('ImageKit Auth Error:', err);
-    res.status(500).json({ 
-      error: `Failed to get ImageKit auth parameters: ${err.message}`,
-      details: err.stack
-    });
-  }
-});
-
-// API Health Check
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    time: new Date().toISOString(),
-    env: process.env.NODE_ENV || 'development',
-    vercel: !!process.env.VERCEL,
-    firebase: admin.apps.length > 0
+server.on('upgrade', (request, socket, head) => {
+  wss.handleUpgrade(request, socket, head, (ws) => {
+    wss.emit('connection', ws, request);
   });
 });
 
-app.get("/api/test-firebase", async (req, res) => {
-  try {
-    const collections = await db.listCollections();
-    res.json({ 
-      status: "connected", 
-      collections: collections.map(c => c.id),
-      projectId: admin.app().options.projectId
-    });
-  } catch (err: any) {
-    res.status(500).json({ 
-      status: "error", 
-      message: err.message, 
-      code: err.code,
-      projectId: admin.app().options.projectId
-    });
-  }
+const broadcast = (type: string, data: any) => {
+  const message = JSON.stringify({ type, data });
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+};
+
+wss.on('connection', (ws) => {
+  console.log('[WS] Client connected');
+  
+  // Send initial data for all collections
+  const collections = [
+    { type: 'products', table: 'products' },
+    { type: 'orders', table: 'orders' },
+    { type: 'users', table: 'users' },
+    { type: 'activity', table: 'activity' },
+    { type: 'withdrawals', table: 'withdrawals' },
+    { type: 'auctions', table: 'auctions' },
+    { type: 'wallet_transactions', table: 'wallet_transactions' },
+    { type: 'notifications', table: 'notifications' },
+    { type: 'livestock', table: 'livestock' },
+    { type: 'livestock_health', table: 'livestock_health' },
+    { type: 'vaccination_records', table: 'vaccination_records' },
+    { type: 'medical_records', table: 'medical_records' },
+    { type: 'breeding_records', table: 'breeding_records' },
+    { type: 'production_records', table: 'production_records' },
+    { type: 'nutrition_records', table: 'nutrition_records' },
+    { type: 'recurring_orders', table: 'recurring_orders' },
+    { type: 'live_sessions', table: 'live_sessions' },
+    { type: 'academy', table: 'academy' },
+    { type: 'loyalty', table: 'loyalty' },
+    { type: 'invoices', table: 'invoices' },
+    { type: 'forum', table: 'forum' },
+    { type: 'chat', table: 'chat' },
+    { type: 'settings', table: 'settings', single: true }
+  ];
+
+  collections.forEach(({ type, table, single }) => {
+    if (single) {
+      const data = db.prepare(`SELECT * FROM ${table} LIMIT 1`).get();
+      ws.send(JSON.stringify({ type: `kuku_config:settings`, data }));
+    } else {
+      const data = db.prepare(`SELECT * FROM ${table} ORDER BY createdAt DESC`).all();
+      ws.send(JSON.stringify({ type: `kuku_${type}`, data }));
+    }
+  });
 });
 
+// --- API Endpoints ---
 
+// --- Generic API Endpoints for Firestore-like operations ---
 
-// Only start the server if not running in a serverless environment like Vercel
-if (!process.env.VERCEL) {
-  startServer().catch(err => console.error('Server failed to start:', err));
-}
+const ALLOWED_COLLECTIONS = [
+  'products', 'orders', 'users', 'activity', 'withdrawals', 'auctions', 
+  'wallet_transactions', 'notifications', 'settings', 'bids',
+  'livestock', 'livestock_health', 'vaccination_records', 'medical_records', 'breeding_records',
+  'production_records', 'nutrition_records', 'recurring_orders',
+  'live_sessions', 'academy', 'loyalty', 'invoices', 'forum', 'chat', 'live_chats'
+];
 
-// --- AUCTION SYSTEM ---
+app.get('/api/:collection', (req, res) => {
+  const { collection } = req.params;
+  if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(404).json({ error: 'Collection not found' });
+  
+  const data = db.prepare(`SELECT * FROM ${collection} ORDER BY createdAt DESC`).all();
+  res.json(data.map(item => ({ ...item, id: item.id || item.userId })));
+});
 
-// Create Auction
-app.post('/api/auctions', async (req, res) => {
+app.get('/api/:collection/:id', (req, res) => {
+  const { collection, id } = req.params;
+  if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(404).json({ error: 'Collection not found' });
+  
+  const item = db.prepare(`SELECT * FROM ${collection} WHERE id = ?`).get(id);
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+  res.json(item);
+});
+
+app.post('/api/:collection', (req, res) => {
+  const { collection } = req.params;
+  if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(404).json({ error: 'Collection not found' });
+  
   try {
-    const { 
-      vendorId, vendorName, productName, description, 
-      startingPrice, minIncrement, durationHours, 
-      location, image
-    } = req.body;
+    const data = req.body;
+    const id = data.id || uuidv4();
+    const fields = Object.keys(data).filter(k => k !== 'id');
+    const values = fields.map(f => data[f]);
     
-    if (!vendorId || !productName || !startingPrice) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    const endTime = new Date();
-    endTime.setHours(endTime.getHours() + Number(durationHours || 24));
-
-    const auctionRef = await db.collection('kuku_auctions').add({
-      vendorId,
-      vendorName,
-      productName,
-      description,
-      startingPrice: Number(startingPrice),
-      minIncrement: Number(minIncrement || 0),
-      currentBid: Number(startingPrice),
-      endTime: admin.firestore.Timestamp.fromDate(endTime),
-      location,
-      image,
-      status: 'active',
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    res.json({ id: auctionRef.id });
+    const query = `INSERT INTO ${collection} (id, ${fields.join(', ')}) VALUES (?, ${fields.map(() => '?').join(', ')})`;
+    db.prepare(query).run(id, ...values);
+    
+    broadcast(`kuku_${collection}`, db.prepare(`SELECT * FROM ${collection} ORDER BY createdAt DESC`).all());
+    res.json({ id, ...data });
   } catch (error: any) {
-    console.error('Create Auction Error:', error);
+    console.error(`Error inserting into ${collection}:`, error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Place Bid
-app.post('/api/auctions/:id/bid', async (req, res) => {
+app.patch('/api/:collection/:id', (req, res) => {
+  const { collection, id } = req.params;
+  if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(404).json({ error: 'Collection not found' });
+  
+  try {
+    const updates = req.body;
+    const current = db.prepare(`SELECT * FROM ${collection} WHERE id = ?`).get(id) as any;
+    if (!current) return res.status(404).json({ error: 'Item not found' });
+
+    const fields = Object.keys(updates);
+    const values: any[] = [];
+    
+    const setClauses = fields.map(field => {
+      const val = updates[field];
+      if (val && typeof val === 'object' && val.type === 'increment') {
+        return `${field} = ${field} + ?`;
+      }
+      if (val && typeof val === 'object' && val.type === 'arrayUnion') {
+        // Simple array handling for SQLite (stored as JSON string)
+        const existing = JSON.parse(current[field] || '[]');
+        const updated = [...new Set([...existing, ...val.args])];
+        values.push(JSON.stringify(updated));
+        return `${field} = ?`;
+      }
+      if (val && typeof val === 'object' && val.type === 'arrayRemove') {
+        const existing = JSON.parse(current[field] || '[]');
+        const updated = existing.filter((item: any) => !val.args.includes(item));
+        values.push(JSON.stringify(updated));
+        return `${field} = ?`;
+      }
+      
+      values.push(typeof val === 'object' ? JSON.stringify(val) : val);
+      return `${field} = ?`;
+    });
+
+    // Add increment values if any
+    fields.forEach(field => {
+      const val = updates[field];
+      if (val && typeof val === 'object' && val.type === 'increment') {
+        values.push(val.value);
+      }
+    });
+
+    const query = `UPDATE ${collection} SET ${setClauses.join(', ')} WHERE id = ?`;
+    db.prepare(query).run(...values, id);
+    
+    broadcast(`kuku_${collection}`, db.prepare(`SELECT * FROM ${collection} ORDER BY createdAt DESC`).all());
+    res.json({ id, ...updates });
+  } catch (error: any) {
+    console.error(`Error updating ${collection}:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/:collection/:id', (req, res) => {
+  const { collection, id } = req.params;
+  if (!ALLOWED_COLLECTIONS.includes(collection)) return res.status(404).json({ error: 'Collection not found' });
+  
+  try {
+    db.prepare(`DELETE FROM ${collection} WHERE id = ?`).run(id);
+    broadcast(`kuku_${collection}`, db.prepare(`SELECT * FROM ${collection} ORDER BY createdAt DESC`).all());
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error(`Error deleting from ${collection}:`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Auth Mock
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body;
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
+  
+  if (user) {
+    res.json(user);
+  } else {
+    // Auto-register for demo purposes
+    const id = uuidv4();
+    const newUser = {
+      id,
+      name: email.split('@')[0],
+      email,
+      role: email.includes('admin') ? 'admin' : (email.includes('vendor') ? 'vendor' : 'user'),
+      walletBalance: 0,
+      createdAt: new Date().toISOString()
+    };
+    db.prepare('INSERT INTO users (id, name, email, role, walletBalance) VALUES (?, ?, ?, ?, ?)').run(
+      newUser.id, newUser.name, newUser.email, newUser.role, newUser.walletBalance
+    );
+    res.json(newUser);
+  }
+});
+
+// Wallet
+app.get('/api/wallet/:vendorId', (req, res) => {
+  const { vendorId } = req.params;
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(vendorId) as any;
+  const transactions = db.prepare('SELECT * FROM wallet_transactions WHERE userId = ? ORDER BY createdAt DESC LIMIT 50').all(vendorId);
+  
+  res.json({
+    balance: user?.walletBalance || 0,
+    vendorName: user?.shopName || user?.name || 'Mtumiaji',
+    transactions
+  });
+});
+
+// Withdrawal
+app.post('/api/withdraw', (req, res) => {
+  const { vendorId, amount, method, phone } = req.body;
+  const amountNum = Number(amount);
+  
+  const settings = db.prepare('SELECT * FROM settings LIMIT 1').get() as any;
+  const feeType = settings?.withdrawalFeeType || 'fixed';
+  const feeValue = Number(settings?.withdrawalFeeValue) || 0;
+  
+  let fee = 0;
+  if (feeType === 'fixed') {
+    fee = feeValue;
+  } else {
+    fee = (amountNum * feeValue) / 100;
+  }
+  
+  const netAmount = amountNum - fee;
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(vendorId) as any;
+  
+  if (!user || user.walletBalance < amountNum) {
+    return res.status(400).json({ error: 'Insufficient balance' });
+  }
+
+  const id = uuidv4();
+  db.prepare('INSERT INTO withdrawals (id, vendorId, vendorName, amount, fee, netAmount, method, phoneNumber, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, vendorId, user.name, amountNum, fee, netAmount, method, phone, 'Pending');
+  
+  db.prepare('INSERT INTO wallet_transactions (id, userId, userName, type, amount, status, description, withdrawalId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(uuidv4(), vendorId, user.name, 'withdrawal', -amountNum, 'Pending', `Withdrawal to ${method} (${phone})`, id);
+  
+  db.prepare('UPDATE users SET walletBalance = walletBalance - ? WHERE id = ?').run(amountNum, vendorId);
+  
+  broadcast('kuku_withdrawals', db.prepare('SELECT * FROM withdrawals ORDER BY createdAt DESC').all());
+  broadcast('kuku_wallet', db.prepare('SELECT * FROM wallet_transactions ORDER BY createdAt DESC').all());
+  
+  res.json({ id, status: 'Pending' });
+});
+
+// Auctions
+app.post('/api/auctions', (req, res) => {
+  try {
+    const { vendorId, vendorName, productName, description, startingPrice, minIncrement, durationHours, location, image } = req.body;
+    const id = uuidv4();
+    const endTime = new Date();
+    endTime.setHours(endTime.getHours() + Number(durationHours || 24));
+
+    db.prepare(`INSERT INTO auctions (id, vendorId, vendorName, productName, description, startingPrice, minIncrement, currentBid, endTime, location, image, status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, vendorId, vendorName, productName, description, startingPrice, minIncrement, startingPrice, endTime.toISOString(), location, image, 'active');
+    
+    broadcast('kuku_auctions', db.prepare('SELECT * FROM auctions ORDER BY createdAt DESC').all());
+    res.json({ id });
+  } catch (error: any) {
+    console.error('Error creating auction:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/auctions/:id/bid', (req, res) => {
   try {
     const { id } = req.params;
     const { userId, userName, amount } = req.body;
     const bidAmount = Number(amount);
 
-    const auctionRef = db.collection('kuku_auctions').doc(id);
-    const auctionDoc = await auctionRef.get();
+    const auction = db.prepare('SELECT * FROM auctions WHERE id = ?').get(id) as any;
+    if (!auction || auction.status !== 'active') return res.status(400).json({ error: 'Auction not active' });
+    if (bidAmount < auction.currentBid + auction.minIncrement) return res.status(400).json({ error: 'Bid too low' });
 
-    if (!auctionDoc.exists) return res.status(404).json({ error: 'Auction not found' });
-    const auction = auctionDoc.data();
+    db.prepare('UPDATE auctions SET currentBid = ?, highestBidderId = ?, highestBidderName = ? WHERE id = ?')
+      .run(bidAmount, userId, userName, id);
+    
+    db.prepare('INSERT INTO bids (id, auctionId, userId, userName, amount) VALUES (?, ?, ?, ?, ?)')
+      .run(uuidv4(), id, userId, userName, bidAmount);
+    
+    broadcast('kuku_auctions', db.prepare('SELECT * FROM auctions ORDER BY createdAt DESC').all());
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error placing bid:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
-    if (auction?.status !== 'active') return res.status(400).json({ error: 'Auction ended' });
-    if (bidAmount < (auction?.currentBid || 0) + (auction?.minIncrement || 0)) {
-      return res.status(400).json({ error: 'Bid too low' });
+// ImageKit Auth
+app.get('/api/imagekit/auth', (req, res) => {
+  try {
+    const publicKey = process.env.VITE_IMAGEKIT_PUBLIC_KEY;
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+    const urlEndpoint = process.env.VITE_IMAGEKIT_URL_ENDPOINT;
+
+    if (!publicKey || !privateKey) {
+      return res.status(503).json({ error: 'ImageKit not configured' });
     }
 
-    // Update auction
-    await auctionRef.update({
-      currentBid: bidAmount,
-      highestBidderId: userId,
-      highestBidderName: userName
-    });
-
-    // Record bid
-    await db.collection('kuku_bids').add({
-      auctionId: id,
-      userId,
-      userName,
-      amount: bidAmount,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    res.json({ success: true });
+    const ik = new ImageKit({ publicKey, privateKey, urlEndpoint: urlEndpoint || '' });
+    res.json(ik.getAuthenticationParameters());
   } catch (error: any) {
+    console.error('Error in ImageKit auth:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Finalize Auction (Winner Selection)
-app.post('/api/auctions/:id/finalize', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const auctionRef = db.collection('kuku_auctions').doc(id);
-    const auctionDoc = await auctionRef.get();
-
-    if (!auctionDoc.exists) return res.status(404).json({ error: 'Auction not found' });
-    const auction = auctionDoc.data();
-
-    if (auction?.status === 'ended') return res.json({ success: true, alreadyEnded: true });
-
-    await auctionRef.update({
-      status: 'ended',
-      winnerId: auction?.highestBidderId || null,
-      winnerName: auction?.highestBidderName || null,
-      paymentStatus: 'pending'
-    });
-
-    res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+// Health Check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Confirm Auction Payment
-app.post('/api/auctions/:id/pay', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { paymentMethod, transactionId, senderPhone, senderName } = req.body;
-
-    const auctionRef = db.collection('kuku_auctions').doc(id);
-    await auctionRef.update({
-      paymentStatus: 'paid',
-      paymentMethod,
-      transactionId,
-      senderPhone,
-      senderName
-    });
-
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error('Pay Auction Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Global Error Handler
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error('Global Server Error:', err);
-  if (res.headersSent) {
-    return next(err);
-  }
-  res.status(500).json({ 
-    error: 'Internal Server Error', 
-    message: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-  });
-});
-
-async function startServer() {
-  // Vite middleware for development
+// Vite middleware for development
+async function startVite() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -540,13 +359,7 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
-
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
 }
 
+startVite();
 
-
-export default app;

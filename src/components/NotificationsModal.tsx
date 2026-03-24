@@ -13,7 +13,7 @@ interface Props {
 export const NotificationsModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const { notifications, user } = useApp();
 
-  const myNotifications = notifications.filter(n => 
+  const myNotifications = (Array.isArray(notifications) ? notifications : []).filter(n => 
     (n.userId === 'all' || n.userId === user?.id) && 
     !(n.deletedBy || []).includes(user?.id || '')
   );

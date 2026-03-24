@@ -1,0 +1,221 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: kuku_users
+    // Document ID: userId (Firebase Auth UID)
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (optional)
+    //   - email: string (required, email format)
+    //   - role: string (required, 'admin' | 'user')
+    //   - walletBalance: number (optional, >= 0)
+    //   - referralCode: string (optional)
+    //   - referredBy: string (optional)
+    //   - theme: string (optional, 'light' | 'dark')
+    //   - language: string (optional, 'en' | 'sw')
+    //   - createdAt: string (required, ISO 8601)
+    //
+    // Collection: kuku_activities
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required)
+    //   - type: string (required)
+    //   - description: string (optional)
+    //   - timestamp: string (required, ISO 8601)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "amytzee@gmail.com" ||
+        (exists(/databases/$(database)/documents/kuku_users/$(request.auth.uid)) && get(/databases/$(database)/documents/kuku_users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'email', 'role', 'createdAt']) &&
+        data.id is string &&
+        isValidEmail(data.email) &&
+        data.role in ['admin', 'user'] &&
+        isValidDateString(data.createdAt) &&
+        (!('walletBalance' in data) || (data.walletBalance is number && data.walletBalance >= 0)) &&
+        (!('theme' in data) || data.theme in ['light', 'dark']) &&
+        (!('language' in data) || data.language in ['en', 'sw']);
+    }
+
+    function isValidActivity(data) {
+      return data.keys().hasAll(['userId', 'type', 'timestamp']) &&
+        data.userId is string &&
+        data.type is string &&
+        isValidDateString(data.timestamp);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // Publicly readable collections (Marketplace data)
+    match /kuku_products/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /kuku_categories/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /kuku_auctions/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /kuku_reviews/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /kuku_statuses/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /kuku_academy/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /kuku_forum/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /kuku_offers/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /kuku_config/{id} { allow read: if true; allow write: if isAdmin(); }
+    
+    // User data (PII protected)
+    match /kuku_users/{userId} {
+      allow read: if (resource.data.role == 'vendor') || isOwner(userId) || isAdmin() || isAuthenticated();
+      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Authenticated-only collections (Ownership protected)
+    match /kuku_orders/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    match /kuku_activity/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin()); 
+      allow create: if isAuthenticated() && (request.resource.data.get('userId', '') == request.auth.uid || request.resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    match /kuku_chat/{id} { 
+      allow read: if isAuthenticated() && (
+        resource.data.get('senderId', '') == request.auth.uid || 
+        resource.data.get('receiverId', '') == request.auth.uid || 
+        (resource.data.keys().contains('participants') && request.auth.uid in resource.data.participants) || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (request.resource.data.get('senderId', '') == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+    
+    match /kuku_notifications/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('userId', '') == 'all' || isAdmin());
+      allow write: if isAdmin(); 
+    }
+    
+    match /kuku_wallet/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow write: if isAdmin(); 
+    }
+    
+    match /kuku_withdrawals/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && (request.resource.data.get('userId', '') == request.auth.uid || request.resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+    
+    match /kuku_loyalty/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || isAdmin());
+      allow write: if isAdmin(); 
+    }
+    
+    match /kuku_invoices/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow write: if isAdmin(); 
+    }
+    
+    // Livestock & Records (Ownership protected)
+    match /kuku_livestock/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    match /kuku_vaccination_records/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    match /kuku_medical_records/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    match /kuku_breeding_records/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    match /kuku_production_records/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    match /kuku_nutrition_records/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    match /kuku_livestock_health/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    match /kuku_recurring_orders/{id} { 
+      allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    match /kuku_live_sessions/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /kuku_live_chats/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /kuku_bids/{id} { allow read: if true; allow write: if isAuthenticated(); }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

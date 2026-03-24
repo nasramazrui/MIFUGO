@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { MessageSquare, Send, X, User, Image as ImageIcon, Loader2, ArrowLeft, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, generateId } from '../utils';
-import { db } from '../services/firebase';
+import { db, handleFirestoreError, OperationType } from '../services/firebase';
 import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 
@@ -24,7 +24,7 @@ export const Chat: React.FC<ChatProps> = ({ receiverId, receiverName, onClose })
     if (!user) return;
 
     const q = query(
-      collection(db, 'kuku_chats'),
+      collection(db, 'kuku_chat'),
       where('participants', 'array-contains', user.id)
     );
 
@@ -43,6 +43,8 @@ export const Chat: React.FC<ChatProps> = ({ receiverId, receiverName, onClose })
         });
       setMessages(filtered);
       setLoading(false);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, 'kuku_chat');
     });
 
     return () => unsubscribe();
@@ -61,7 +63,7 @@ export const Chat: React.FC<ChatProps> = ({ receiverId, receiverName, onClose })
     setInput('');
 
     try {
-      await addDoc(collection(db, 'kuku_chats'), {
+      await addDoc(collection(db, 'kuku_chat'), {
         senderId: user.id,
         receiverId,
         participants: [user.id, receiverId],
@@ -70,6 +72,7 @@ export const Chat: React.FC<ChatProps> = ({ receiverId, receiverName, onClose })
         createdAt: serverTimestamp()
       });
     } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'kuku_chat');
       toast.error('Imeshindwa kutuma ujumbe');
     }
   };

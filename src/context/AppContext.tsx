@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Product, Order, Review, Activity, Withdrawal, Status, Category, WalletTransaction, Auction, CartItem, AcademyPost, LoyaltyPoint, Invoice, ForumPost, ChatMessage, VaccinationRecord, RecurringOrder, LivestockHealthRecord } from '../types';
+import { User, Product, Order, Review, Activity, Withdrawal, Status, Category, WalletTransaction, Auction, CartItem, AcademyPost, LoyaltyPoint, Invoice, ForumPost, ChatMessage, VaccinationRecord, RecurringOrder, LivestockHealthRecord, Livestock, MedicalRecord, BreedingRecord, ProductionRecord, NutritionRecord } from '../types';
 import { generateId } from '../utils';
 import { ADMIN_EMAIL, ADMIN_PASS, TRANSLATIONS } from '../constants';
-import { auth, db } from '../services/firebase';
-import { GoogleGenAI } from "@google/genai";
-import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { 
+  auth, 
+  db,
+  onAuthStateChanged, 
+  signOut,
   collection, 
   onSnapshot, 
   query, 
@@ -18,8 +19,12 @@ import {
   updateDoc,
   where,
   increment,
-  getDocs
-} from 'firebase/firestore';
+  getDocs,
+  handleFirestoreError,
+  OperationType,
+  or
+} from '../services/firebase';
+import { GoogleGenAI } from "@google/genai";
 import { toast } from 'react-hot-toast';
 
 export interface Notification {
@@ -100,10 +105,16 @@ interface AppContextType {
   invoices: Invoice[];
   forumPosts: ForumPost[];
   chatMessages: ChatMessage[];
+  livestock: Livestock[];
   vaccinationRecords: VaccinationRecord[];
-  recurringOrders: RecurringOrder[];
+  medicalRecords: MedicalRecord[];
+  breedingRecords: BreedingRecord[];
+  productionRecords: ProductionRecord[];
+  nutritionRecords: NutritionRecord[];
   livestockHealthRecords: LivestockHealthRecord[];
+  recurringOrders: RecurringOrder[];
   liveSessions: any[];
+  handleReferral: (referralCode: string, newUserId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -131,16 +142,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [view, setView] = useState<'auto' | 'shop' | 'dashboard'>('auto');
   const [cart, setCart] = useState<CartItem[]>(() => {
     const saved = localStorage.getItem('kuku_cart');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error("Error parsing cart from localStorage:", e);
+      return [];
+    }
   });
   const [academyPosts, setAcademyPosts] = useState<AcademyPost[]>([]);
   const [loyaltyPoints, setLoyaltyPoints] = useState<LoyaltyPoint[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [forumPosts, setForumPosts] = useState<ForumPost[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [livestock, setLivestock] = useState<Livestock[]>([]);
   const [vaccinationRecords, setVaccinationRecords] = useState<VaccinationRecord[]>([]);
-  const [recurringOrders, setRecurringOrders] = useState<RecurringOrder[]>([]);
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
+  const [breedingRecords, setBreedingRecords] = useState<BreedingRecord[]>([]);
+  const [productionRecords, setProductionRecords] = useState<ProductionRecord[]>([]);
+  const [nutritionRecords, setNutritionRecords] = useState<NutritionRecord[]>([]);
   const [livestockHealthRecords, setLivestockHealthRecords] = useState<LivestockHealthRecord[]>([]);
+  const [recurringOrders, setRecurringOrders] = useState<RecurringOrder[]>([]);
   const [liveSessions, setLiveSessions] = useState<any[]>([]);
   const [lastNotificationCount, setLastNotificationCount] = useState(0);
 
@@ -170,15 +192,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [cart]);
 
   const addToCart = (product: Product, quantity: number) => {
-    const existing = cart.find(item => item.productId === product.id);
+    const safeCart = Array.isArray(cart) ? cart : [];
+    const existing = safeCart.find(item => item.productId === product.id);
     if (existing) {
-      setCart(cart.map(item => 
+      setCart(safeCart.map(item => 
         item.productId === product.id 
           ? { ...item, qty: item.qty + quantity } 
           : item
       ));
     } else {
-      setCart([...cart, {
+      setCart([...safeCart, {
         id: generateId(),
         productId: product.id,
         name: product.name,
@@ -191,11 +214,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const removeFromCart = (id: string) => {
-    setCart(cart.filter(item => item.id !== id));
+    setCart(prev => (Array.isArray(prev) ? prev : []).filter(item => item.id !== id));
   };
 
   const updateCartQty = (productId: string, delta: number) => {
     setCart(prev => {
+      if (!Array.isArray(prev)) return [];
       const existing = prev.find(item => item.productId === productId);
       if (!existing) return prev;
       
@@ -220,7 +244,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await updateDoc(doc(db, 'kuku_users', user.id), { theme: newTheme });
       }
     } catch (e) {
-      console.error("Error updating theme:", e);
+      handleFirestoreError(e, OperationType.UPDATE, `kuku_users/${user?.id}`);
     }
   };
 
@@ -232,7 +256,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await updateDoc(doc(db, 'kuku_users', user.id), { language: newLang });
       }
     } catch (e) {
-      console.error("Error updating language:", e);
+      handleFirestoreError(e, OperationType.UPDATE, `kuku_users/${user?.id}`);
     }
   };
 
@@ -270,11 +294,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setLoading(false);
     }, 8000);
 
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+    let unsubUser: (() => void) | null = null;
+    const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
+      if (unsubUser) unsubUser();
+      
       try {
         if (fbUser) {
-          // Use a snapshot for real-time user data (like wallet balance)
-          const unsubUser = onSnapshot(doc(db, 'kuku_users', fbUser.uid), (snap) => {
+          unsubUser = onSnapshot(doc(db, 'kuku_users', fbUser.uid), (snap) => {
             if (snap.exists()) {
               setUser({ id: fbUser.uid, ...snap.data() } as User);
             } else if (fbUser.email === ADMIN_EMAIL) {
@@ -288,13 +314,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 walletBalance: 0,
                 createdAt: new Date().toISOString()
               };
-              setDoc(doc(db, 'kuku_users', fbUser.uid), adminData);
+              setDoc(doc(db, 'kuku_users', fbUser.uid), adminData).catch(err => handleFirestoreError(err, OperationType.CREATE, `kuku_users/${fbUser.uid}`));
               setUser(adminData);
             }
             setLoading(false);
             clearTimeout(safetyTimer);
+          }, (err) => {
+            handleFirestoreError(err, OperationType.GET, `kuku_users/${fbUser.uid}`);
           });
-          return unsubUser;
         } else {
           setUser(null);
           setLoading(false);
@@ -307,190 +334,215 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearTimeout(safetyTimer);
       }
     });
+
     return () => {
-      unsubscribe();
+      unsubscribeAuth();
+      if (unsubUser) unsubUser();
       clearTimeout(safetyTimer);
     };
   }, []);
 
-  // Firestore Listeners
+  // Firestore Listeners - Public Data
   useEffect(() => {
+    const publicUnsubs: (() => void)[] = [];
+
+    const setupPublicListener = (collName: string, setter: (data: any) => void, orderField = 'createdAt', direction: 'asc' | 'desc' = 'desc') => {
+      const q = query(collection(db, collName), orderBy(orderField, direction));
+      const unsub = onSnapshot(q, (snap) => {
+        setter(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, (err) => {
+        handleFirestoreError(err, OperationType.GET, collName);
+      });
+      publicUnsubs.push(unsub);
+    };
+
     // Products
-    const qProducts = query(collection(db, 'kuku_products'), orderBy('createdAt', 'desc'));
-    const unsubProducts = onSnapshot(qProducts, (snap) => {
-      setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product)));
-    }, (err) => {
-      console.error("Firestore Products Error:", err);
-    });
-
-    // Orders
-    const qOrders = query(collection(db, 'kuku_orders'), orderBy('createdAt', 'desc'));
-    const unsubOrders = onSnapshot(qOrders, (snap) => {
-      setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as Order)));
-    }, (err) => {
-      console.error("Firestore Orders Error:", err);
-    });
-
-    // Users & Vendors
-    const qUsers = query(collection(db, 'kuku_users'), orderBy('createdAt', 'desc'));
-    const unsubUsers = onSnapshot(qUsers, (snap) => {
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
-      setUsers(all.filter(u => u.role === 'user'));
-      setVendors(all.filter(u => u.role === 'vendor'));
-      setAdmins(all.filter(u => u.role === 'admin'));
-    }, (err) => {
-      console.error("Firestore Users Error:", err);
-    });
-
-    // Activities
-    const qActs = query(collection(db, 'kuku_activity'), orderBy('createdAt', 'desc'));
-    const unsubActs = onSnapshot(qActs, (snap) => {
-      setActivities(snap.docs.map(d => ({ id: d.id, ...d.data() } as Activity)));
-    });
-
-    // Withdrawals
-    const qWithdraws = query(collection(db, 'kuku_withdrawals'), orderBy('createdAt', 'desc'));
-    const unsubWithdraws = onSnapshot(qWithdraws, (snap) => {
-      setWithdrawals(snap.docs.map(d => ({ id: d.id, ...d.data() } as Withdrawal)));
-    });
-
+    setupPublicListener('kuku_products', setProducts);
+    
+    // Categories
+    setupPublicListener('kuku_categories', setCategories, 'createdAt', 'asc');
+    
+    // Auctions
+    setupPublicListener('kuku_auctions', setAuctions);
+    
     // Reviews
-    const qReviews = query(collection(db, 'kuku_reviews'), orderBy('createdAt', 'desc'));
-    const unsubReviews = onSnapshot(qReviews, (snap) => {
-      setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() } as Review)));
-    });
+    setupPublicListener('kuku_reviews', setReviews);
+    
+    // Statuses
+    setupPublicListener('kuku_statuses', setStatuses);
+    
+    // Academy
+    setupPublicListener('kuku_academy', setAcademyPosts);
+    
+    // Forum
+    setupPublicListener('kuku_forum', setForumPosts);
+    
+    // Offers
+    setupPublicListener('kuku_offers', setOffers);
+
+    // Live Sessions
+    setupPublicListener('kuku_live_sessions', setLiveSessions);
 
     // System Settings
     const unsubSettings = onSnapshot(doc(db, 'kuku_config', 'settings'), (snap) => {
       if (snap.exists()) {
         setSystemSettings(snap.data());
+      } else {
+        setSystemSettings({});
+      }
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, 'kuku_config/settings');
+    });
+    publicUnsubs.push(unsubSettings);
+
+    // Vendors (Publicly readable)
+    const qVendors = query(collection(db, 'kuku_users'), where('role', '==', 'vendor'), orderBy('createdAt', 'desc'));
+    const unsubVendors = onSnapshot(qVendors, (snap) => {
+      setVendors(snap.docs.map(d => ({ id: d.id, ...d.data() } as User)));
+    }, (err) => {
+      // Only log if it's not a permission error for unauthenticated users
+      if (err.code !== 'permission-denied') {
+        handleFirestoreError(err, OperationType.GET, 'kuku_users_vendors');
       }
     });
-
-    // Statuses
-    const qStatuses = query(collection(db, 'kuku_statuses'), orderBy('createdAt', 'desc'));
-    const unsubStatuses = onSnapshot(qStatuses, (snap) => {
-      setStatuses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Status)));
-    });
-
-    // Categories
-    const qCats = query(collection(db, 'kuku_categories'), orderBy('createdAt', 'asc'));
-    const unsubCats = onSnapshot(qCats, (snap) => {
-      setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as Category)));
-    });
-
-    // Auctions
-    const qAuctions = query(collection(db, 'kuku_auctions'), orderBy('createdAt', 'desc'));
-    const unsubAuctions = onSnapshot(qAuctions, (snap) => {
-      setAuctions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Auction)));
-    });
-
-    // Wallet Transactions
-    const qWallet = query(collection(db, 'kuku_wallet'), orderBy('createdAt', 'desc'));
-    const unsubWallet = onSnapshot(qWallet, (snap) => {
-      setWalletTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction)));
-    });
-
-    // Notifications
-    const qNotifications = query(collection(db, 'kuku_notifications'), orderBy('createdAt', 'desc'));
-    const unsubNotifications = onSnapshot(qNotifications, (snap) => {
-      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-    });
-
-    // Livestock Health Records
-    const qHealth = query(collection(db, 'kuku_livestock_health'), orderBy('createdAt', 'desc'));
-    const unsubHealth = onSnapshot(qHealth, (snap) => {
-      setLivestockHealthRecords(snap.docs.map(d => ({ id: d.id, ...d.data() } as LivestockHealthRecord)));
-    });
-
-    // Offers
-    const qOffers = query(collection(db, 'kuku_offers'), orderBy('createdAt', 'desc'));
-    const unsubOffers = onSnapshot(qOffers, (snap) => {
-      setOffers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Offer)));
-    });
-
-    // Academy Posts
-    const qAcademy = query(collection(db, 'kuku_academy'), orderBy('createdAt', 'desc'));
-    const unsubAcademy = onSnapshot(qAcademy, (snap) => {
-      setAcademyPosts(snap.docs.map(d => ({ id: d.id, ...d.data() } as AcademyPost)));
-    });
-
-    // Loyalty Points
-    const qLoyalty = query(collection(db, 'kuku_loyalty'), orderBy('createdAt', 'desc'));
-    const unsubLoyalty = onSnapshot(qLoyalty, (snap) => {
-      setLoyaltyPoints(snap.docs.map(d => ({ id: d.id, ...d.data() } as LoyaltyPoint)));
-    });
-
-    // Invoices
-    const qInvoices = query(collection(db, 'kuku_invoices'), orderBy('createdAt', 'desc'));
-    const unsubInvoices = onSnapshot(qInvoices, (snap) => {
-      setInvoices(snap.docs.map(d => ({ id: d.id, ...d.data() } as Invoice)));
-    });
-
-    // Forum Posts
-    const qForum = query(collection(db, 'kuku_forum'), orderBy('createdAt', 'desc'));
-    const unsubForum = onSnapshot(qForum, (snap) => {
-      setForumPosts(snap.docs.map(d => ({ id: d.id, ...d.data() } as ForumPost)));
-    });
-
-    // Chat Messages
-    const qChat = query(collection(db, 'kuku_chats'), orderBy('createdAt', 'asc'));
-    const unsubChat = onSnapshot(qChat, (snap) => {
-      setChatMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage)));
-    });
-
-    // Vaccination Records
-    const qVaccination = query(collection(db, 'kuku_vaccinations'), orderBy('createdAt', 'desc'));
-    const unsubVaccination = onSnapshot(qVaccination, (snap) => {
-      setVaccinationRecords(snap.docs.map(d => ({ id: d.id, ...d.data() } as VaccinationRecord)));
-    });
-
-    // Recurring Orders
-    const qRecurring = query(collection(db, 'kuku_recurring'), orderBy('createdAt', 'desc'));
-    const unsubRecurring = onSnapshot(qRecurring, (snap) => {
-      setRecurringOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as RecurringOrder)));
-    });
-
-    // Live Sessions
-    const unsubLive = onSnapshot(collection(db, 'kuku_live_sessions'), (snap) => {
-      setLiveSessions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    publicUnsubs.push(unsubVendors);
 
     return () => {
-      unsubProducts();
-      unsubOrders();
-      unsubUsers();
-      unsubActs();
-      unsubWithdraws();
-      unsubReviews();
-      unsubSettings();
-      unsubStatuses();
-      unsubCats();
-      unsubWallet();
-      unsubAuctions();
-      unsubNotifications();
-      unsubOffers();
-      unsubAcademy();
-      unsubLoyalty();
-      unsubInvoices();
-      unsubForum();
-      unsubChat();
-      unsubVaccination();
-      unsubRecurring();
-      unsubLive();
+      publicUnsubs.forEach(unsub => unsub());
     };
   }, []);
+
+  // Firestore Listeners - Authenticated Data
+  useEffect(() => {
+    if (!user) {
+      // Clear authenticated data when logged out
+      setOrders([]);
+      setActivities([]);
+      setWithdrawals([]);
+      setChatMessages([]);
+      setNotifications([]);
+      setWalletTransactions([]);
+      setLoyaltyPoints([]);
+      setInvoices([]);
+      setLivestock([]);
+      setVaccinationRecords([]);
+      setMedicalRecords([]);
+      setBreedingRecords([]);
+      setProductionRecords([]);
+      setNutritionRecords([]);
+      setLivestockHealthRecords([]);
+      setRecurringOrders([]);
+      return;
+    }
+
+    const authUnsubs: (() => void)[] = [];
+
+    const setupAuthListener = (collName: string, setter: (data: any) => void, orderField = 'createdAt', direction: 'asc' | 'desc' = 'desc') => {
+      let q;
+      if (user.role === 'admin') {
+        q = query(collection(db, collName), orderBy(orderField, direction));
+      } else {
+        // Filter by userId or vendorId for non-admins
+        if (collName === 'kuku_chat') {
+          q = query(collection(db, collName), or(where('senderId', '==', user.id), where('receiverId', '==', user.id)), orderBy(orderField, direction));
+        } else if (collName === 'kuku_orders') {
+          q = query(collection(db, collName), or(where('userId', '==', user.id), where('vendorId', '==', user.id)), orderBy(orderField, direction));
+        } else if (collName === 'kuku_notifications') {
+          q = query(collection(db, collName), where('userId', 'in', [user.id, 'all']), orderBy(orderField, direction));
+        } else if (collName === 'kuku_activity') {
+          q = query(collection(db, collName), where('userId', '==', user.id), orderBy(orderField, direction));
+        } else if (collName === 'kuku_withdrawals' || collName === 'kuku_wallet' || collName === 'kuku_invoices') {
+          q = query(collection(db, collName), or(where('userId', '==', user.id), where('vendorId', '==', user.id)), orderBy(orderField, direction));
+        } else if (collName.startsWith('kuku_livestock') || collName.includes('records')) {
+          // Livestock related collections often use vendorId or userId
+          q = query(collection(db, collName), or(where('userId', '==', user.id), where('vendorId', '==', user.id)), orderBy(orderField, direction));
+        } else {
+          q = query(collection(db, collName), where('userId', '==', user.id), orderBy(orderField, direction));
+        }
+      }
+
+      const unsub = onSnapshot(q, (snap) => {
+        setter(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, (err) => {
+        // Suppress permission errors for non-admins on certain collections if needed
+        if (err.code === 'permission-denied' && user.role !== 'admin') {
+          console.warn(`Permission denied for ${collName}, skipping listener.`);
+          return;
+        }
+        handleFirestoreError(err, OperationType.GET, collName);
+      });
+      authUnsubs.push(unsub);
+    };
+
+    // Orders
+    setupAuthListener('kuku_orders', setOrders);
+    
+    // Activities
+    setupAuthListener('kuku_activity', setActivities);
+    
+    // Chat
+    setupAuthListener('kuku_chat', setChatMessages, 'createdAt', 'asc');
+    
+    // Notifications
+    setupAuthListener('kuku_notifications', setNotifications);
+    
+    // Wallet
+    setupAuthListener('kuku_wallet', setWalletTransactions);
+    
+    // Withdrawals
+    setupAuthListener('kuku_withdrawals', setWithdrawals);
+    
+    // Loyalty
+    setupAuthListener('kuku_loyalty', setLoyaltyPoints);
+    
+    // Invoices
+    setupAuthListener('kuku_invoices', setInvoices);
+    
+    // Livestock & Records
+    setupAuthListener('kuku_livestock', setLivestock);
+    setupAuthListener('kuku_vaccination_records', setVaccinationRecords);
+    setupAuthListener('kuku_medical_records', setMedicalRecords);
+    setupAuthListener('kuku_breeding_records', setBreedingRecords);
+    setupAuthListener('kuku_production_records', setProductionRecords);
+    setupAuthListener('kuku_nutrition_records', setNutritionRecords);
+    setupAuthListener('kuku_livestock_health', setLivestockHealthRecords);
+    setupAuthListener('kuku_recurring_orders', setRecurringOrders);
+
+    // Admin-only data
+    if (user.role === 'admin') {
+      const qUsers = query(collection(db, 'kuku_users'), where('role', '==', 'user'), orderBy('createdAt', 'desc'));
+      const unsubUsers = onSnapshot(qUsers, (snap) => {
+        setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as User)));
+      }, (err) => {
+        handleFirestoreError(err, OperationType.GET, 'kuku_users_admin');
+      });
+      authUnsubs.push(unsubUsers);
+
+      const qAdmins = query(collection(db, 'kuku_users'), where('role', '==', 'admin'), orderBy('createdAt', 'desc'));
+      const unsubAdmins = onSnapshot(qAdmins, (snap) => {
+        setAdmins(snap.docs.map(d => ({ id: d.id, ...d.data() } as User)));
+      }, (err) => {
+        handleFirestoreError(err, OperationType.GET, 'kuku_admins_admin');
+      });
+      authUnsubs.push(unsubAdmins);
+    }
+
+    return () => {
+      authUnsubs.forEach(unsub => unsub());
+    };
+  }, [user]);
 
   const addActivity = async (icon: string, text: string) => {
     try {
       await addDoc(collection(db, 'kuku_activity'), {
         icon,
         text,
+        userId: user?.id || 'system',
         time: 'Sasa hivi',
         createdAt: serverTimestamp()
       });
     } catch (e) {
-      console.error("Error adding activity: ", e);
+      handleFirestoreError(e, OperationType.CREATE, 'kuku_activity');
     }
   };
 
@@ -499,7 +551,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await addDoc(collection(db, 'kuku_notifications'), {
         title,
         message,
-        userId,
+        userId: userId || 'all',
         link,
         icon: '🔔',
         text: `${title}: ${message}`,
@@ -511,7 +563,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Also add to activity for general log
       await addActivity('🔔', `${title}: ${message}`);
     } catch (e) {
-      console.error("Error adding notification: ", e);
+      handleFirestoreError(e, OperationType.CREATE, 'kuku_notifications');
     }
   };
 
@@ -522,7 +574,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updatedAt: serverTimestamp()
       }, { merge: true });
     } catch (e) {
-      console.error("Error updating settings: ", e);
+      handleFirestoreError(e, OperationType.UPDATE, 'kuku_config/settings');
       throw e;
     }
   };
@@ -551,13 +603,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Award points to referrer
         await updateDoc(doc(db, 'kuku_users', referrerId), {
           loyaltyPoints: increment(bonus)
-        });
+        }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `kuku_users/${referrerId}`));
         
         // Award points to referee
         await updateDoc(doc(db, 'kuku_users', newUserId), {
           loyaltyPoints: increment(bonus),
           referredBy: referrerId
-        });
+        }).catch(e => handleFirestoreError(e, OperationType.UPDATE, `kuku_users/${newUserId}`));
 
         await addDoc(collection(db, 'kuku_loyalty'), {
           userId: referrerId,
@@ -566,7 +618,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           type: 'referral',
           description: `Referral bonus for inviting a new user`,
           createdAt: serverTimestamp()
-        });
+        }).catch(e => handleFirestoreError(e, OperationType.CREATE, 'kuku_loyalty'));
 
         await addDoc(collection(db, 'kuku_loyalty'), {
           userId: newUserId,
@@ -574,7 +626,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           type: 'referral',
           description: `Welcome bonus for using referral code`,
           createdAt: serverTimestamp()
-        });
+        }).catch(e => handleFirestoreError(e, OperationType.CREATE, 'kuku_loyalty'));
 
         toast.success(`Zawadi ya mwaliko imetolewa! 🎁`);
       }
@@ -621,9 +673,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       invoices,
       forumPosts,
       chatMessages,
+      livestock,
       vaccinationRecords,
-      recurringOrders,
+      medicalRecords,
+      breedingRecords,
+      productionRecords,
+      nutritionRecords,
       livestockHealthRecords,
+      recurringOrders,
       liveSessions,
       handleReferral
     }}>

@@ -3,8 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Calendar, Plus, CheckCircle2, Clock, AlertCircle, Trash2, Edit2, ChevronRight, Bell, Syringe } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, generateId } from '../utils';
-import { db } from '../services/firebase';
-import { collection, addDoc, serverTimestamp, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { db, collection, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, handleFirestoreError, OperationType } from '../services/firebase';
 import { toast } from 'react-hot-toast';
 import { Modal } from '../components/Modal';
 
@@ -19,7 +18,7 @@ export const VaccinationCalendar: React.FC = () => {
     notes: ''
   });
 
-  const myRecords = vaccinationRecords.filter(r => r.userId === user?.id);
+  const myRecords = (Array.isArray(vaccinationRecords) ? vaccinationRecords : []).filter(r => r.userId === user?.id);
 
   const handleAddRecord = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +45,7 @@ export const VaccinationCalendar: React.FC = () => {
         notes: ''
       });
     } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_vaccinations');
       toast.error('Hitilafu imetokea');
     }
   };
@@ -55,6 +55,7 @@ export const VaccinationCalendar: React.FC = () => {
       await updateDoc(doc(db, 'kuku_vaccinations', id), { completed: !current });
       toast.success(current ? 'Imewekwa kama haijakamilika' : 'Hongera! Chanjo imekamilika');
     } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_vaccinations/${id}`);
       toast.error('Hitilafu imetokea');
     }
   };
@@ -65,6 +66,7 @@ export const VaccinationCalendar: React.FC = () => {
       await deleteDoc(doc(db, 'kuku_vaccinations', id));
       toast.success('Imefutwa');
     } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `kuku_vaccinations/${id}`);
       toast.error('Hitilafu imetokea');
     }
   };
@@ -101,7 +103,7 @@ export const VaccinationCalendar: React.FC = () => {
             <CheckCircle2 size={24} />
           </div>
           <h3 className="text-2xl font-black text-slate-900 dark:text-white">
-            {myRecords.filter(r => r.completed).length}
+            {(Array.isArray(myRecords) ? myRecords : []).filter(r => r.completed).length}
           </h3>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Zilizokamilika</p>
         </div>
@@ -110,7 +112,7 @@ export const VaccinationCalendar: React.FC = () => {
             <Clock size={24} />
           </div>
           <h3 className="text-2xl font-black text-slate-900 dark:text-white">
-            {myRecords.filter(r => !r.completed).length}
+            {(Array.isArray(myRecords) ? myRecords : []).filter(r => !r.completed).length}
           </h3>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Zinazofuata</p>
         </div>

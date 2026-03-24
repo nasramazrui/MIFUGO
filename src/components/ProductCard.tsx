@@ -16,7 +16,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
   const { t, systemSettings, cart, addToCart, updateCartQty } = useApp();
   const currency = systemSettings?.currency || 'TZS';
 
-  const cartItem = cart.find(item => item.productId === product.id);
+  const cartItem = Array.isArray(cart) ? cart.find(item => item.productId === product.id) : undefined;
   
   return (
     <motion.div

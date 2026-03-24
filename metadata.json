@@ -1,5 +1,5 @@
 {
-  "name": "Digital Livestock Market Live",
-  "description": "Premium Agricultural & Livestock Marketplace with Real-time Tracking, Live Auctions, and Vendor Management.",
+  "name": "Mifugo Digital POS",
+  "description": "Mfumo wa kidijitali wa kufuatilia taarifa za mifugo kwa kutumia QR Code, chanjo, matibabu, uzazi na uzalishaji.",
   "requestFramePermissions": ["camera", "microphone", "geolocation"]
 }

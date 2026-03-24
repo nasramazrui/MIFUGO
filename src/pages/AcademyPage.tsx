@@ -46,7 +46,7 @@ export const AcademyPage: React.FC = () => {
     { id: 'general', label: 'Mengineyo', icon: '💡' }
   ];
 
-  const filteredPosts = academyPosts.filter(post => {
+  const filteredPosts = (Array.isArray(academyPosts) ? academyPosts : []).filter(post => {
     const matchesCat = selectedCategory === 'all' || post.category === selectedCategory;
     const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           post.content.toLowerCase().includes(searchQuery.toLowerCase());

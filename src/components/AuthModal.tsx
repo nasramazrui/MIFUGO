@@ -3,16 +3,10 @@ import { useApp } from '../context/AppContext';
 import { Modal } from './Modal';
 import { ADMIN_EMAIL } from '../constants';
 import { toast } from 'react-hot-toast';
-import { auth, db } from '../services/firebase';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  updateProfile
-} from 'firebase/auth';
+import { auth, db, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, doc, setDoc, getDoc, serverTimestamp, googleProvider, signInWithPopup, handleFirestoreError, OperationType } from '../services/firebase';
 import { getAuthEmail, isEmail } from '../utils/authUtils';
 import { generateId } from '../utils';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Chrome } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -25,6 +19,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const [view, setView] = useState<'choice' | 'login' | 'register'>('choice');
   const [loading, setLoading] = useState(false);
   const [serverStatus, setServerStatus] = useState<'checking' | 'ok' | 'fail'>('checking');
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const fbUser = result.user;
+      
+      // Check if user exists in Firestore
+      const userDoc = await getDoc(doc(db, 'kuku_users', fbUser.uid));
+      
+      if (!userDoc.exists()) {
+        const myReferralCode = generateId().substring(0, 8).toUpperCase();
+        const userData = {
+          name: fbUser.displayName || 'Mtumiaji',
+          email: fbUser.email || '',
+          role: 'user',
+          contact: fbUser.phoneNumber || '',
+          hasWhatsApp: true,
+          theme,
+          language,
+          referralCode: myReferralCode,
+          loyaltyPoints: 0,
+          createdAt: new Date().toISOString(),
+          serverCreatedAt: serverTimestamp()
+        };
+        await setDoc(doc(db, 'kuku_users', fbUser.uid), userData);
+        addActivity('👤', `Mteja mpya "${fbUser.displayName}" amesajiliwa (Google)`);
+      } else {
+        toast.success('Karibu tena!');
+      }
+      
+      onSuccess?.();
+      onClose();
+    } catch (error: any) {
+      if (error.code === 'permission-denied') {
+        handleFirestoreError(error, OperationType.WRITE, `kuku_users/${auth.currentUser?.uid}`);
+      }
+      toast.error(error.message || 'Hitilafu wakati wa kuingia na Google');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   React.useEffect(() => {
     fetch('/api/health')
@@ -104,6 +140,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       onSuccess?.();
       onClose();
     } catch (error: any) {
+      if (error.code === 'permission-denied') {
+        handleFirestoreError(error, OperationType.WRITE, `kuku_users/${auth.currentUser?.uid}`);
+      }
       toast.error(error.message || 'Hitilafu wakati wa kusajili');
     } finally {
       setLoading(false);
@@ -133,6 +172,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               className="w-full bg-white dark:bg-slate-800 border-2 border-amber-200 dark:border-slate-700 hover:border-amber-400 dark:hover:border-amber-500 text-amber-800 dark:text-amber-400 font-black py-4 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
             >
               ✨ Hapana — {t('register')}
+            </button>
+            
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100 dark:border-slate-800"></div></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-slate-900 px-2 text-slate-400 font-bold">Au tumia</span></div>
+            </div>
+
+            <button 
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold py-3 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-3"
+            >
+              <Chrome size={18} className="text-blue-500" />
+              Ingia na Google
             </button>
           </div>
           {serverStatus === 'fail' && (
@@ -186,6 +239,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               />
             </div>
             <button type="submit" className="w-full btn-primary mt-4">{t('login')} Sasa →</button>
+            
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100 dark:border-slate-800"></div></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-slate-900 px-2 text-slate-400 font-bold">Au tumia</span></div>
+            </div>
+
+            <button 
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold py-3 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-3"
+            >
+              <Chrome size={18} className="text-blue-500" />
+              Ingia na Google
+            </button>
+
             <button 
               type="button"
               onClick={() => setView('register')}
@@ -274,6 +343,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               </div>
             </div>
             <button type="submit" className="w-full btn-primary mt-4">{t('register')} Sasa 🎉</button>
+            
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100 dark:border-slate-800"></div></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-slate-900 px-2 text-slate-400 font-bold">Au tumia</span></div>
+            </div>
+
+            <button 
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold py-3 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-3"
+            >
+              <Chrome size={18} className="text-blue-500" />
+              Sajili na Google
+            </button>
+
             <button 
               type="button"
               onClick={() => setView('login')}

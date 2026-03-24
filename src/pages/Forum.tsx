@@ -3,8 +3,7 @@ import { useApp } from '../context/AppContext';
 import { MessageSquare, ThumbsUp, Share2, Plus, Image as ImageIcon, Send, X, Search, Filter, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, formatCurrency } from '../utils';
-import { db } from '../services/firebase';
-import { collection, addDoc, serverTimestamp, updateDoc, doc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { db, collection, addDoc, serverTimestamp, updateDoc, doc, arrayUnion, arrayRemove, handleFirestoreError, OperationType } from '../services/firebase';
 import { toast } from 'react-hot-toast';
 import { Modal } from '../components/Modal';
 
@@ -17,7 +16,7 @@ export const Forum: React.FC = () => {
   const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState('');
 
-  const filteredPosts = forumPosts.filter(post => 
+  const filteredPosts = (Array.isArray(forumPosts) ? forumPosts : []).filter(post => 
     (post.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
      post.content.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -49,6 +48,7 @@ export const Forum: React.FC = () => {
       setIsAddModalOpen(false);
       setNewPost({ title: '', content: '', image: '' });
     } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_forum');
       toast.error('Hitilafu imetokea');
     }
   };
@@ -60,6 +60,7 @@ export const Forum: React.FC = () => {
         likes: isLiked ? arrayRemove(user.id) : arrayUnion(user.id)
       });
     } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_forum/${postId}`);
       console.error(error);
     }
   };
@@ -67,7 +68,7 @@ export const Forum: React.FC = () => {
   const handleAddComment = async (postId: string) => {
     if (!user || !commentText.trim()) return;
     try {
-      const post = forumPosts.find(p => p.id === postId);
+      const post = Array.isArray(forumPosts) ? forumPosts.find(p => p.id === postId) : undefined;
       if (!post) return;
 
       const newComment = {
@@ -85,6 +86,7 @@ export const Forum: React.FC = () => {
       setCommentingPostId(null);
       toast.success('Maoni yameongezwa');
     } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_forum/${postId}`);
       toast.error('Hitilafu imetokea');
     }
   };

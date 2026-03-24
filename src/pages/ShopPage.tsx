@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Status, User } from '../types';
 import { ProductCard } from '../components/ProductCard';
@@ -10,10 +11,8 @@ import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell, BookOpen, Tag, FileText, Syringe, QrCode, CheckCircle2, MessageCircle, Video } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { db, auth } from '../services/firebase';
+import { db, auth, collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc, getDoc, createUserWithEmailAndPassword, updateProfile, deleteUser, updatePassword, handleFirestoreError, OperationType } from '../services/firebase';
 import { getAuthEmail, isEmail } from '../utils/authUtils';
-import { collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc, getDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, updateProfile, deleteUser, updatePassword } from 'firebase/auth';
 import { AuctionPage } from './AuctionPage';
 import { Forum } from './Forum';
 import { VaccinationCalendar } from './VaccinationCalendar';
@@ -30,12 +29,14 @@ import html2canvas from 'html2canvas';
 import { RecentPurchases } from '../components/RecentPurchases';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { AcademyPage } from './AcademyPage';
+import LivestockManager from './LivestockManager';
 
 export const ShopPage: React.FC = () => {
+  const navigate = useNavigate();
   const { products, user, vendors, orders, setOrders, addActivity, addNotification, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty, notifications, academyPosts, offers, livestockHealthRecords, liveSessions } = useApp();
   const currency = systemSettings?.currency || 'TZS';
-  const unreadNotifications = notifications.filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
-  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'auctions' | 'academy' | 'forum' | 'vaccination' | 'chat'>('browse');
+  const unreadNotifications = (Array.isArray(notifications) ? notifications : []).filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
+  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'auctions' | 'academy' | 'forum' | 'vaccination' | 'chat' | 'livestock'>('browse');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeChat, setActiveChat] = useState<{ id: string, name: string } | null>(null);
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
@@ -46,10 +47,20 @@ export const ShopPage: React.FC = () => {
   const [activeLiveRoomId, setActiveLiveRoomId] = useState<string | null>(null);
   const [viewedStatuses, setViewedStatuses] = useState<string[]>(() => {
     const saved = localStorage.getItem('viewed_statuses');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error("Error parsing viewed_statuses from localStorage:", e);
+      return [];
+    }
   });
   const [selectedCat, setSelectedCat] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -113,7 +124,7 @@ export const ShopPage: React.FC = () => {
     try {
       const data = JSON.parse(decodedText);
       if (data.type === 'payment' && data.vendorId) {
-        const vendor = vendors.find(v => v.id === data.vendorId);
+        const vendor = Array.isArray(vendors) ? vendors.find(v => v.id === data.vendorId) : undefined;
         if (vendor) {
           // Success feedback
           playBeep();
@@ -129,7 +140,7 @@ export const ShopPage: React.FC = () => {
           setIsQRPaymentModalOpen(true);
         }
       } else if (data.type === 'product' && data.productId) {
-        let product = products.find(p => p.id === data.productId);
+        let product = Array.isArray(products) ? products.find(p => p.id === data.productId) : undefined;
         
         if (!product) {
           // Fallback: Try to fetch directly from Firestore if not in local state
@@ -169,6 +180,18 @@ export const ShopPage: React.FC = () => {
         const productId = url.searchParams.get('productId');
         const liveRoomId = url.searchParams.get('live');
         
+        // Handle livestock URL
+        if (url.pathname.includes('/livestock/')) {
+          const livestockId = url.pathname.split('/livestock/')[1];
+          if (livestockId) {
+            playBeep();
+            if (navigator.vibrate) navigator.vibrate([200]);
+            setIsQRScannerOpen(false);
+            window.location.href = `/livestock/${livestockId}`;
+            return;
+          }
+        }
+
         if (liveRoomId) {
           setActiveLiveRoomId(liveRoomId);
           setIsQRScannerOpen(false);
@@ -177,7 +200,7 @@ export const ShopPage: React.FC = () => {
         }
 
         if (productId) {
-          let product = products.find(p => p.id === productId);
+          let product = Array.isArray(products) ? products.find(p => p.id === productId) : undefined;
           if (!product) {
             const productDoc = await getDoc(doc(db, 'kuku_products', productId));
             if (productDoc.exists()) {
@@ -289,7 +312,7 @@ export const ShopPage: React.FC = () => {
       setIsQRPaymentModalOpen(false);
       setQrPaymentData({ vendor: null, amount: '' });
     } catch (error) {
-      console.error('QR Payment error:', error);
+      handleFirestoreError(error, OperationType.WRITE, 'kuku_wallet');
       toast.error('Hitilafu imetokea wakati wa malipo');
     } finally {
       setIsProcessingQRPayment(false);
@@ -331,8 +354,8 @@ export const ShopPage: React.FC = () => {
   const langRef = useRef<HTMLDivElement>(null);
 
   // Status State
-  const activeLiveSessions = liveSessions.filter(s => s.status === 'live');
-  const endedLiveSessions = liveSessions.filter(s => s.status === 'ended');
+  const activeLiveSessions = (Array.isArray(liveSessions) ? liveSessions : []).filter(s => s.status === 'live');
+  const endedLiveSessions = (Array.isArray(liveSessions) ? liveSessions : []).filter(s => s.status === 'ended');
 
   // Filter out ended sessions that are older than 24 hours
   const filteredEndedSessions = endedLiveSessions.filter(s => {
@@ -359,7 +382,7 @@ export const ShopPage: React.FC = () => {
       const params = new URLSearchParams(window.location.search);
       const productId = params.get('productId');
       if (productId) {
-        let product = products.find(p => p.id === productId);
+        let product = Array.isArray(products) ? products.find(p => p.id === productId) : undefined;
         if (!product) {
           try {
             const productDoc = await getDoc(doc(db, 'kuku_products', productId));
@@ -481,6 +504,7 @@ export const ShopPage: React.FC = () => {
       });
       toast.success('Wasifu umesasishwa!');
     } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_users/${user.id}`);
       toast.error('Hitilafu wakati wa kusasisha wasifu');
     } finally {
       setIsProfileLoading(false);
@@ -516,6 +540,7 @@ export const ShopPage: React.FC = () => {
       
       toast.success(`Umefanikiwa kupata ${formatCurrency(value, currency)}!`);
     } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'kuku_wallet');
       toast.error('Hitilafu imetokea. Jaribu tena.');
     } finally {
       setIsRedeeming(false);
@@ -526,8 +551,8 @@ export const ShopPage: React.FC = () => {
     if (!user) return;
     if (!confirm('Je, una uhakika unataka kufuta akaunti yako? Hatua hii haiwezi kurudishwa.')) return;
     
+    const userId = user.id;
     try {
-      const userId = user.id;
       // 1. Delete Auth user first (it might fail due to recent login)
       const currentUser = auth.currentUser;
       if (currentUser) {
@@ -541,6 +566,9 @@ export const ShopPage: React.FC = () => {
       logout();
       setIsProfileModalOpen(false);
     } catch (error: any) {
+      if (error.code === 'permission-denied') {
+        handleFirestoreError(error, OperationType.DELETE, `kuku_users/${userId}`);
+      }
       console.error(error);
       if (error.code === 'auth/requires-recent-login') {
         toast.error('Tafadhali toka na uingie tena ili kufuta akaunti yako kwa usalama.');
@@ -650,6 +678,7 @@ export const ShopPage: React.FC = () => {
       toast.success('Ombi la kutoa pesa limetumwa!');
       addActivity('💸', `Umeomba kutoa ${formatCurrency(amountNum, currency)}`);
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.WRITE, 'kuku_withdrawals');
       toast.error(error.message || 'Hitilafu wakati wa kutuma maombi');
     } finally {
       setIsWithdrawLoading(false);
@@ -719,6 +748,9 @@ export const ShopPage: React.FC = () => {
       
       setIsVendorRegModalOpen(false);
     } catch (error: any) {
+      if (error.code === 'permission-denied') {
+        handleFirestoreError(error, OperationType.WRITE, `kuku_users/${auth.currentUser?.uid}`);
+      }
       toast.error(error.message || 'Hitilafu wakati wa kusajili');
     } finally {
       setIsVendorLoading(false);
@@ -770,6 +802,7 @@ export const ShopPage: React.FC = () => {
       setVendorRating(0);
       setVendorReviewText('');
     } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_reviews');
       toast.error('Imeshindwa kutuma maoni');
     } finally {
       setIsSubmittingReview(false);
@@ -802,6 +835,7 @@ export const ShopPage: React.FC = () => {
       setReviewRating(5);
       toast.success('Asante kwa maoni yako!');
     } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_reviews');
       toast.error('Imeshindwa kutuma maoni');
     } finally {
       setIsReviewLoading(false);
@@ -814,6 +848,7 @@ export const ShopPage: React.FC = () => {
       await deleteDoc(doc(db, 'kuku_reviews', reviewId));
       toast.success('Maoni yamefutwa');
     } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `kuku_reviews/${reviewId}`);
       toast.error('Imeshindwa kufuta maoni');
     }
   };
@@ -825,7 +860,7 @@ export const ShopPage: React.FC = () => {
     if (!user || !replyText.trim()) return;
     try {
       const reviewRef = doc(db, 'kuku_reviews', reviewId);
-      const review = reviews.find(r => r.id === reviewId);
+      const review = Array.isArray(reviews) ? reviews.find(r => r.id === reviewId) : undefined;
       const newReply = {
         id: generateId(),
         userId: user.id,
@@ -852,6 +887,7 @@ export const ShopPage: React.FC = () => {
       setReplyingTo(null);
       toast.success('Jibu limetumwa');
     } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_reviews/${reviewId}`);
       toast.error('Imeshindwa kutuma jibu');
     }
   };
@@ -863,7 +899,7 @@ export const ShopPage: React.FC = () => {
     }
     try {
       const reviewRef = doc(db, 'kuku_reviews', reviewId);
-      const review = reviews.find(r => r.id === reviewId);
+      const review = Array.isArray(reviews) ? reviews.find(r => r.id === reviewId) : undefined;
       const likes = review?.likes || [];
       const newLikes = likes.includes(user.id) 
         ? likes.filter(id => id !== user.id)
@@ -880,6 +916,7 @@ export const ShopPage: React.FC = () => {
         );
       }
     } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_reviews/${reviewId}`);
       console.error(error);
     }
   };
@@ -891,7 +928,7 @@ export const ShopPage: React.FC = () => {
     }
     try {
       const reviewRef = doc(db, 'kuku_reviews', reviewId);
-      const review = reviews.find(r => r.id === reviewId);
+      const review = Array.isArray(reviews) ? reviews.find(r => r.id === reviewId) : undefined;
       const reactions = review?.reactions || [];
       const existingReactionIndex = reactions.findIndex(r => r.userId === user.id && r.emoji === emoji);
       
@@ -904,6 +941,7 @@ export const ShopPage: React.FC = () => {
       
       await updateDoc(reviewRef, { reactions: newReactions });
     } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_reviews/${reviewId}`);
       console.error(error);
     }
   };
@@ -916,7 +954,13 @@ export const ShopPage: React.FC = () => {
                          p.vendorName.toLowerCase().includes(searchLower) ||
                          (p.desc && p.desc.toLowerCase().includes(searchLower)) ||
                          (p.location && p.location.toLowerCase().includes(searchLower));
-    return matchesCat && matchesSearch && p.approved;
+    
+    const price = Number(p.price) || 0;
+    const min = minPrice ? Number(minPrice) : 0;
+    const max = maxPrice ? Number(maxPrice) : Infinity;
+    const matchesPrice = price >= min && price <= max;
+
+    return matchesCat && matchesSearch && matchesPrice && p.approved;
   });
 
   const filteredVendors = vendors.filter(v => {
@@ -929,7 +973,7 @@ export const ShopPage: React.FC = () => {
   });
 
   const isStoreOpen = (vendorId: string) => {
-    const vendor = vendors.find(v => v.id === vendorId);
+    const vendor = Array.isArray(vendors) ? vendors.find(v => v.id === vendorId) : undefined;
     // If vendor doesn't exist or hasn't set any settings, assume open
     if (!vendor) return true;
     if (!vendor.openTime || !vendor.closeTime) return true;
@@ -974,7 +1018,7 @@ export const ShopPage: React.FC = () => {
   const [isOrderLoading, setIsOrderLoading] = useState(false);
 
   const confirmOrder = async () => {
-    const p = selectedProduct || products.find(x => x.id === selectedProduct?.id);
+    const p = selectedProduct || (Array.isArray(products) ? products.find(x => x.id === selectedProduct?.id) : undefined);
     if (!p || !user) return;
 
     if (payMethod === 'wallet') {
@@ -1118,6 +1162,7 @@ export const ShopPage: React.FC = () => {
         toast.success('Malipo yamethibitishwa! Tafadhali tuma WhatsApp.');
       }
     } catch (error: any) {
+      handleFirestoreError(error, OperationType.WRITE, 'kuku_orders');
       console.error("Order Error:", error);
       toast.error('Hitilafu wakati wa kutuma agizo. Jaribu tena.');
     } finally {
@@ -1152,6 +1197,7 @@ export const ShopPage: React.FC = () => {
       setWalletStep('whatsapp');
       toast.success('Ombi la kuongeza pesa limetumwa!');
     } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_wallet');
       toast.error('Hitilafu imetokea');
     } finally {
       setIsWalletLoading(false);
@@ -1239,6 +1285,7 @@ export const ShopPage: React.FC = () => {
       toast.success('Asante kwa kuthibitisha! Malipo yameingizwa kwenye Wallet ya Muuzaji.');
       addActivity('✅', `Mteja amethibitisha kupokea agizo #${selectedOrder.id.substring(0,8)}. Pesa imetumwa kwa muuzaji.`);
     } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'kuku_orders');
       console.error("Confirm Receipt Error:", error);
       toast.error('Hitilafu imetokea wakati wa kuthibitisha.');
     }
@@ -1250,6 +1297,7 @@ export const ShopPage: React.FC = () => {
       await deleteDoc(doc(db, 'kuku_orders', orderId));
       toast.success('Agizo limefutwa');
     } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `kuku_orders/${orderId}`);
       toast.error('Imeshindwa kufuta agizo');
     }
   };
@@ -1276,6 +1324,7 @@ export const ShopPage: React.FC = () => {
       setOrderReviewComment('');
       toast.success('Asante kwa maoni yako!');
     } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_reviews');
       console.error("Submit Review Error:", error);
       toast.error('Hitilafu imetokea wakati wa kutuma maoni.');
     } finally {
@@ -1305,6 +1354,7 @@ export const ShopPage: React.FC = () => {
       setStatusVideoUrl('');
       setIsStatusModalOpen(false);
     } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'kuku_statuses');
       toast.error('Hitilafu wakati wa kuweka status');
     } finally {
       setIsStatusLoading(false);
@@ -1316,7 +1366,7 @@ export const ShopPage: React.FC = () => {
       setIsAuthModalOpen(true);
       return;
     }
-    const status = statuses.find(s => s.id === statusId);
+    const status = Array.isArray(statuses) ? statuses.find(s => s.id === statusId) : undefined;
     if (!status) return;
 
     const newLikes = status.likes.includes(user.id)
@@ -1326,6 +1376,7 @@ export const ShopPage: React.FC = () => {
     try {
       await updateDoc(doc(db, 'kuku_statuses', statusId), { likes: newLikes });
     } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_statuses/${statusId}`);
       toast.error('Hitilafu wakati wa kulike');
     }
   };
@@ -1338,7 +1389,7 @@ export const ShopPage: React.FC = () => {
     const text = commentText[statusId];
     if (!text?.trim()) return;
 
-    const status = statuses.find(s => s.id === statusId);
+    const status = Array.isArray(statuses) ? statuses.find(s => s.id === statusId) : undefined;
     if (!status) return;
 
     const newComment = {
@@ -1355,6 +1406,7 @@ export const ShopPage: React.FC = () => {
       });
       setCommentText(prev => ({ ...prev, [statusId]: '' }));
     } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_statuses/${statusId}`);
       toast.error('Hitilafu wakati wa kucomment');
     }
   };
@@ -1367,6 +1419,7 @@ export const ShopPage: React.FC = () => {
       await deleteDoc(doc(db, 'kuku_statuses', statusId));
       toast.success('Status imefutwa');
     } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `kuku_statuses/${statusId}`);
       toast.error('Hitilafu wakati wa kufuta status');
     }
   };
@@ -1430,9 +1483,6 @@ export const ShopPage: React.FC = () => {
                     { id: 'auctions', label: t('auctions'), icon: Gavel },
                     { id: 'stores', label: t('stores'), icon: Store },
                     { id: 'orders', label: t('orders'), icon: Package },
-                    { id: 'chat', label: t('chat'), icon: Send },
-                    { id: 'vaccination', label: t('vaccination'), icon: Syringe },
-                    { id: 'forum', label: t('forum'), icon: MessageSquare },
                     { id: 'cart', label: t('cart_title'), icon: ShoppingCart },
                     { id: 'profile', label: t('profile'), icon: UserIcon },
                   ].map((item) => (
@@ -1635,8 +1685,23 @@ export const ShopPage: React.FC = () => {
               >
                 <QrCode size={20} className="sm:w-6 sm:h-6" />
               </button>
-              <button className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all">
+              <button 
+                onClick={() => setIsSearchOpen(!isSearchOpen)}
+                className={cn(
+                  "w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all",
+                  isSearchOpen ? "bg-amber-500 text-white" : "bg-slate-100 dark:bg-slate-900 text-slate-400 hover:bg-slate-200"
+                )}
+              >
                 <Search size={20} className="sm:w-6 sm:h-6" />
+              </button>
+              <button 
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={cn(
+                  "w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all",
+                  isFilterOpen || minPrice || maxPrice ? "bg-amber-500 text-white" : "bg-slate-100 dark:bg-slate-900 text-slate-400 hover:bg-slate-200"
+                )}
+              >
+                <Settings size={20} className="sm:w-6 sm:h-6" />
               </button>
               <div className="relative" ref={langRef}>
                 <button 
@@ -1733,7 +1798,81 @@ export const ShopPage: React.FC = () => {
 
         {/* Main Content */}
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-4 sm:py-8 pb-32">
-        {/* Banner Slider */}
+          <AnimatePresence>
+            {isSearchOpen && (
+              <motion.div 
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="mb-6 overflow-hidden"
+              >
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                  <input 
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Tafuta bidhaa, duka, au eneo..."
+                    className="w-full pl-12 pr-4 py-4 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-[24px] font-bold text-slate-900 dark:text-white focus:border-amber-400 outline-none transition-all shadow-sm"
+                    autoFocus
+                  />
+                  {searchQuery && (
+                    <button 
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X size={20} />
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {isFilterOpen && (
+              <motion.div 
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="mb-6 overflow-hidden"
+              >
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border-2 border-slate-100 dark:border-slate-800 shadow-xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-black text-slate-900 dark:text-white">Chuja kwa Bei</h3>
+                    <button 
+                      onClick={() => { setMinPrice(''); setMaxPrice(''); }}
+                      className="text-xs font-black text-amber-600 uppercase tracking-widest hover:underline"
+                    >
+                      Futa Zote
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bei ya Chini ({currency})</label>
+                      <input 
+                        type="number"
+                        value={minPrice}
+                        onChange={(e) => setMinPrice(e.target.value)}
+                        placeholder="0"
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl font-bold text-slate-900 dark:text-white outline-none focus:border-amber-400 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bei ya Juu ({currency})</label>
+                      <input 
+                        type="number"
+                        value={maxPrice}
+                        onChange={(e) => setMaxPrice(e.target.value)}
+                        placeholder="Mwisho"
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl font-bold text-slate-900 dark:text-white outline-none focus:border-amber-400 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Banner Slider */}
         {(systemSettings?.banners?.length > 0 ? systemSettings.banners : [{ image: 'https://img.freepik.com/free-vector/diwali-sale-banner-with-realistic-diya-lamps_1017-21157.jpg', link: '#' }]).map((banner: any, idx: number, arr: any[]) => (
           idx === (Math.floor(Date.now() / 5000) % arr.length) && (
             <div key={idx} className="mb-8 relative group overflow-hidden rounded-[40px] aspect-[21/10] sm:aspect-[21/8] shadow-xl shadow-slate-200 dark:shadow-none">
@@ -1752,6 +1891,7 @@ export const ShopPage: React.FC = () => {
         ))}
         {activeTab === 'forum' && <Forum />}
         {activeTab === 'vaccination' && <VaccinationCalendar />}
+        {activeTab === 'livestock' && <LivestockManager />}
         {activeTab === 'chat' && (
           <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 h-[600px] overflow-hidden shadow-xl">
             {activeChat ? (
@@ -1802,7 +1942,7 @@ export const ShopPage: React.FC = () => {
                 </div>
                 <div className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
                   {offers.filter(o => !o.expiryDate || new Date(o.expiryDate) >= new Date()).map(offer => {
-                    const vendor = vendors.find(v => v.id === offer.vendorId);
+                    const vendor = Array.isArray(vendors) ? vendors.find(v => v.id === offer.vendorId) : undefined;
                     return (
                       <div key={offer.id} className="flex-shrink-0 w-[280px] sm:w-[320px] bg-gradient-to-br from-amber-500 to-orange-600 rounded-[32px] p-6 text-white shadow-lg shadow-amber-500/20 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-white/20 transition-all" />
@@ -2394,7 +2534,7 @@ export const ShopPage: React.FC = () => {
                     <div className="grid grid-cols-1 gap-3">
                       {user.role === 'admin' && (
                         <button 
-                          onClick={() => { setView('dashboard'); setIsProfileModalOpen(false); }}
+                          onClick={() => { navigate('/admin'); setIsProfileModalOpen(false); }}
                           className="w-full flex items-center justify-between p-4 bg-slate-900 text-white rounded-2xl font-black text-sm hover:bg-slate-800 transition-all"
                         >
                           <div className="flex items-center gap-3">
@@ -2404,9 +2544,9 @@ export const ShopPage: React.FC = () => {
                           <ChevronRight size={16} />
                         </button>
                       )}
-                      {user.role === 'vendor' && (
+                      {(user.role === 'vendor' || user.role === 'admin') && (
                         <button 
-                          onClick={() => { setView('dashboard'); setIsProfileModalOpen(false); }}
+                          onClick={() => { navigate('/vendor'); setIsProfileModalOpen(false); }}
                           className="w-full flex items-center justify-between p-4 bg-amber-600 text-white rounded-2xl font-black text-sm hover:bg-amber-700 transition-all"
                         >
                           <div className="flex items-center gap-3">
@@ -4231,7 +4371,7 @@ export const ShopPage: React.FC = () => {
 
               <button 
                 onClick={() => {
-                  const vendor = vendors.find(v => v.id === selectedProduct?.vendorId);
+                  const vendor = Array.isArray(vendors) ? vendors.find(v => v.id === selectedProduct?.vendorId) : undefined;
                   const msg = payMethod === 'wallet' 
                     ? `Habari Admin,\n\nKuna order mpya imelipwa kwa Wallet.\n\n📦 Product: *${selectedProduct?.name}*\n👤 Buyer: *${user?.name}*\n💳 Payment Method: Wallet\n💰 Amount: *${formatCurrency(selectedProduct?.price * qty + (deliveryMethod === 'city' ? (selectedProduct?.deliveryCity || 0) : deliveryMethod === 'out' ? (selectedProduct?.deliveryOut || 0) : 0), currency)}*\n🧑💼 Seller: *${vendor?.shopName || vendor?.name || 'N/A'}*\n📞 Seller Phone: *${vendor?.phone || 'N/A'}*`
                     : `Habari,\n\nNimelipia bidhaa kwenye app.\n\n📦 Product: *${selectedProduct?.name}*\n👤 Jina la Mnunuzi: *${user?.name}*\n\n💳 Njia ya Malipo: *${payMethod.toUpperCase()}*\n\n📱 Namba ya Mtumaji: *${senderPhone}*\n💰 Kiasi: *${formatCurrency(Number(sentAmount), currency)}*\n🔑 Transaction ID: *${transactionId}*\n\n🧑💼 Muuzaji wa Product: *${vendor?.shopName || vendor?.name || 'N/A'}*\n📞 Namba ya Muuzaji: *${vendor?.phone || 'N/A'}*\n\nAsante.`;
@@ -4531,7 +4671,7 @@ export const ShopPage: React.FC = () => {
                       setIsAuthModalOpen(true);
                     } else {
                       const firstItem = cart[0];
-                      const product = products.find(p => p.id === firstItem.productId);
+                      const product = Array.isArray(products) ? products.find(p => p.id === firstItem.productId) : undefined;
                       if (product) {
                         setSelectedProduct(product);
                         setQty(firstItem.qty);
@@ -4677,7 +4817,7 @@ export const ShopPage: React.FC = () => {
         isOpen={!!activeLiveRoomId} 
         onClose={() => setActiveLiveRoomId(null)} 
         roomId={activeLiveRoomId || ''} 
-        isHost={activeLiveRoomId && user?.id ? liveSessions.find(s => s.roomId === activeLiveRoomId)?.hostId === user.id : false} 
+        isHost={activeLiveRoomId && user?.id && Array.isArray(liveSessions) ? liveSessions.find(s => s.roomId === activeLiveRoomId)?.hostId === user.id : false} 
         userId={user?.id || `guest_${Math.floor(Math.random() * 10000)}`} 
         userName={user?.name || 'Mteja'} 
       />

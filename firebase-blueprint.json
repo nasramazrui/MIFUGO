@@ -1,0 +1,69 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents a user in the system.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "user", "vendor"] },
+        "walletBalance": { "type": "number" },
+        "referralCode": { "type": "string" },
+        "referredBy": { "type": "string" },
+        "theme": { "type": "string", "enum": ["light", "dark"] },
+        "language": { "type": "string", "enum": ["en", "sw"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email", "role"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Represents a product for sale.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "vendorId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "price", "vendorId"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Represents a purchase order.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "vendorId": { "type": "string" },
+        "total": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "vendorId", "total", "status"]
+    }
+  },
+  "firestore": {
+    "kuku_users/{userId}": {
+      "schema": "User",
+      "description": "Collection of users."
+    },
+    "kuku_products/{productId}": {
+      "schema": "Product",
+      "description": "Collection of products."
+    },
+    "kuku_orders/{orderId}": {
+      "schema": "Order",
+      "description": "Collection of orders."
+    },
+    "kuku_activity/{activityId}": {
+      "schema": "Activity",
+      "description": "Collection of user activities."
+    },
+    "kuku_config/settings": {
+      "schema": "object",
+      "description": "System settings."
+    }
+  }
+}
