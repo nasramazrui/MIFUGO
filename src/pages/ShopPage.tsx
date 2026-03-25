@@ -9,7 +9,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell, BookOpen, Tag, FileText, Syringe, QrCode, CheckCircle2, MessageCircle, Video } from 'lucide-react';
+import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell, BookOpen, Tag, FileText, Syringe, QrCode, CheckCircle2, MessageCircle, Video, Activity, Clock, Save } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth, collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc, getDoc, createUserWithEmailAndPassword, updateProfile, deleteUser, updatePassword, handleFirestoreError, OperationType } from '../services/firebase';
 import { getAuthEmail, isEmail } from '../utils/authUtils';
@@ -31,12 +31,15 @@ import { NotificationsModal } from '../components/NotificationsModal';
 import { AcademyPage } from './AcademyPage';
 import LivestockManager from './LivestockManager';
 
+import { ManualPaymentModal } from '../components/ManualPaymentModal';
+import { QRCodeModal } from '../components/QRCodeModal';
+
 export const ShopPage: React.FC = () => {
   const navigate = useNavigate();
-  const { products, user, vendors, orders, setOrders, addActivity, addNotification, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty, notifications, academyPosts, offers, livestockHealthRecords, liveSessions } = useApp();
+  const { products, user, vendors, doctors, orders, setOrders, addActivity, addNotification, reviews, statuses, categories, auctions, walletTransactions, logout, systemSettings, t, theme, setTheme, language, setLanguage, setView, cart, addToCart, removeFromCart, updateCartQty, notifications, academyPosts, offers, livestockHealthRecords, liveSessions } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const unreadNotifications = (Array.isArray(notifications) ? notifications : []).filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
-  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'auctions' | 'academy' | 'forum' | 'vaccination' | 'chat' | 'livestock'>('browse');
+  const [activeTab, setActiveTab] = useState<'browse' | 'stores' | 'orders' | 'auctions' | 'academy' | 'forum' | 'vaccination' | 'chat' | 'doctors'>('browse');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeChat, setActiveChat] = useState<{ id: string, name: string } | null>(null);
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
@@ -79,6 +82,9 @@ export const ShopPage: React.FC = () => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState<{ amount: number; reason: string; actionType: string; targetId?: string; extraData?: any } | null>(null);
   const handleDownloadInvoice = async (order: any) => {
     try {
       const doc = await generateInvoicePDF(order, systemSettings);
@@ -123,6 +129,16 @@ export const ShopPage: React.FC = () => {
   const handleQRScan = async (decodedText: string) => {
     try {
       const data = JSON.parse(decodedText);
+      
+      // Handle livestock JSON (with or without type field)
+      if (data.id && (data.tag || data.species || data.type === 'livestock')) {
+        playBeep();
+        if (navigator.vibrate) navigator.vibrate([200]);
+        setIsQRScannerOpen(false);
+        navigate(`/livestock/${data.id}`);
+        return;
+      }
+
       if (data.type === 'payment' && data.vendorId) {
         const vendor = Array.isArray(vendors) ? vendors.find(v => v.id === data.vendorId) : undefined;
         if (vendor) {
@@ -579,7 +595,30 @@ export const ShopPage: React.FC = () => {
   };
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isRegChoiceModalOpen, setIsRegChoiceModalOpen] = useState(false);
   const [isVendorRegModalOpen, setIsVendorRegModalOpen] = useState(false);
+  const [isDoctorRegModalOpen, setIsDoctorRegModalOpen] = useState(false);
+  const [isDoctorLoading, setIsDoctorLoading] = useState(false);
+  const [doctorFormData, setDoctorFormData] = useState({
+    fullName: '',
+    phone: '',
+    email: '',
+    password: '',
+    qualification: '',
+    licenseNumber: '',
+    experienceYears: '',
+    specialization: 'Mixed',
+    region: '',
+    district: '',
+    village: '',
+    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    workingHours: '08:00 - 17:00',
+    consultationFee: '',
+    offersEmergency: false,
+    licenseImage: '',
+    avatar: '',
+    bio: ''
+  });
   const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [selectedVendor, setSelectedVendor] = useState<any>(null);
@@ -682,6 +721,88 @@ export const ShopPage: React.FC = () => {
       toast.error(error.message || 'Hitilafu wakati wa kutuma maombi');
     } finally {
       setIsWithdrawLoading(false);
+    }
+  };
+
+  const handleDoctorRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsDoctorLoading(true);
+    try {
+      if (user) {
+        // Upgrade existing user
+        const doctorData = {
+          role: 'doctor',
+          status: 'pending',
+          qualification: doctorFormData.qualification,
+          licenseNumber: doctorFormData.licenseNumber,
+          experienceYears: Number(doctorFormData.experienceYears),
+          specialization: doctorFormData.specialization,
+          region: doctorFormData.region,
+          district: doctorFormData.district,
+          village: doctorFormData.village,
+          openDays: doctorFormData.availableDays,
+          openTime: doctorFormData.workingHours.split(' - ')[0],
+          closeTime: doctorFormData.workingHours.split(' - ')[1],
+          consultationFee: Number(doctorFormData.consultationFee),
+          offersEmergency: doctorFormData.offersEmergency,
+          licenseImage: doctorFormData.licenseImage,
+          avatar: doctorFormData.avatar,
+          bio: doctorFormData.bio,
+          updatedAt: serverTimestamp()
+        };
+        
+        await updateDoc(doc(db, 'kuku_users', user.id), doctorData);
+        addActivity('🩺', `Mtumiaji "${user.name}" ameomba kuwa daktari wa mifugo`);
+        toast.success('Ombi lako limetumwa! Subiri idhini ya Admin.');
+      } else {
+        // Create new account
+        const email = getAuthEmail(doctorFormData.email || doctorFormData.phone);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, doctorFormData.password);
+        const fbUser = userCredential.user;
+        
+        await updateProfile(fbUser, { displayName: doctorFormData.fullName });
+        
+        const doctorData = {
+          name: doctorFormData.fullName,
+          email: doctorFormData.email,
+          phone: doctorFormData.phone,
+          role: 'doctor',
+          status: 'pending',
+          qualification: doctorFormData.qualification,
+          licenseNumber: doctorFormData.licenseNumber,
+          experienceYears: Number(doctorFormData.experienceYears),
+          specialization: doctorFormData.specialization,
+          region: doctorFormData.region,
+          district: doctorFormData.district,
+          village: doctorFormData.village,
+          openDays: doctorFormData.availableDays,
+          openTime: doctorFormData.workingHours.split(' - ')[0],
+          closeTime: doctorFormData.workingHours.split(' - ')[1],
+          consultationFee: Number(doctorFormData.consultationFee),
+          offersEmergency: doctorFormData.offersEmergency,
+          licenseImage: doctorFormData.licenseImage,
+          avatar: doctorFormData.avatar,
+          bio: doctorFormData.bio,
+          theme,
+          language,
+          createdAt: new Date().toISOString(),
+          serverCreatedAt: serverTimestamp()
+        };
+        
+        await setDoc(doc(db, 'kuku_users', fbUser.uid), doctorData);
+        addActivity('🩺', `Daktari mpya "${doctorFormData.fullName}" amejisajili`);
+        toast.success('Usajili umekamilika! Subiri idhini ya Admin.');
+      }
+      
+      const msg = `*Maombi ya Daktari wa Mifugo — ${systemSettings?.app_name || 'Digital Livestock Market Live'}*\n\nJina: ${doctorFormData.fullName}\nSimu: ${doctorFormData.phone}\nLeseni: ${doctorFormData.licenseNumber}\nUtaalamu: ${doctorFormData.specialization}\n\nTafadhali nihakikie.`;
+      window.open(`https://wa.me/${ADMIN_WA.replace(/\+/g,'')}?text=${encodeURIComponent(msg)}`);
+      
+      setIsDoctorRegModalOpen(false);
+    } catch (error: any) {
+      handleFirestoreError(error, OperationType.WRITE, 'kuku_users');
+      toast.error(error.message || 'Hitilafu wakati wa usajili');
+    } finally {
+      setIsDoctorLoading(false);
     }
   };
 
@@ -1048,7 +1169,7 @@ export const ShopPage: React.FC = () => {
     const actualDeliveryFee = deliveryMethod === 'pickup' ? 0 : deliveryFee;
     
     const subtotal = (p.price || 0) * qty;
-    const adminCommission = subtotal * 0.06;
+    const adminCommission = subtotal * ((systemSettings?.commissionRate || 6) / 100);
     const vendorNet = subtotal - adminCommission;
     const total = subtotal + actualDeliveryFee;
 
@@ -1243,6 +1364,60 @@ export const ShopPage: React.FC = () => {
       console.error('Error generating certificate:', error);
       toast.error('Imeshindwa kutengeneza cheti', { id: 'cert-toast' });
       certElement.style.display = 'none';
+    }
+  };
+
+  const handleManualPaymentSubmit = async (details: { network: string; senderPhone: string; senderName: string; amount: number; sms: string }) => {
+    if (!paymentDetails || !user) return;
+
+    const { amount, reason, actionType, targetId, extraData } = paymentDetails;
+    
+    try {
+      // Save to Firestore
+      await addDoc(collection(db, 'kuku_manual_payments'), {
+        userId: user.id,
+        userName: user.name,
+        userPhone: user.phone || user.contact || '',
+        amount,
+        reason,
+        actionType,
+        targetId: targetId || null,
+        extraData: extraData || null,
+        network: details.network,
+        senderPhone: details.senderPhone,
+        senderName: details.senderName,
+        sms: details.sms,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+
+      // Construct WhatsApp message for Admin
+      const msg = `*MALIPO MAPYA (MANUAL)* 💰
+------------------------
+*Sababu:* ${reason}
+*Kiasi:* ${amount.toLocaleString()} TZS
+*Mtandao:* ${details.network}
+*Namba Iliyotuma:* ${details.senderPhone}
+*Jina la Aliyetuma:* ${details.senderName}
+*Mtumiaji:* ${user.name} (${user.phone || user.contact || 'No Contact'})
+*Aina ya Action:* ${actionType}
+${targetId ? `*Target ID:* ${targetId}\n` : ''}
+*SMS ya Uthibitisho:*
+"${details.sms}"
+------------------------
+Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
+
+      const adminPhone = systemSettings?.adminWhatsApp || '255764225358';
+      const waUrl = `https://wa.me/${adminPhone.replace(/\+/g, '')}?text=${encodeURIComponent(msg)}`;
+      
+      window.open(waUrl, '_blank');
+      
+      setPaymentModalOpen(false);
+      setPaymentDetails(null);
+      toast.success('Taarifa za malipo zimetumwa kwa Admin kikamilifu. Tafadhali subiri uhakiki.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'kuku_manual_payments');
+      toast.error('Imeshindwa kutuma taarifa za malipo. Tafadhali jaribu tena.');
     }
   };
 
@@ -1482,6 +1657,7 @@ export const ShopPage: React.FC = () => {
                     { id: 'browse', label: t('market'), icon: ShoppingBag },
                     { id: 'auctions', label: t('auctions'), icon: Gavel },
                     { id: 'stores', label: t('stores'), icon: Store },
+                    { id: 'doctors', label: 'Madaktari', icon: Activity },
                     { id: 'orders', label: t('orders'), icon: Package },
                     { id: 'cart', label: t('cart_title'), icon: ShoppingCart },
                     { id: 'profile', label: t('profile'), icon: UserIcon },
@@ -1525,12 +1701,12 @@ export const ShopPage: React.FC = () => {
                   <button 
                     onClick={() => {
                       setIsMobileMenuOpen(false);
-                      setIsVendorRegModalOpen(true);
+                      setIsRegChoiceModalOpen(true);
                     }}
                     className="w-full bg-gradient-to-br from-amber-500 to-amber-600 text-white p-5 rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-600/20 hover:shadow-amber-600/40 transition-all active:scale-95 group flex items-center justify-center gap-3"
                   >
                     <Store size={18} className="group-hover:rotate-12 transition-transform" />
-                    {t('register_store')}
+                    {t('register_store')} / {t('register_doctor')}
                   </button>
                 </div>
               </div>
@@ -1590,6 +1766,7 @@ export const ShopPage: React.FC = () => {
               { id: 'browse', label: t('market'), icon: ShoppingBag },
               { id: 'auctions', label: t('auctions'), icon: Gavel },
               { id: 'stores', label: t('stores'), icon: Store },
+              { id: 'doctors', label: 'Madaktari', icon: Activity },
               { id: 'orders', label: t('orders'), icon: Package },
               { id: 'chat', label: t('chat'), icon: Send },
               { id: 'vaccination', label: t('vaccination'), icon: Syringe },
@@ -1633,11 +1810,11 @@ export const ShopPage: React.FC = () => {
 
           <div className="mt-8">
             <button 
-              onClick={() => setIsVendorRegModalOpen(true)}
+              onClick={() => setIsRegChoiceModalOpen(true)}
               className="w-full bg-gradient-to-br from-amber-500 to-amber-600 text-white p-5 rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-600/20 hover:shadow-amber-600/40 transition-all active:scale-95 group flex items-center justify-center gap-3"
             >
               <Store size={18} className="group-hover:rotate-12 transition-transform" />
-              {t('register_store')}
+              {t('register_store')} / {t('register_doctor')}
             </button>
           </div>
         </div>
@@ -1891,7 +2068,6 @@ export const ShopPage: React.FC = () => {
         ))}
         {activeTab === 'forum' && <Forum />}
         {activeTab === 'vaccination' && <VaccinationCalendar />}
-        {activeTab === 'livestock' && <LivestockManager />}
         {activeTab === 'chat' && (
           <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 h-[600px] overflow-hidden shadow-xl">
             {activeChat ? (
@@ -2281,6 +2457,151 @@ export const ShopPage: React.FC = () => {
           </motion.div>
         )}
 
+        {activeTab === 'doctors' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white">🩺 Madaktari wa Mifugo</h2>
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Tafuta daktari, eneo, au utaalamu..." 
+                  className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {doctors.filter(d => 
+                d.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                (d.region && d.region.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                (d.district && d.district.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                (d.specialization && d.specialization.toLowerCase().includes(searchQuery.toLowerCase()))
+              ).length === 0 ? (
+                <div className="col-span-full py-20 text-center">
+                  <div className="w-20 h-20 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center text-4xl mx-auto mb-4">🩺</div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Hakuna daktari aliyepatikana</h3>
+                  <p className="text-slate-500 dark:text-slate-400">Jaribu kutafuta kwa jina, eneo au utaalamu mwingine.</p>
+                </div>
+              ) : (
+                doctors.filter(d => 
+                  d.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  (d.region && d.region.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                  (d.district && d.district.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                  (d.specialization && d.specialization.toLowerCase().includes(searchQuery.toLowerCase()))
+                ).map(d => (
+                  <div 
+                    key={d.id}
+                    className="bg-white dark:bg-slate-900 rounded-[28px] border border-blue-100 dark:border-slate-800 p-6 shadow-sm hover:shadow-xl transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-3xl font-black text-blue-800 dark:text-blue-500 group-hover:scale-110 transition-transform overflow-hidden">
+                        {d.avatar ? (
+                          <img src={d.avatar} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          d.name[0].toUpperCase()
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-black text-slate-900 dark:text-white">{d.name}</h3>
+                          {d.isTopDoctor && (
+                            <span className="bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                              <Star size={10} /> Top
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400">📍 {d.region}, {d.district}</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-[10px] font-black text-blue-600 dark:text-blue-500 uppercase tracking-widest">{d.qualification}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                        <span>Utaalamu:</span>
+                        <span className="text-slate-900 dark:text-slate-300 uppercase">{d.specialization}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                        <span>Uzoefu:</span>
+                        <span className="text-slate-900 dark:text-slate-300">{d.experienceYears} Miaka</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                        <span>Gharama:</span>
+                        <span className="text-emerald-600 font-black">{formatCurrency(d.consultationFee || 0, currency)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-2 h-2 rounded-full", d.offersEmergency ? "bg-emerald-500" : "bg-slate-300")} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          {d.offersEmergency ? 'Emergency Ready' : 'No Emergency'}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        {user?.id === d.id ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPaymentDetails({
+                                amount: systemSettings?.topDoctorFee || 15000,
+                                reason: `Malipo ya Top Doctor (Mwezi 1)`,
+                                actionType: 'top_doctor_subscription',
+                                targetId: d.id,
+                                extraData: { doctorId: d.id }
+                              });
+                              setPaymentModalOpen(true);
+                            }}
+                            className="bg-amber-500 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all flex items-center gap-1"
+                          >
+                            <Star size={12} /> Kuwa Top Doctor
+                          </button>
+                        ) : (
+                          <>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(`tel:${d.phone}`);
+                              }}
+                              className="w-8 h-8 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center hover:bg-blue-100 transition-colors"
+                              title="Piga Simu"
+                            >
+                              <Activity size={14} />
+                            </button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!user) {
+                                  setIsAuthModalOpen(true);
+                                  return;
+                                }
+                                setPaymentDetails({
+                                  amount: d.consultationFee || 0,
+                                  reason: `Ushauri wa Daktari: ${d.name}`,
+                                  actionType: 'doctor_consultation',
+                                  targetId: d.id,
+                                  extraData: { doctorPhone: d.phone }
+                                });
+                                setPaymentModalOpen(true);
+                              }}
+                              className="bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all flex items-center gap-1"
+                            >
+                              <MessageCircle size={12} /> Lipia Ushauri
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'orders' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
              <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6">📦 {t('orders')}</h2>
@@ -2385,6 +2706,14 @@ export const ShopPage: React.FC = () => {
           >
             <Store size={22} strokeWidth={2.5} />
             <span className="text-[9px] font-black uppercase tracking-[0.15em]">MADUKA</span>
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('doctors')}
+            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'doctors' ? "text-amber-500" : "text-slate-500")}
+          >
+            <Activity size={22} strokeWidth={2.5} />
+            <span className="text-[9px] font-black uppercase tracking-[0.15em]">DOKTA</span>
           </button>
 
           <button 
@@ -2655,6 +2984,293 @@ export const ShopPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Registration Choice Modal */}
+      <Modal
+        isOpen={isRegChoiceModalOpen}
+        onClose={() => setIsRegChoiceModalOpen(false)}
+        title={t('register_choice_title')}
+      >
+        <div className="grid grid-cols-1 gap-4 p-2">
+          <button
+            onClick={() => {
+              setIsRegChoiceModalOpen(false);
+              setIsVendorRegModalOpen(true);
+            }}
+            className="flex items-center gap-4 p-6 rounded-[24px] bg-amber-50 border-2 border-amber-100 hover:border-amber-500 transition-all group text-left"
+          >
+            <div className="w-16 h-16 rounded-2xl bg-amber-500 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/20 group-hover:scale-110 transition-transform">
+              🏪
+            </div>
+            <div>
+              <h4 className="font-black text-slate-900 uppercase tracking-tight">{t('register_choice_store')}</h4>
+              <p className="text-xs text-slate-500 font-medium">Uza mifugo, chakula na dawa</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsRegChoiceModalOpen(false);
+              setIsDoctorRegModalOpen(true);
+            }}
+            className="flex items-center gap-4 p-6 rounded-[24px] bg-blue-50 border-2 border-blue-100 hover:border-blue-500 transition-all group text-left"
+          >
+            <div className="w-16 h-16 rounded-2xl bg-blue-500 flex items-center justify-center text-3xl shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-transform">
+              🩺
+            </div>
+            <div>
+              <h4 className="font-black text-slate-900 uppercase tracking-tight">{t('register_choice_doctor')}</h4>
+              <p className="text-xs text-slate-500 font-medium">Toa huduma za kitaalamu kwa wafugaji</p>
+            </div>
+          </button>
+        </div>
+      </Modal>
+
+      {/* Doctor Registration Modal */}
+      <Modal
+        isOpen={isDoctorRegModalOpen}
+        onClose={() => setIsDoctorRegModalOpen(false)}
+        title={t('register_doctor')}
+      >
+        <form onSubmit={handleDoctorRegister} className="space-y-6">
+          <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-start gap-3 mb-4">
+            <span className="text-2xl">🩺</span>
+            <p className="text-xs text-blue-800 leading-relaxed">
+              Sajili wasifu wako kama daktari wa mifugo. Maelezo yako yatahakikiwa na Admin kabla ya kuonekana kwa wafugaji.
+            </p>
+          </div>
+
+          {/* Basic Info */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+              <UserIcon size={16} /> {t('doctor_basic_info')}
+            </h4>
+            {!user && (
+              <>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{t('name')} *</label>
+                    <input 
+                      type="text" required className="input-field" placeholder="Dr. John Doe"
+                      value={doctorFormData.fullName} onChange={e => setDoctorFormData({...doctorFormData, fullName: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{t('whatsapp')} *</label>
+                    <input 
+                      type="tel" required className="input-field" placeholder="0712345678"
+                      value={doctorFormData.phone} onChange={e => setDoctorFormData({...doctorFormData, phone: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{t('email')} (Optional)</label>
+                    <input 
+                      type="email" className="input-field" placeholder="doctor@example.com"
+                      value={doctorFormData.email} onChange={e => setDoctorFormData({...doctorFormData, email: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{t('password')} *</label>
+                    <input 
+                      type="password" required className="input-field" placeholder="••••••••"
+                      value={doctorFormData.password} onChange={e => setDoctorFormData({...doctorFormData, password: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Professional Info */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+              <Gavel size={16} /> {t('doctor_prof_info')}
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{t('qualification')} *</label>
+                <input 
+                  type="text" required className="input-field" placeholder="Diploma in Animal Health"
+                  value={doctorFormData.qualification} onChange={e => setDoctorFormData({...doctorFormData, qualification: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{t('license_number')} *</label>
+                <input 
+                  type="text" required className="input-field" placeholder="VET-12345"
+                  value={doctorFormData.licenseNumber} onChange={e => setDoctorFormData({...doctorFormData, licenseNumber: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{t('experience_years')} *</label>
+                <input 
+                  type="number" required className="input-field" placeholder="5"
+                  value={doctorFormData.experienceYears} onChange={e => setDoctorFormData({...doctorFormData, experienceYears: e.target.value})}
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{t('specialization')} *</label>
+                <select 
+                  className="input-field"
+                  value={doctorFormData.specialization} onChange={e => setDoctorFormData({...doctorFormData, specialization: e.target.value})}
+                >
+                  <option value="Mixed">Mixed (Mchanganyiko)</option>
+                  <option value="Cattle">Cattle (Ng'ombe)</option>
+                  <option value="Poultry">Poultry (Kuku)</option>
+                  <option value="Small Ruminants">Small Ruminants (Mbuzi/Kondoo)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Location */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+              <MapPin size={16} /> {t('doctor_location')}
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Mkoa *</label>
+                <input 
+                  type="text" required className="input-field" placeholder="Dar es Salaam"
+                  value={doctorFormData.region} onChange={e => setDoctorFormData({...doctorFormData, region: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Wilaya *</label>
+                <input 
+                  type="text" required className="input-field" placeholder="Kinondoni"
+                  value={doctorFormData.district} onChange={e => setDoctorFormData({...doctorFormData, district: e.target.value})}
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Kijiji / Mtaa</label>
+                <input 
+                  type="text" className="input-field" placeholder="Mbezi Juu"
+                  value={doctorFormData.village} onChange={e => setDoctorFormData({...doctorFormData, village: e.target.value})}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Availability */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+              <Clock size={16} /> {t('doctor_availability')}
+            </h4>
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Siku za Kazi</label>
+                <div className="flex flex-wrap gap-2">
+                  {DAYS.map(day => (
+                    <button
+                      key={day.key}
+                      type="button"
+                      onClick={() => {
+                        const current = [...doctorFormData.availableDays];
+                        if (current.includes(day.key)) {
+                          setDoctorFormData({...doctorFormData, availableDays: current.filter(d => d !== day.key)});
+                        } else {
+                          setDoctorFormData({...doctorFormData, availableDays: [...current, day.key]});
+                        }
+                      }}
+                      className={cn(
+                        "px-3 py-2 rounded-xl text-xs font-bold transition-all",
+                        doctorFormData.availableDays.includes(day.key)
+                          ? "bg-blue-500 text-white"
+                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                      )}
+                    >
+                      {day.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Masaa ya Kazi</label>
+                <input 
+                  type="text" className="input-field" placeholder="08:00 - 17:00"
+                  value={doctorFormData.workingHours} onChange={e => setDoctorFormData({...doctorFormData, workingHours: e.target.value})}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Service Info */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+              <ShoppingBag size={16} /> {t('doctor_service_info')}
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{t('consultation_fee')} (TZS)</label>
+                <input 
+                  type="number" className="input-field" placeholder="20000"
+                  value={doctorFormData.consultationFee} onChange={e => setDoctorFormData({...doctorFormData, consultationFee: e.target.value})}
+                />
+              </div>
+              <div className="flex items-end pb-2">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative">
+                    <input 
+                      type="checkbox" className="sr-only"
+                      checked={doctorFormData.offersEmergency} onChange={e => setDoctorFormData({...doctorFormData, offersEmergency: e.target.checked})}
+                    />
+                    <div className={cn("w-10 h-6 rounded-full transition-colors", doctorFormData.offersEmergency ? "bg-red-500" : "bg-slate-200")}></div>
+                    <div className={cn("absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform", doctorFormData.offersEmergency ? "translate-x-4" : "")}></div>
+                  </div>
+                  <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{t('offers_emergency')}</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Verification */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+              <Activity size={16} /> {t('doctor_verification')}
+            </h4>
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{t('license_image')} (Link) *</label>
+                <input 
+                  type="url" required className="input-field" placeholder="https://..."
+                  value={doctorFormData.licenseImage} onChange={e => setDoctorFormData({...doctorFormData, licenseImage: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Picha ya Wasifu (Link)</label>
+                <input 
+                  type="url" className="input-field" placeholder="https://..."
+                  value={doctorFormData.avatar} onChange={e => setDoctorFormData({...doctorFormData, avatar: e.target.value})}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Extra */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+              <MessageSquare size={16} /> {t('doctor_extra')}
+            </h4>
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{t('bio')}</label>
+              <textarea 
+                className="input-field min-h-[100px] py-3" placeholder="Elezea uzoefu wako..."
+                value={doctorFormData.bio} onChange={e => setDoctorFormData({...doctorFormData, bio: e.target.value})}
+              ></textarea>
+            </div>
+          </div>
+
+          <button 
+            type="submit" disabled={isDoctorLoading}
+            className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-blue-600/20 hover:shadow-blue-600/40 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
+          >
+            {isDoctorLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Save size={20} />}
+            {t('register')}
+          </button>
+        </form>
+      </Modal>
 
       {/* Vendor KYC Modal */}
       <Modal 
@@ -3387,9 +4003,17 @@ export const ShopPage: React.FC = () => {
 
             {selectedProduct.isLivestock && (
               <div className="bg-emerald-50 dark:bg-emerald-900/10 p-6 rounded-[32px] border border-emerald-100 dark:border-emerald-900/30 space-y-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Tag size={18} className="text-emerald-600" />
-                  <h4 className="text-xs font-black text-emerald-900 dark:text-emerald-400 uppercase tracking-widest">Pasipoti ya Mfugo (Livestock Passport)</h4>
+                <div className="flex items-center gap-2 mb-2 justify-between">
+                  <div className="flex items-center gap-2">
+                    <Tag size={18} className="text-emerald-600" />
+                    <h4 className="text-xs font-black text-emerald-900 dark:text-emerald-400 uppercase tracking-widest">Pasipoti ya Mfugo (Livestock Passport)</h4>
+                  </div>
+                  <button 
+                    onClick={() => setQrModalOpen(true)}
+                    className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-xl hover:bg-emerald-200 transition-colors"
+                  >
+                    <QrCode size={18} />
+                  </button>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
@@ -3474,28 +4098,28 @@ export const ShopPage: React.FC = () => {
             {selectedProduct.isLivestock && (
               <div 
                 id="livestock-certificate" 
-                className="hidden absolute top-0 left-0 w-[800px] bg-white p-10 text-slate-900 z-[-100]"
-                style={{ fontFamily: 'sans-serif' }}
+                className="hidden absolute top-0 left-0 w-[800px] p-10 z-[-100]"
+                style={{ fontFamily: 'sans-serif', backgroundColor: '#ffffff', color: '#0f172a' }}
               >
-                <div className="border-8 border-emerald-600 p-8 rounded-3xl relative overflow-hidden">
+                <div className="p-8 rounded-3xl relative overflow-hidden" style={{ border: '8px solid #059669' }}>
                   {/* Watermark */}
                   <div className="absolute inset-0 opacity-5 flex items-center justify-center pointer-events-none">
                     <QrCode size={400} />
                   </div>
 
-                  <div className="flex justify-between items-start mb-10 border-b-2 border-slate-100 pb-6 relative z-10">
+                  <div className="flex justify-between items-start mb-10 pb-6 relative z-10" style={{ borderBottom: '2px solid #f1f5f9' }}>
                     <div>
-                      <h1 className="text-4xl font-black text-emerald-800 uppercase tracking-tighter mb-2">Digital Livestock Passport</h1>
-                      <p className="text-slate-500 font-bold uppercase tracking-widest">Cheti cha Mfugo & Afya</p>
+                      <h1 className="text-4xl font-black uppercase tracking-tighter mb-2" style={{ color: '#065f46' }}>Digital Livestock Passport</h1>
+                      <p className="font-bold uppercase tracking-widest" style={{ color: '#64748b' }}>Cheti cha Mfugo & Afya</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Tarehe</p>
+                      <p className="text-sm font-bold uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Tarehe</p>
                       <p className="text-lg font-black">{new Date().toLocaleDateString()}</p>
                     </div>
                   </div>
 
                   <div className="flex gap-8 mb-10 relative z-10">
-                    <div className="w-64 h-64 bg-slate-50 rounded-3xl border-4 border-emerald-100 flex items-center justify-center overflow-hidden shrink-0">
+                    <div className="w-64 h-64 rounded-3xl flex items-center justify-center overflow-hidden shrink-0" style={{ backgroundColor: '#f8fafc', border: '4px solid #d1fae5' }}>
                       {selectedProduct.image ? (
                         <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
                       ) : (
@@ -3505,62 +4129,61 @@ export const ShopPage: React.FC = () => {
                     
                     <div className="flex-1 space-y-6">
                       <div>
-                        <h2 className="text-3xl font-black text-slate-900 mb-1">{selectedProduct.name}</h2>
-                        <p className="text-emerald-600 font-black text-xl">{formatCurrency(selectedProduct.price, currency)}</p>
+                        <h2 className="text-3xl font-black mb-1" style={{ color: '#0f172a' }}>{selectedProduct.name}</h2>
+                        <p className="font-black text-xl" style={{ color: '#059669' }}>{formatCurrency(selectedProduct.price, currency)}</p>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Tag Number</p>
-                          <p className="text-lg font-black text-slate-900">{selectedProduct.tagNumber || 'N/A'}</p>
+                        <div className="p-4 rounded-2xl" style={{ backgroundColor: '#f8fafc' }}>
+                          <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Tag Number</p>
+                          <p className="text-lg font-black" style={{ color: '#0f172a' }}>{selectedProduct.tagNumber || 'N/A'}</p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Breed / Uzao</p>
-                          <p className="text-lg font-black text-slate-900">{selectedProduct.breed || 'N/A'}</p>
+                        <div className="p-4 rounded-2xl" style={{ backgroundColor: '#f8fafc' }}>
+                          <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Breed / Uzao</p>
+                          <p className="text-lg font-black" style={{ color: '#0f172a' }}>{selectedProduct.breed || 'N/A'}</p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Umri</p>
-                          <p className="text-lg font-black text-slate-900">{selectedProduct.age || 'N/A'}</p>
+                        <div className="p-4 rounded-2xl" style={{ backgroundColor: '#f8fafc' }}>
+                          <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Umri</p>
+                          <p className="text-lg font-black" style={{ color: '#0f172a' }}>{selectedProduct.age || 'N/A'}</p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Uzito</p>
-                          <p className="text-lg font-black text-slate-900">{selectedProduct.weight ? `${selectedProduct.weight} Kg` : 'N/A'}</p>
+                        <div className="p-4 rounded-2xl" style={{ backgroundColor: '#f8fafc' }}>
+                          <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Uzito</p>
+                          <p className="text-lg font-black" style={{ color: '#0f172a' }}>{selectedProduct.weight ? `${selectedProduct.weight} Kg` : 'N/A'}</p>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <div className="mb-10 relative z-10">
-                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-widest mb-4 border-b-2 border-slate-100 pb-2">Historia ya Afya & Chanjo</h3>
+                    <h3 className="text-xl font-black uppercase tracking-widest mb-4 pb-2" style={{ color: '#0f172a', borderBottom: '2px solid #f1f5f9' }}>Historia ya Afya & Chanjo</h3>
                     {livestockHealthRecords.filter(r => r.productId === selectedProduct.id).length === 0 ? (
-                      <p className="text-slate-500 italic">Hakuna rekodi za afya zilizopatikana.</p>
+                      <p style={{ color: '#64748b', fontStyle: 'italic' }}>Hakuna rekodi za afya zilizopatikana.</p>
                     ) : (
                       <table className="w-full text-left border-collapse">
                         <thead>
-                          <tr className="border-b-2 border-slate-200">
-                            <th className="py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Tarehe</th>
-                            <th className="py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Aina</th>
-                            <th className="py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Maelezo</th>
-                            <th className="py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Daktari</th>
+                          <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                            <th className="py-3 text-xs font-black uppercase tracking-widest" style={{ color: '#94a3b8' }}>Tarehe</th>
+                            <th className="py-3 text-xs font-black uppercase tracking-widest" style={{ color: '#94a3b8' }}>Aina</th>
+                            <th className="py-3 text-xs font-black uppercase tracking-widest" style={{ color: '#94a3b8' }}>Maelezo</th>
+                            <th className="py-3 text-xs font-black uppercase tracking-widest" style={{ color: '#94a3b8' }}>Daktari</th>
                           </tr>
                         </thead>
                         <tbody>
                           {livestockHealthRecords
                             .filter(r => r.productId === selectedProduct.id)
                             .map(record => (
-                              <tr key={record.id} className="border-b border-slate-100">
-                                <td className="py-3 font-bold text-slate-900">{record.date}</td>
+                              <tr key={record.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td className="py-3 font-bold" style={{ color: '#0f172a' }}>{record.date}</td>
                                 <td className="py-3">
-                                  <span className={cn(
-                                    "px-3 py-1 rounded-full text-xs font-black uppercase",
-                                    record.type === 'vaccination' ? "bg-emerald-100 text-emerald-700" :
-                                    record.type === 'treatment' ? "bg-rose-100 text-rose-700" : "bg-blue-100 text-blue-700"
-                                  )}>
+                                  <span className="px-3 py-1 rounded-full text-xs font-black uppercase" style={{ 
+                                    backgroundColor: record.type === 'vaccination' ? '#d1fae5' : record.type === 'treatment' ? '#ffe4e6' : '#dbeafe',
+                                    color: record.type === 'vaccination' ? '#047857' : record.type === 'treatment' ? '#be123c' : '#1d4ed8'
+                                  }}>
                                     {record.type}
                                   </span>
                                 </td>
-                                <td className="py-3 text-sm text-slate-600">{record.title}</td>
-                                <td className="py-3 text-sm font-bold text-slate-900">{record.performedBy || '-'}</td>
+                                <td className="py-3 text-sm" style={{ color: '#475569' }}>{record.title}</td>
+                                <td className="py-3 text-sm font-bold" style={{ color: '#0f172a' }}>{record.performedBy || '-'}</td>
                               </tr>
                             ))}
                         </tbody>
@@ -3568,20 +4191,20 @@ export const ShopPage: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="flex justify-between items-end pt-6 border-t-2 border-slate-100 relative z-10">
+                  <div className="flex justify-between items-end pt-6 relative z-10" style={{ borderTop: '2px solid #f1f5f9' }}>
                     <div>
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Mmiliki / Muuzaji</p>
-                      <p className="text-xl font-black text-slate-900">{selectedProduct.vendorName}</p>
+                      <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Mmiliki / Muuzaji</p>
+                      <p className="text-xl font-black" style={{ color: '#0f172a' }}>{selectedProduct.vendorName}</p>
                     </div>
                     <div className="text-center">
-                      <div className="bg-white p-2 rounded-xl border-2 border-slate-200 inline-block mb-2">
+                      <div className="bg-white p-2 rounded-xl inline-block mb-2" style={{ border: '2px solid #e2e8f0' }}>
                         <QRCode 
                           value={`${window.location.origin}?productId=${selectedProduct.id}`}
                           size={100}
                           level="M"
                         />
                       </div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Scan for Verification</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#94a3b8' }}>Scan for Verification</p>
                     </div>
                   </div>
                 </div>
@@ -4821,6 +5444,29 @@ export const ShopPage: React.FC = () => {
         userId={user?.id || `guest_${Math.floor(Math.random() * 10000)}`} 
         userName={user?.name || 'Mteja'} 
       />
+
+      <ManualPaymentModal
+        isOpen={paymentModalOpen}
+        onClose={() => {
+          setPaymentModalOpen(false);
+          setPaymentDetails(null);
+        }}
+        amount={paymentDetails?.amount || 0}
+        reason={paymentDetails?.reason || ''}
+        systemSettings={systemSettings}
+        onSubmit={handleManualPaymentSubmit}
+      />
+
+      {selectedProduct && (
+        <QRCodeModal
+          isOpen={qrModalOpen}
+          onClose={() => setQrModalOpen(false)}
+          url={`${window.location.origin}/livestock/${selectedProduct.id}`}
+          title={selectedProduct.name}
+          subtitle={`Livestock ID: ${selectedProduct.tagNumber || selectedProduct.id.substring(0, 8).toUpperCase()} • ${selectedProduct.breed || 'Unknown'}`}
+          logo={selectedProduct.image}
+        />
+      )}
     </div>
   );
 };

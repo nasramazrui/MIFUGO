@@ -18,6 +18,7 @@ import { db,
   getDocs,
   getDoc,
   query,
+  onSnapshot,
   where,
   limit,
   handleFirestoreError,
@@ -38,6 +39,7 @@ import {
   X,
   TrendingUp,
   MapPin,
+  Activity,
   ShoppingBag,
   Bell,
   Settings,
@@ -86,6 +88,7 @@ export const AdminPanel: React.FC = () => {
     user,
     users, 
     vendors, 
+    doctors,
     admins,
     products, 
     orders, 
@@ -111,10 +114,27 @@ export const AdminPanel: React.FC = () => {
     t
   } = useApp();
   const currency = systemSettings?.currency || 'TZS';
-  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'prods' | 'orders' | 'users' | 'admins' | 'wallet' | 'settings' | 'status' | 'cats' | 'reviews' | 'announcements' | 'offers' | 'academy'>('over');
+  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'doctors' | 'prods' | 'orders' | 'users' | 'admins' | 'wallet' | 'settings' | 'status' | 'cats' | 'reviews' | 'announcements' | 'offers' | 'academy' | 'manual_payments'>('over');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
+
+  const [manualPayments, setManualPayments] = useState<any[]>([]);
+  const [isManualPaymentsLoading, setIsManualPaymentsLoading] = useState(false);
+
+  useEffect(() => {
+    if (user?.role !== 'admin') return;
+    setIsManualPaymentsLoading(true);
+    const unsubscribe = onSnapshot(collection(db, 'kuku_manual_payments'), (snapshot) => {
+      const paymentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setManualPayments(paymentsData.sort((a: any, b: any) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)));
+      setIsManualPaymentsLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'kuku_manual_payments');
+      setIsManualPaymentsLoading(false);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -504,8 +524,8 @@ export const AdminPanel: React.FC = () => {
   // Dynamic Analytics
   const totalRevenue = (Array.isArray(orders) ? orders : []).filter(o => o.status === 'delivered').reduce((s, o) => s + o.total, 0);
   const totalAdminEarnings = (Array.isArray(orders) ? orders : [])
-    .filter(o => o.status === 'delivered')
-    .reduce((s, o) => s + (o.adminCommission || (o.total - (o.deliveryFee || 0)) * 0.06), 0);
+    .filter(o => o.status === 'delivered' || o.status === 'completed')
+    .reduce((s, o) => s + (o.adminCommission || (o.total - (o.deliveryFee || 0)) * ((systemSettings?.commissionRate || 6) / 100)), 0);
   
   const regionStats = (Array.isArray(vendors) ? vendors : []).reduce((acc: any, v) => {
     const reg = v.region || 'Unknown';
@@ -703,6 +723,36 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  const approveDoctor = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'kuku_users', id), { status: 'approved' });
+      addActivity('🩺', `Daktari ameidhinishwa`);
+      // Notify User
+      await addNotification(
+        'Ombi la Daktari Limeidhinishwa! 🩺',
+        `Hongera! Ombi lako la kuwa daktari wa mifugo limeidhinishwa. Sasa unaweza kuonekana kwa wafugaji na kutoa huduma.`,
+        id,
+        'profile'
+      );
+
+      toast.success('Daktari ameidhinishwa');
+    } catch (error: any) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_users/${id}`);
+      toast.error('Hitilafu wakati wa kuidhinisha');
+    }
+  };
+
+  const rejectDoctor = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'kuku_users', id), { status: 'rejected' });
+      addActivity('✕', `Maombi ya daktari yamekataliwa`);
+      toast.success('Maombi yamekataliwa');
+    } catch (error: any) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_users/${id}`);
+      toast.error('Hitilafu wakati wa kukataa');
+    }
+  };
+
   const approveVendor = async (id: string) => {
     try {
       await updateDoc(doc(db, 'kuku_users', id), { status: 'approved' });
@@ -831,7 +881,9 @@ export const AdminPanel: React.FC = () => {
           {[
             { id: 'over', label: 'Muhtasari', icon: LayoutDashboard },
             { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+            { id: 'manual_payments', label: 'Malipo (Manual)', icon: Wallet },
             { id: 'vendors', label: 'Wauuzaji', icon: Store, badge: pendingVendors.length },
+            { id: 'doctors', label: 'Madaktari', icon: Activity, badge: (Array.isArray(users) ? users : []).filter(u => u.role === 'doctor' && u.status === 'pending').length },
             { id: 'prods', label: 'Bidhaa', icon: Package },
             { id: 'orders', label: 'Maagizo', icon: ClipboardList },
             { id: 'users', label: 'Watumiaji', icon: Users },
@@ -939,7 +991,9 @@ export const AdminPanel: React.FC = () => {
           {[
             { id: 'over', label: 'Muhtasari', icon: LayoutDashboard },
             { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+            { id: 'manual_payments', label: 'Malipo (Manual)', icon: Wallet },
             { id: 'vendors', label: 'Wauuzaji', icon: Store, badge: pendingVendors.length },
+            { id: 'doctors', label: 'Madaktari', icon: Activity, badge: (Array.isArray(users) ? users : []).filter(u => u.role === 'doctor' && u.status === 'pending').length },
             { id: 'prods', label: 'Bidhaa', icon: Package },
             { id: 'orders', label: 'Maagizo', icon: ClipboardList },
             { id: 'users', label: 'Watumiaji', icon: Users },
@@ -1040,16 +1094,17 @@ export const AdminPanel: React.FC = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6">
               {[
-                { label: 'Watumiaji', value: users.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+                { label: 'Watumiaji', value: users.filter(u => u.role === 'user').length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
                 { label: 'Wauuzaji', value: vendors.length, icon: Store, color: 'text-emerald-600', bg: 'bg-emerald-50', sub: `${pendingVendors.length} wanasubiri` },
+                { label: 'Madaktari', value: users.filter(u => u.role === 'doctor' && u.status === 'approved').length, icon: Activity, color: 'text-cyan-600', bg: 'bg-cyan-50', sub: `${users.filter(u => u.role === 'doctor' && u.status === 'pending').length} wanasubiri` },
                 { label: 'Bidhaa', value: products.length, icon: Package, color: 'text-amber-600', bg: 'bg-amber-50' },
                 { label: 'Maagizo', value: orders.length, icon: ClipboardList, color: 'text-red-600', bg: 'bg-red-50' },
                 { label: `Mapato Admin`, value: formatCurrency(totalAdminEarnings, currency), icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
               ].map((stat, i) => (
                 <div key={i} className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all group">
-                  <div className={cn("w-12 h-12 md:w-14 md:h-14 rounded-[16px] md:rounded-[20px] flex items-center justify-center mb-4 md:mb-6 group-hover:scale-110 transition-transform", stat.bg, stat.bg.includes('blue') && 'dark:bg-blue-900/20', stat.bg.includes('emerald') && 'dark:bg-emerald-900/20', stat.bg.includes('amber') && 'dark:bg-amber-900/20', stat.bg.includes('red') && 'dark:bg-red-900/20', stat.bg.includes('purple') && 'dark:bg-purple-900/20')}>
+                  <div className={cn("w-12 h-12 md:w-14 md:h-14 rounded-[16px] md:rounded-[20px] flex items-center justify-center mb-4 md:mb-6 group-hover:scale-110 transition-transform", stat.bg, stat.bg.includes('blue') && 'dark:bg-blue-900/20', stat.bg.includes('emerald') && 'dark:bg-emerald-900/20', stat.bg.includes('cyan') && 'dark:bg-cyan-900/20', stat.bg.includes('amber') && 'dark:bg-amber-900/20', stat.bg.includes('red') && 'dark:bg-red-900/20', stat.bg.includes('purple') && 'dark:bg-purple-900/20')}>
                     <stat.icon className={stat.color} size={24} />
                   </div>
                   <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
@@ -1326,6 +1381,104 @@ export const AdminPanel: React.FC = () => {
           </motion.div>
         )}
 
+        {activeTab === 'doctors' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <h2 className="text-3xl font-black text-slate-900 mb-8">Madaktari wa Mifugo</h2>
+            <div className="space-y-4">
+              {users.filter(u => u.role === 'doctor').length === 0 ? (
+                <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800">
+                  <Activity size={48} className="mx-auto text-slate-200 dark:text-slate-800 mb-4" />
+                  <p className="text-slate-400">Hakuna madaktari bado.</p>
+                </div>
+              ) : (
+                users.filter(u => u.role === 'doctor').map(d => (
+                  <div key={d.id} className="bg-white dark:bg-slate-900 rounded-[24px] md:rounded-[28px] border border-slate-100 dark:border-slate-800 p-5 md:p-6 flex flex-col shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center text-3xl font-black text-blue-800 dark:text-blue-500 overflow-hidden">
+                          {d.avatar ? <img src={d.avatar} className="w-full h-full object-cover" /> : d.name[0].toUpperCase()}
+                        </div>
+                        <div>
+                          <h4 className="font-black text-slate-900 dark:text-white">{d.name}</h4>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">{d.qualification} · {d.specialization}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={cn(
+                              "text-[9px] font-black px-2 py-0.5 rounded-full uppercase",
+                              d.status === 'approved' ? "bg-emerald-100 text-emerald-700" : 
+                              d.status === 'pending' ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                            )}>
+                              {d.status}
+                            </span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                              📍 {d.region}, {d.district}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {d.status === 'pending' && (
+                          <button 
+                            onClick={() => approveDoctor(d.id)}
+                            className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center hover:bg-emerald-600 transition-colors"
+                            title="Approve"
+                          >
+                            <Check size={20} />
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => rejectDoctor(d.id)}
+                          className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-100 transition-colors"
+                          title="Reject / Deactivate"
+                        >
+                          <X size={20} />
+                        </button>
+                        <button 
+                          onClick={() => deleteUser(d.id)}
+                          className="w-10 h-10 bg-slate-100 text-slate-500 rounded-xl flex items-center justify-center hover:bg-slate-200 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-50 dark:border-slate-800">
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase mb-1">License No</p>
+                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{d.licenseNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Experience</p>
+                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{d.experienceYears} Years</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Consultation</p>
+                        <p className="text-xs font-bold text-emerald-600">{formatCurrency(d.consultationFee || 0, currency)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Emergency</p>
+                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{d.offersEmergency ? 'YES' : 'NO'}</p>
+                      </div>
+                    </div>
+
+                    {d.licenseImage && (
+                      <div className="mt-4">
+                        <p className="text-[9px] font-black text-slate-400 uppercase mb-2">License Image</p>
+                        <a 
+                          href={d.licenseImage} target="_blank" rel="noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-[10px] font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200 transition-all"
+                        >
+                          <FileText size={14} /> View Document
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'prods' && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <h2 className="text-3xl font-black text-slate-900 mb-8">Bidhaa Zote</h2>
@@ -1561,7 +1714,7 @@ export const AdminPanel: React.FC = () => {
               </button>
             </div>
             <div className="grid gap-4">
-              {users.map(u => (
+              {users.filter(u => u.role === 'user').map(u => (
                 <div key={u.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-2xl font-black text-blue-800">
@@ -1639,6 +1792,190 @@ export const AdminPanel: React.FC = () => {
                 </div>
               ))}
             </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'manual_payments' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+              <h2 className="text-3xl font-black text-slate-900">Malipo (Manual)</h2>
+            </div>
+            
+            {isManualPaymentsLoading ? (
+              <div className="flex justify-center py-20">
+                <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : manualPayments.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-3xl border border-slate-100">
+                <Wallet className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                <p className="text-slate-500 font-bold">Hakuna malipo ya manual yaliyopatikana.</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-[32px] border border-slate-100 overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100">
+                        <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tarehe</th>
+                        <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Mtumiaji</th>
+                        <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kiasi</th>
+                        <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Sababu</th>
+                        <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Mtandao & SMS</th>
+                        <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                        <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Vitendo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {manualPayments.map((payment) => (
+                        <tr key={payment.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="p-4 text-sm font-bold text-slate-600">
+                            {payment.createdAt?.toDate().toLocaleDateString('sw-TZ')}
+                          </td>
+                          <td className="p-4">
+                            <div className="font-black text-slate-900">{payment.userName}</div>
+                            <div className="text-xs text-slate-500">{payment.userPhone}</div>
+                          </td>
+                          <td className="p-4 font-black text-emerald-600">
+                            {formatCurrency(payment.amount, currency)}
+                          </td>
+                          <td className="p-4">
+                            <div className="text-sm font-bold text-slate-700">{payment.reason}</div>
+                            <div className="text-[10px] text-slate-400 uppercase">{payment.actionType}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="text-xs font-bold text-slate-700 uppercase">{payment.network}</div>
+                            <div className="text-xs text-slate-500">{payment.senderName} ({payment.senderPhone})</div>
+                            <div className="text-[10px] text-slate-400 mt-1 italic max-w-[200px] truncate" title={payment.sms}>"{payment.sms}"</div>
+                          </td>
+                          <td className="p-4">
+                            <span className={cn(
+                              "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                              payment.status === 'approved' ? "bg-emerald-100 text-emerald-700" :
+                              payment.status === 'rejected' ? "bg-red-100 text-red-700" :
+                              "bg-amber-100 text-amber-700"
+                            )}>
+                              {payment.status}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right">
+                            {payment.status === 'pending' && (
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm('Je, una uhakika unataka kuidhinisha malipo haya?')) return;
+                                    try {
+                                      await updateDoc(doc(db, 'kuku_manual_payments', payment.id), { status: 'approved' });
+                                      
+                                      // Handle specific actions based on actionType
+                                      if (payment.actionType === 'vendor_subscription') {
+                                        await updateDoc(doc(db, 'kuku_users', payment.userId), {
+                                          subscriptionStatus: 'active',
+                                          subscriptionPlan: payment.extraData?.plan || 'monthly',
+                                          subscriptionExpiry: new Date(Date.now() + (payment.extraData?.plan === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString()
+                                        });
+                                      } else if (payment.actionType === 'doctor_consultation') {
+                                        // Maybe add to doctor's wallet or create an appointment record
+                                        if (payment.targetId) {
+                                          await updateDoc(doc(db, 'kuku_users', payment.targetId), {
+                                            walletBalance: increment(payment.amount * (1 - ((systemSettings?.commissionRate || 0) / 100)))
+                                          });
+                                          await addDoc(collection(db, 'kuku_wallet'), {
+                                            userId: payment.targetId,
+                                            userName: 'Doctor',
+                                            amount: payment.amount * (1 - ((systemSettings?.commissionRate || 0) / 100)),
+                                            type: 'consultation',
+                                            status: 'approved',
+                                            description: `Malipo ya ushauri kutoka kwa ${payment.userName}`,
+                                            date: new Date().toISOString().split('T')[0],
+                                            createdAt: serverTimestamp()
+                                          });
+                                        }
+                                      } else if (payment.actionType === 'top_doctor_subscription') {
+                                        if (payment.targetId) {
+                                          await updateDoc(doc(db, 'kuku_users', payment.targetId), {
+                                            isTopDoctor: true,
+                                            topDoctorExpiry: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+                                          });
+                                        }
+                                      } else if (payment.actionType === 'auction_payment') {
+                                        if (payment.extraData?.auctionId) {
+                                          // Update auction payment status
+                                          await updateDoc(doc(db, 'kuku_auctions', payment.extraData.auctionId), {
+                                            paymentStatus: 'paid',
+                                            paidAt: serverTimestamp()
+                                          });
+
+                                          // Create order
+                                          const orderData = {
+                                            userId: payment.userId,
+                                            userName: payment.userName,
+                                            userContact: payment.userPhone,
+                                            userWA: payment.userPhone,
+                                            payPhone: payment.senderPhone,
+                                            vendorId: payment.extraData.vendorId,
+                                            vendorName: payment.extraData.vendorName,
+                                            productId: payment.extraData.auctionId,
+                                            productPrice: payment.amount,
+                                            qty: 1,
+                                            total: payment.amount,
+                                            payMethod: payment.network,
+                                            senderName: payment.senderName,
+                                            transactionId: payment.id,
+                                            sentAmount: payment.amount.toString(),
+                                            status: 'pending',
+                                            items: [{
+                                              name: `MNADA: ${payment.extraData.productName}`,
+                                              qty: 1,
+                                              price: payment.amount,
+                                              emoji: '🏆',
+                                              image: payment.extraData.image || ''
+                                            }],
+                                            date: new Date().toLocaleString(),
+                                            createdAt: new Date().toISOString(),
+                                            serverCreatedAt: serverTimestamp()
+                                          };
+
+                                          await addDoc(collection(db, 'kuku_orders'), orderData);
+                                        }
+                                      }
+                                      
+                                      toast.success('Malipo yameidhinishwa kikamilifu.');
+                                    } catch (error) {
+                                      handleFirestoreError(error, OperationType.UPDATE, `kuku_manual_payments/${payment.id}`);
+                                      toast.error('Hitilafu imetokea.');
+                                    }
+                                  }}
+                                  className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-xl transition-colors"
+                                  title="Idhinisha"
+                                >
+                                  <Check size={16} />
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm('Je, una uhakika unataka kukataa malipo haya?')) return;
+                                    try {
+                                      await updateDoc(doc(db, 'kuku_manual_payments', payment.id), { status: 'rejected' });
+                                      toast.success('Malipo yamekataliwa.');
+                                    } catch (error) {
+                                      handleFirestoreError(error, OperationType.UPDATE, `kuku_manual_payments/${payment.id}`);
+                                      toast.error('Hitilafu imetokea.');
+                                    }
+                                  }}
+                                  className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors"
+                                  title="Kataa"
+                                >
+                                  <X size={16} />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -2585,84 +2922,173 @@ export const AdminPanel: React.FC = () => {
               </div>
 
               {/* Financial & Withdrawal Settings */}
-              <div className="bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm">
-                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+              <div className="bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800 p-6 md:p-10 shadow-sm">
+                <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                   <div className="w-8 h-8 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
                     <DollarSign size={18} />
                   </div>
-                  Financial & Withdrawal Settings
+                  Malipo na Kamisheni (Payments & Commissions)
                 </h3>
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Withdrawal Fee Type</label>
-                    <select 
-                      value={localSettings.withdrawalFeeType}
-                      onChange={(e) => setLocalSettings(prev => ({ ...prev, withdrawalFeeType: e.target.value as any }))}
-                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
-                    >
-                      <option value="fixed">Fixed Amount (Kiasi Maalum)</option>
-                      <option value="percentage">Percentage (Asilimia %)</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">
-                      Withdrawal Fee Value ({localSettings.withdrawalFeeType === 'fixed' ? currency : '%'})
-                    </label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Kamisheni ya Mauzo (%)</label>
                     <input 
                       type="number"
-                      value={localSettings.withdrawalFeeValue}
-                      onChange={(e) => setLocalSettings(prev => ({ ...prev, withdrawalFeeValue: Number(e.target.value) }))}
+                      value={localSettings.commissionRate || 0}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, commissionRate: Number(e.target.value) }))}
                       className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
-                      placeholder="Mf. 5000 au 5"
+                      placeholder="Mf. 5 kwa 5%"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Admin WhatsApp (for notifications)</label>
-                    <input 
-                      type="text"
-                      value={localSettings.adminWhatsApp}
-                      onChange={(e) => setLocalSettings(prev => ({ ...prev, adminWhatsApp: e.target.value }))}
-                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
-                      placeholder="255764225358"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Payment Number (for Auction Winners)</label>
-                    <input 
-                      type="text"
-                      value={localSettings.paymentNumber}
-                      onChange={(e) => setLocalSettings(prev => ({ ...prev, paymentNumber: e.target.value }))}
-                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
-                      placeholder="0687225353"
-                    />
-                  </div>
-                  <div className="md:col-span-2 space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Payment Name (Account Name)</label>
-                    <input 
-                      type="text"
-                      value={localSettings.paymentName}
-                      onChange={(e) => setLocalSettings(prev => ({ ...prev, paymentName: e.target.value }))}
-                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
-                      placeholder="Amour"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Points Per 1000 TZS Spent</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Ada ya Top Doctor kwa Mwezi ({currency})</label>
                     <input 
                       type="number"
-                      value={localSettings.pointsPerOrder}
-                      onChange={(e) => setLocalSettings(prev => ({ ...prev, pointsPerOrder: Number(e.target.value) }))}
+                      value={localSettings.topDoctorFee || 0}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, topDoctorFee: Number(e.target.value) }))}
                       className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="Mf. 15000"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Value of 1 Point (in TZS)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Ada ya Muuzaji (Mwezi) ({currency})</label>
                     <input 
                       type="number"
-                      value={localSettings.pointsValue}
-                      onChange={(e) => setLocalSettings(prev => ({ ...prev, pointsValue: Number(e.target.value) }))}
+                      value={localSettings.vendorSubscriptionMonthly || 0}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, vendorSubscriptionMonthly: Number(e.target.value) }))}
                       className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="Mf. 10000"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Ada ya Muuzaji (Mwaka) ({currency})</label>
+                    <input 
+                      type="number"
+                      value={localSettings.vendorSubscriptionYearly || 0}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, vendorSubscriptionYearly: Number(e.target.value) }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      placeholder="Mf. 100000"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 pt-4 border-t border-slate-100">
+                    <h4 className="font-black text-slate-900 mb-4">Namba za Malipo (Mitandao ya Simu)</h4>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <label className="text-[10px] font-black text-green-600 uppercase tracking-widest">M-Pesa</label>
+                        <input 
+                          type="text" placeholder="Namba (Mf. 075...)"
+                          value={localSettings.paymentMethods?.mpesa?.number || ''}
+                          onChange={(e) => setLocalSettings(prev => ({ ...prev, paymentMethods: { ...prev.paymentMethods, mpesa: { ...prev.paymentMethods?.mpesa, number: e.target.value, name: prev.paymentMethods?.mpesa?.name || '' } } }))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 outline-none focus:border-amber-500 text-sm mb-2"
+                        />
+                        <input 
+                          type="text" placeholder="Jina la Akaunti"
+                          value={localSettings.paymentMethods?.mpesa?.name || ''}
+                          onChange={(e) => setLocalSettings(prev => ({ ...prev, paymentMethods: { ...prev.paymentMethods, mpesa: { ...prev.paymentMethods?.mpesa, name: e.target.value, number: prev.paymentMethods?.mpesa?.number || '' } } }))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 outline-none focus:border-amber-500 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Tigo Pesa</label>
+                        <input 
+                          type="text" placeholder="Namba (Mf. 065...)"
+                          value={localSettings.paymentMethods?.tigopesa?.number || ''}
+                          onChange={(e) => setLocalSettings(prev => ({ ...prev, paymentMethods: { ...prev.paymentMethods, tigopesa: { ...prev.paymentMethods?.tigopesa, number: e.target.value, name: prev.paymentMethods?.tigopesa?.name || '' } } }))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 outline-none focus:border-amber-500 text-sm mb-2"
+                        />
+                        <input 
+                          type="text" placeholder="Jina la Akaunti"
+                          value={localSettings.paymentMethods?.tigopesa?.name || ''}
+                          onChange={(e) => setLocalSettings(prev => ({ ...prev, paymentMethods: { ...prev.paymentMethods, tigopesa: { ...prev.paymentMethods?.tigopesa, name: e.target.value, number: prev.paymentMethods?.tigopesa?.number || '' } } }))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 outline-none focus:border-amber-500 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <label className="text-[10px] font-black text-red-600 uppercase tracking-widest">Airtel Money</label>
+                        <input 
+                          type="text" placeholder="Namba (Mf. 068...)"
+                          value={localSettings.paymentMethods?.airtel?.number || ''}
+                          onChange={(e) => setLocalSettings(prev => ({ ...prev, paymentMethods: { ...prev.paymentMethods, airtel: { ...prev.paymentMethods?.airtel, number: e.target.value, name: prev.paymentMethods?.airtel?.name || '' } } }))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 outline-none focus:border-amber-500 text-sm mb-2"
+                        />
+                        <input 
+                          type="text" placeholder="Jina la Akaunti"
+                          value={localSettings.paymentMethods?.airtel?.name || ''}
+                          onChange={(e) => setLocalSettings(prev => ({ ...prev, paymentMethods: { ...prev.paymentMethods, airtel: { ...prev.paymentMethods?.airtel, name: e.target.value, number: prev.paymentMethods?.airtel?.number || '' } } }))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 outline-none focus:border-amber-500 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest">HaloPesa</label>
+                        <input 
+                          type="text" placeholder="Namba (Mf. 062...)"
+                          value={localSettings.paymentMethods?.halopesa?.number || ''}
+                          onChange={(e) => setLocalSettings(prev => ({ ...prev, paymentMethods: { ...prev.paymentMethods, halopesa: { ...prev.paymentMethods?.halopesa, number: e.target.value, name: prev.paymentMethods?.halopesa?.name || '' } } }))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 outline-none focus:border-amber-500 text-sm mb-2"
+                        />
+                        <input 
+                          type="text" placeholder="Jina la Akaunti"
+                          value={localSettings.paymentMethods?.halopesa?.name || ''}
+                          onChange={(e) => setLocalSettings(prev => ({ ...prev, paymentMethods: { ...prev.paymentMethods, halopesa: { ...prev.paymentMethods?.halopesa, name: e.target.value, number: prev.paymentMethods?.halopesa?.number || '' } } }))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 outline-none focus:border-amber-500 text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2 pt-4 border-t border-slate-100 grid md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Withdrawal Fee Type</label>
+                      <select 
+                        value={localSettings.withdrawalFeeType}
+                        onChange={(e) => setLocalSettings(prev => ({ ...prev, withdrawalFeeType: e.target.value as any }))}
+                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      >
+                        <option value="fixed">Fixed Amount (Kiasi Maalum)</option>
+                        <option value="percentage">Percentage (Asilimia %)</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">
+                        Withdrawal Fee Value ({localSettings.withdrawalFeeType === 'fixed' ? currency : '%'})
+                      </label>
+                      <input 
+                        type="number"
+                        value={localSettings.withdrawalFeeValue}
+                        onChange={(e) => setLocalSettings(prev => ({ ...prev, withdrawalFeeValue: Number(e.target.value) }))}
+                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                        placeholder="Mf. 5000 au 5"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Admin WhatsApp (for notifications)</label>
+                      <input 
+                        type="text"
+                        value={localSettings.adminWhatsApp}
+                        onChange={(e) => setLocalSettings(prev => ({ ...prev, adminWhatsApp: e.target.value }))}
+                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                        placeholder="255764225358"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Points Per 1000 TZS Spent</label>
+                      <input 
+                        type="number"
+                        value={localSettings.pointsPerOrder}
+                        onChange={(e) => setLocalSettings(prev => ({ ...prev, pointsPerOrder: Number(e.target.value) }))}
+                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Value of 1 Point (in TZS)</label>
+                      <input 
+                        type="number"
+                        value={localSettings.pointsValue}
+                        onChange={(e) => setLocalSettings(prev => ({ ...prev, pointsValue: Number(e.target.value) }))}
+                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

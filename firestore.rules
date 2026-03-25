@@ -19,13 +19,14 @@ service cloud.firestore {
     //   - language: string (optional, 'en' | 'sw')
     //   - createdAt: string (required, ISO 8601)
     //
-    // Collection: kuku_activities
+    // Collection: kuku_manual_payments
     // Document ID: auto-generated
     // Fields:
     //   - userId: string (required)
-    //   - type: string (required)
-    //   - description: string (optional)
-    //   - timestamp: string (required, ISO 8601)
+    //   - userName: string (optional)
+    //   - amount: number (required)
+    //   - status: string (required, 'pending' | 'approved' | 'rejected')
+    //   - createdAt: timestamp (required)
     //
     // ===============================================================
 
@@ -44,7 +45,8 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         (request.auth.token.email == "amytzee@gmail.com" ||
-        (exists(/databases/$(database)/documents/kuku_users/$(request.auth.uid)) && get(/databases/$(database)/documents/kuku_users/$(request.auth.uid)).data.role == 'admin'));
+        (exists(/databases/$(database)/documents/kuku_users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/kuku_users/$(request.auth.uid)).data.role == 'admin'));
     }
 
     function isValidEmail(email) {
@@ -65,16 +67,16 @@ service cloud.firestore {
         isValidEmail(data.email) &&
         data.role in ['admin', 'user'] &&
         isValidDateString(data.createdAt) &&
-        (!('walletBalance' in data) || (data.walletBalance is number && data.walletBalance >= 0)) &&
+        (!('walletBalance' in data) || ((data.walletBalance is int || data.walletBalance is float) && data.walletBalance >= 0)) &&
         (!('theme' in data) || data.theme in ['light', 'dark']) &&
         (!('language' in data) || data.language in ['en', 'sw']);
     }
 
-    function isValidActivity(data) {
-      return data.keys().hasAll(['userId', 'type', 'timestamp']) &&
+    function isValidManualPayment(data) {
+      return data.keys().hasAll(['userId', 'amount', 'status', 'createdAt']) &&
         data.userId is string &&
-        data.type is string &&
-        isValidDateString(data.timestamp);
+        (data.amount is int || data.amount is float) &&
+        data.status in ['pending', 'approved', 'rejected'];
     }
 
     // ===============================================================
@@ -212,10 +214,16 @@ service cloud.firestore {
     match /kuku_live_sessions/{id} { allow read: if true; allow write: if isAuthenticated(); }
     match /kuku_live_chats/{id} { allow read: if true; allow write: if isAuthenticated(); }
     match /kuku_bids/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /kuku_manual_payments/{id} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidManualPayment(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() && isValidManualPayment(request.resource.data);
+      allow delete: if isAdmin();
+    }
 
     // Default deny
     match /{path=**} {
-      allow read, write: if false;
+      allow read, write: if isAdmin();
     }
   }
 }

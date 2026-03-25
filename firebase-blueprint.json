@@ -42,6 +42,19 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "vendorId", "total", "status"]
+    },
+    "ManualPayment": {
+      "title": "ManualPayment",
+      "description": "Represents a manual payment submission.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "status"]
     }
   },
   "firestore": {
@@ -64,6 +77,10 @@
     "kuku_config/settings": {
       "schema": "object",
       "description": "System settings."
+    },
+    "kuku_manual_payments/{paymentId}": {
+      "schema": "ManualPayment",
+      "description": "Collection of manual payments."
     }
   }
 }

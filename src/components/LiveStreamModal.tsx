@@ -30,7 +30,7 @@ interface ChatMessage {
 export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userId, userName, vendorAvatar }: LiveStreamModalProps) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const zpRef = useRef<any>(null);
-  const { systemSettings, auctions, user, addActivity } = useApp();
+  const { systemSettings, auctions, user, addActivity, setConfirmModal } = useApp();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [likes, setLikes] = useState<{ id: number, x: number }[]>([]);
@@ -774,31 +774,43 @@ export default function LiveStreamModal({ isOpen, onClose, roomId, isHost, userI
 
   const handleRemoveUser = (targetUserId: string, targetUserName: string) => {
     if (!isHost || !zpRef.current || !hasJoinedRef.current || !isZegoReadyRef.current || hasLeftRef.current) return;
-    if (window.confirm(`Je, una uhakika unataka kumtoa ${targetUserName} kwenye live?`)) {
-      if (!zpRef.current || !hasJoinedRef.current || !isZegoReadyRef.current || hasLeftRef.current) return;
-      try {
-        (zpRef.current as any).sendInRoomCommand(JSON.stringify({ 
-          type: 'remove_user', 
-          targetUserId 
-        }), [] as string[]);
-        toast.success(`${targetUserName} ametolewa.`);
-      } catch (e) {
-        console.error("Error removing user:", e);
+    
+    setConfirmModal({
+      isOpen: true,
+      title: 'Ondoa Mtumiaji',
+      message: `Je, una uhakika unataka kumtoa ${targetUserName} kwenye live?`,
+      onConfirm: async () => {
+        if (!zpRef.current || !hasJoinedRef.current || !isZegoReadyRef.current || hasLeftRef.current) return;
+        try {
+          (zpRef.current as any).sendInRoomCommand(JSON.stringify({ 
+            type: 'remove_user', 
+            targetUserId 
+          }), [] as string[]);
+          toast.success(`${targetUserName} ametolewa.`);
+        } catch (e) {
+          console.error("Error removing user:", e);
+        }
       }
-    }
+    });
   };
 
   const handleDeleteMessage = async (messageId: string) => {
     if (!isHost || !roomId) return;
-    if (window.confirm('Je, una uhakika unataka kufuta ujumbe huu?')) {
-      try {
-        await deleteDoc(doc(db, 'kuku_live_chats', messageId));
-        toast.success('Ujumbe umefutwa');
-      } catch (e) {
-        handleFirestoreError(e, OperationType.DELETE, `kuku_live_chats/${messageId}`);
-        toast.error('Imeshindwa kufuta ujumbe');
+    
+    setConfirmModal({
+      isOpen: true,
+      title: 'Futa Ujumbe',
+      message: 'Je, una uhakika unataka kufuta ujumbe huu?',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'kuku_live_chats', messageId));
+          toast.success('Ujumbe umefutwa');
+        } catch (e) {
+          handleFirestoreError(e, OperationType.DELETE, `kuku_live_chats/${messageId}`);
+          toast.error('Imeshindwa kufuta ujumbe');
+        }
       }
-    }
+    });
   };
 
   if (!isOpen) return null;

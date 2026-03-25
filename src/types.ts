@@ -2,7 +2,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'user' | 'vendor' | 'admin';
+  role: 'user' | 'vendor' | 'admin' | 'doctor';
   avatar?: string;
   contact?: string;
   hasWhatsApp?: boolean;
@@ -14,6 +14,8 @@ export interface User {
   shopBanner?: string;
   location?: string;
   region?: string;
+  district?: string;
+  village?: string;
   tin?: string;
   nida?: string;
   license?: string;
@@ -30,6 +32,19 @@ export interface User {
   referralCode?: string;
   referredBy?: string;
   createdAt: string;
+  // Doctor specific
+  qualification?: string;
+  licenseNumber?: string;
+  experienceYears?: number;
+  specialization?: string;
+  consultationFee?: number;
+  offersEmergency?: boolean;
+  licenseImage?: string;
+  isTopDoctor?: boolean;
+  topDoctorExpiry?: string;
+  bio?: string;
+  rating?: number;
+  reviewCount?: number;
 }
 
 export type ProductUnit = 'Piece' | 'Kg' | 'Tray' | 'Half' | 'Quarter';
@@ -412,6 +427,16 @@ export interface SystemSettings {
   adminWhatsApp: string;
   paymentNumber: string;
   paymentName: string;
+  commissionRate?: number;
+  topDoctorFee?: number;
+  vendorSubscriptionMonthly?: number;
+  vendorSubscriptionYearly?: number;
+  paymentMethods?: {
+    mpesa?: { number: string, name: string };
+    tigopesa?: { number: string, name: string };
+    airtel?: { number: string, name: string };
+    halopesa?: { number: string, name: string };
+  };
   pointsPerOrder?: number; // How many points per 1000 TZS
   pointsValue?: number; // Value of 1 point in TZS
   firebase_service_account?: string;

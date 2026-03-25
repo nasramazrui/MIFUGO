@@ -16,10 +16,13 @@ import {
   Weight,
   Tag,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  QrCode,
+  Share2
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Livestock } from '../types';
+import { QRCodeModal } from '../components/QRCodeModal';
 
 const LivestockDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -27,6 +30,7 @@ const LivestockDetails: React.FC = () => {
   const { livestock, products, vaccinationRecords, medicalRecords, breedingRecords, productionRecords, nutritionRecords, livestockHealthRecords } = useApp();
   const [animal, setAnimal] = useState<Livestock | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'health' | 'breeding' | 'production' | 'nutrition'>('info');
+  const [qrModalOpen, setQrModalOpen] = useState(false);
 
   useEffect(() => {
     const legacyLivestock: Livestock[] = (Array.isArray(products) ? products : [])
@@ -77,12 +81,21 @@ const LivestockDetails: React.FC = () => {
       <div className="bg-emerald-600 text-white p-6 pb-20 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
         <div className="relative z-10 max-w-4xl mx-auto">
-          <button 
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors mb-4"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
+          <div className="flex items-center justify-between mb-4">
+            <button 
+              onClick={() => navigate(-1)}
+              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+            <button 
+              onClick={() => setQrModalOpen(true)}
+              className="p-2 hover:bg-white/10 rounded-full transition-colors flex items-center gap-2"
+              title="Share QR Code"
+            >
+              <QrCode className="w-6 h-6" />
+            </button>
+          </div>
           <div className="flex items-center gap-4">
             <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-white/20 shadow-xl bg-white/10">
               <img 
@@ -160,6 +173,37 @@ const LivestockDetails: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Lost Animal / Found Section */}
+            <div className="mt-8 p-6 bg-amber-50 rounded-[32px] border-2 border-amber-100 border-dashed">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <AlertCircle className="w-6 h-6 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-amber-900 mb-1">Found this animal?</h3>
+                  <p className="text-sm text-amber-700 mb-4">
+                    If you have found this animal and believe it is lost, please contact the owner immediately using the details below.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <a 
+                      href={`tel:${animal.ownerPhone}`}
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl font-bold text-sm hover:bg-amber-700 transition-colors"
+                    >
+                      <Phone size={16} /> Call Owner
+                    </a>
+                    <a 
+                      href={`https://wa.me/${animal.ownerPhone?.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors"
+                    >
+                      <Share2 size={16} /> WhatsApp
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {activeTab === 'health' && (
               <div className="space-y-10">
@@ -328,6 +372,30 @@ const LivestockDetails: React.FC = () => {
           </div>
         </div>
       </div>
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 flex gap-4 z-40">
+        <button 
+          onClick={() => setQrModalOpen(true)}
+          className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-100"
+        >
+          <QrCode className="w-5 h-5" />
+          Share QR ID
+        </button>
+        <button className="flex-1 py-4 bg-gray-100 text-gray-700 rounded-2xl font-bold flex items-center justify-center gap-2">
+          <Share2 className="w-5 h-5" />
+          Share Link
+        </button>
+      </div>
+
+      {animal && (
+        <QRCodeModal
+          isOpen={qrModalOpen}
+          onClose={() => setQrModalOpen(false)}
+          url={`${window.location.origin}/livestock/${animal.id}`}
+          title={animal.name || `Animal #${animal.tagNumber}`}
+          subtitle={`Livestock ID: ${animal.tagNumber} • ${animal.breed}`}
+          logo={animal.image}
+        />
+      )}
     </div>
   );
 };

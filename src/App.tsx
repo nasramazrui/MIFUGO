@@ -9,11 +9,12 @@ import { applyThemeColor } from './utils/theme';
 import { Wrench, LogIn } from 'lucide-react';
 import { AuthModal } from './components/AuthModal';
 import { RecentPurchases } from './components/RecentPurchases';
+import { ConfirmModal } from './components/ConfirmModal';
 import LivestockManager from './pages/LivestockManager';
 import LivestockDetails from './pages/LivestockDetails';
 
 const AppContent: React.FC = () => {
-  const { user, loading, systemSettings } = useApp();
+  const { user, loading, systemSettings, confirmModal, setConfirmModal } = useApp();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
@@ -145,6 +146,14 @@ const AppContent: React.FC = () => {
       </Routes>
       
       <RecentPurchases />
+      
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+      />
     </div>
   );
 };

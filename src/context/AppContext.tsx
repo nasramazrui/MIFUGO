@@ -61,6 +61,8 @@ interface AppContextType {
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   vendors: User[];
   setVendors: React.Dispatch<React.SetStateAction<User[]>>;
+  doctors: User[];
+  setDoctors: React.Dispatch<React.SetStateAction<User[]>>;
   admins: User[];
   setAdmins: React.Dispatch<React.SetStateAction<User[]>>;
   users: User[];
@@ -115,6 +117,13 @@ interface AppContextType {
   recurringOrders: RecurringOrder[];
   liveSessions: any[];
   handleReferral: (referralCode: string, newUserId: string) => Promise<void>;
+  confirmModal: {
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void | Promise<void>;
+  };
+  setConfirmModal: (state: { isOpen: boolean; title: string; message: string; onConfirm: () => void | Promise<void> }) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -124,6 +133,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [vendors, setVendors] = useState<User[]>([]);
+  const [doctors, setDoctors] = useState<User[]>([]);
   const [admins, setAdmins] = useState<User[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -165,6 +175,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [recurringOrders, setRecurringOrders] = useState<RecurringOrder[]>([]);
   const [liveSessions, setLiveSessions] = useState<any[]>([]);
   const [lastNotificationCount, setLastNotificationCount] = useState(0);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
 
   const playNotificationSound = () => {
     try {
@@ -407,6 +428,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     publicUnsubs.push(unsubVendors);
 
+    // Doctors (Publicly readable)
+    const qDoctors = query(collection(db, 'kuku_users'), where('role', '==', 'doctor'), where('status', '==', 'approved'), orderBy('createdAt', 'desc'));
+    const unsubDoctors = onSnapshot(qDoctors, (snap) => {
+      setDoctors(snap.docs.map(d => ({ id: d.id, ...d.data() } as User)));
+    }, (err) => {
+      if (err.code !== 'permission-denied') {
+        handleFirestoreError(err, OperationType.GET, 'kuku_users_doctors');
+      }
+    });
+    publicUnsubs.push(unsubDoctors);
+
     return () => {
       publicUnsubs.forEach(unsub => unsub());
     };
@@ -510,7 +542,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Admin-only data
     if (user.role === 'admin') {
-      const qUsers = query(collection(db, 'kuku_users'), where('role', '==', 'user'), orderBy('createdAt', 'desc'));
+      const qUsers = query(collection(db, 'kuku_users'), orderBy('createdAt', 'desc'));
       const unsubUsers = onSnapshot(qUsers, (snap) => {
         setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as User)));
       }, (err) => {
@@ -641,6 +673,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       products, setProducts,
       orders, setOrders,
       vendors, setVendors,
+      doctors, setDoctors,
       admins, setAdmins,
       users, setUsers,
       reviews, setReviews,
@@ -682,7 +715,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       livestockHealthRecords,
       recurringOrders,
       liveSessions,
-      handleReferral
+      handleReferral,
+      confirmModal,
+      setConfirmModal
     }}>
       {children}
     </AppContext.Provider>

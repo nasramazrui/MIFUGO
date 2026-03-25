@@ -31,13 +31,20 @@ import {
 import { useApp } from '../context/AppContext';
 import { db, collection, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, handleFirestoreError, OperationType } from '../services/firebase';
 import { Livestock, VaccinationRecord, MedicalRecord, BreedingRecord, ProductionRecord, NutritionRecord } from '../types';
-import QRCode from 'react-qr-code';
+import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeModal } from '../components/QRCodeModal';
 import toast from 'react-hot-toast';
 
-const LivestockManager: React.FC = () => {
-  const { livestock, products, user, vaccinationRecords, medicalRecords, breedingRecords, productionRecords, nutritionRecords } = useApp();
+interface LivestockManagerProps {
+  onSellAsProduct?: (animal: Livestock) => void;
+  onSellAsAuction?: (animal: Livestock, isLive: boolean) => void;
+}
+
+const LivestockManager: React.FC<LivestockManagerProps> = ({ onSellAsProduct, onSellAsAuction }) => {
+  const { livestock, products, user, vaccinationRecords, medicalRecords, breedingRecords, productionRecords, nutritionRecords, setConfirmModal } = useApp();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedAnimal, setSelectedAnimal] = useState<Livestock | null>(null);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSpecies, setFilterSpecies] = useState('All');
   const [activeTab, setActiveTab] = useState<'info' | 'health' | 'breeding' | 'production' | 'nutrition'>('info');
@@ -163,19 +170,25 @@ const LivestockManager: React.FC = () => {
   };
 
   const handleDeleteAnimal = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this animal?')) return;
-    try {
-      // Check if it's a legacy livestock (in products)
-      const isLegacy = products.some(p => p.id === id && p.isLivestock);
-      const collectionName = isLegacy ? 'kuku_products' : 'kuku_livestock';
-      
-      await deleteDoc(doc(db, collectionName, id));
-      setSelectedAnimal(null);
-      toast.success('Animal deleted');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, id);
-      toast.error('Failed to delete animal');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Futa Mnyama',
+      message: 'Je, una uhakika unataka kufuta mnyama huyu? Hatua hii haiwezi kurudishwa.',
+      onConfirm: async () => {
+        try {
+          // Check if it's a legacy livestock (in products)
+          const isLegacy = products.some(p => p.id === id && p.isLivestock);
+          const collectionName = isLegacy ? 'kuku_products' : 'kuku_livestock';
+          
+          await deleteDoc(doc(db, collectionName, id));
+          setSelectedAnimal(null);
+          toast.success('Mnyama amefutwa');
+        } catch (error) {
+          handleFirestoreError(error, OperationType.DELETE, id);
+          toast.error('Imeshindwa kufuta mnyama');
+        }
+      }
+    });
   };
 
   const filteredLivestock = (Array.isArray(allLivestock) ? allLivestock : []).filter(animal => {
@@ -206,31 +219,20 @@ const LivestockManager: React.FC = () => {
       toast.error('Failed to add record');
     }
   };
-  const downloadQR = () => {
-    if (!selectedAnimal) return;
-    const svg = document.getElementById("animal-qr");
-    if (svg) {
-      const svgData = new XMLSerializer().serializeToString(svg);
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const img = new Image();
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx?.drawImage(img, 0, 0);
-        const pngFile = canvas.toDataURL("image/png");
-        const downloadLink = document.createElement("a");
-        downloadLink.download = `QR_${selectedAnimal.tagNumber}.png`;
-        downloadLink.href = `${pngFile}`;
-        downloadLink.click();
-      };
-      img.src = "data:image/svg+xml;base64," + btoa(svgData);
-    }
-  };
 
   const handleSellAnimal = async (sellType: 'live' | 'regular' | 'product') => {
     if (!selectedAnimal || !user) return;
     
+    // If props are provided, use them to open the forms in the parent component
+    if (sellType === 'product' && onSellAsProduct) {
+      onSellAsProduct(selectedAnimal);
+      return;
+    }
+    if ((sellType === 'live' || sellType === 'regular') && onSellAsAuction) {
+      onSellAsAuction(selectedAnimal, sellType === 'live');
+      return;
+    }
+
     try {
       if (sellType === 'product') {
         await addDoc(collection(db, 'kuku_products'), {
@@ -307,41 +309,25 @@ const LivestockManager: React.FC = () => {
               alt={selectedAnimal.name}
               className="w-full h-full object-cover"
             />
-            <div className="absolute top-4 right-4 bg-white p-2 rounded-xl shadow-md group">
-              <QRCode id="animal-qr" value={JSON.stringify({
-                id: selectedAnimal.id,
-                tag: selectedAnimal.tagNumber,
-                owner: selectedAnimal.ownerName,
-                phone: selectedAnimal.ownerPhone,
-                species: selectedAnimal.species,
-                breed: selectedAnimal.breed
-              })} size={80} />
-              <button 
-                onClick={() => {
-                  const svg = document.getElementById("animal-qr");
-                  if (svg) {
-                    const svgData = new XMLSerializer().serializeToString(svg);
-                    const canvas = document.createElement("canvas");
-                    const ctx = canvas.getContext("2d");
-                    const img = new Image();
-                    img.onload = () => {
-                      canvas.width = img.width;
-                      canvas.height = img.height;
-                      ctx?.drawImage(img, 0, 0);
-                      const pngFile = canvas.toDataURL("image/png");
-                      const downloadLink = document.createElement("a");
-                      downloadLink.download = `QR_${selectedAnimal.tagNumber}.png`;
-                      downloadLink.href = pngFile;
-                      downloadLink.click();
-                    };
-                    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
-                  }
+            <div className="absolute top-4 right-4 bg-white p-3 rounded-2xl shadow-xl border-4 border-emerald-50 group cursor-pointer" onClick={() => setQrModalOpen(true)}>
+              <QRCodeSVG 
+                id="animal-qr" 
+                value={`${window.location.origin}/livestock/${selectedAnimal.id}`}
+                size={100}
+                level="H"
+                includeMargin={false}
+                imageSettings={{
+                  src: selectedAnimal.image || 'https://cdn-icons-png.flaticon.com/512/2395/2395796.png',
+                  x: undefined,
+                  y: undefined,
+                  height: 24,
+                  width: 24,
+                  excavate: true,
                 }}
-                className="absolute -bottom-2 -right-2 bg-emerald-600 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Download QR Code"
-              >
-                <Download size={14} />
-              </button>
+              />
+              <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors rounded-xl flex items-center justify-center">
+                <QrCode className="w-6 h-6 text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
             </div>
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6">
               <div className="flex justify-between items-end">
@@ -485,19 +471,24 @@ const LivestockManager: React.FC = () => {
                         </div>
                         <p className="text-xs text-emerald-700 mt-1">Next due: {record.nextDueDate}</p>
                         <button 
-                          onClick={async () => {
-                            if (confirm('Delete this record?')) {
-                              try {
-                                await deleteDoc(doc(db, 'kuku_vaccination_records', record.id));
-                                toast.success('Record deleted');
-                              } catch (e) {
-                                handleFirestoreError(e, OperationType.DELETE, `kuku_vaccination_records/${record.id}`);
+                          onClick={() => {
+                            setConfirmModal({
+                              isOpen: true,
+                              title: 'Futa Kumbukumbu',
+                              message: 'Je, una uhakika unataka kufuta kumbukumbu hii ya chanjo?',
+                              onConfirm: async () => {
+                                try {
+                                  await deleteDoc(doc(db, 'kuku_vaccination_records', record.id));
+                                  toast.success('Kumbukumbu imefutwa');
+                                } catch (e) {
+                                  handleFirestoreError(e, OperationType.DELETE, `kuku_vaccination_records/${record.id}`);
+                                }
                               }
-                            }
+                            });
                           }}
                           className="text-[10px] text-red-500 mt-2 hover:underline"
                         >
-                          Delete
+                          Futa
                         </button>
                       </div>
                     ))}
@@ -530,19 +521,24 @@ const LivestockManager: React.FC = () => {
                         <p className="text-xs text-red-700 mt-1">Treatment: {record.medicine}</p>
                         <p className="text-xs font-bold text-red-800 mt-1">Cost: TSh {record.cost.toLocaleString()}</p>
                         <button 
-                          onClick={async () => {
-                            if (confirm('Delete this record?')) {
-                              try {
-                                await deleteDoc(doc(db, 'kuku_medical_records', record.id));
-                                toast.success('Record deleted');
-                              } catch (e) {
-                                handleFirestoreError(e, OperationType.DELETE, `kuku_medical_records/${record.id}`);
+                          onClick={() => {
+                            setConfirmModal({
+                              isOpen: true,
+                              title: 'Futa Kumbukumbu',
+                              message: 'Je, una uhakika unataka kufuta kumbukumbu hii ya matibabu?',
+                              onConfirm: async () => {
+                                try {
+                                  await deleteDoc(doc(db, 'kuku_medical_records', record.id));
+                                  toast.success('Kumbukumbu imefutwa');
+                                } catch (e) {
+                                  handleFirestoreError(e, OperationType.DELETE, `kuku_medical_records/${record.id}`);
+                                }
                               }
-                            }
+                            });
                           }}
                           className="text-[10px] text-red-500 mt-2 hover:underline"
                         >
-                          Delete
+                          Futa
                         </button>
                       </div>
                     ))}
@@ -692,13 +688,22 @@ const LivestockManager: React.FC = () => {
             Delete Animal
           </button>
           <button 
-            onClick={downloadQR}
-            className="flex-1 flex items-center justify-center py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
+            onClick={() => setQrModalOpen(true)}
+            className="flex-1 flex items-center justify-center py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100"
           >
             <QrCode className="w-4 h-4 mr-2" />
-            Download QR
+            View & Download QR
           </button>
         </div>
+
+        <QRCodeModal
+          isOpen={qrModalOpen}
+          onClose={() => setQrModalOpen(false)}
+          url={`${window.location.origin}/livestock/${selectedAnimal.id}`}
+          title={selectedAnimal.name || `Animal #${selectedAnimal.tagNumber}`}
+          subtitle={`Livestock ID: ${selectedAnimal.tagNumber} • ${selectedAnimal.breed}`}
+          logo={selectedAnimal.image}
+        />
       </div>
     );
   }

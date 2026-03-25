@@ -69,9 +69,11 @@ import { db, auth, updatePassword, collection, addDoc, updateDoc, deleteDoc, doc
 import { toast } from 'react-hot-toast';
 import LivestockManager from './LivestockManager';
 
+import { ManualPaymentModal } from '../components/ManualPaymentModal';
+
 export const VendorPortal: React.FC = () => {
   const navigate = useNavigate();
-  const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, addNotification, systemSettings, theme, setTheme, language, setLanguage, setView, t, walletTransactions, notifications, offers, livestockHealthRecords } = useApp();
+  const { user, products, orders, auctions, withdrawals, statuses, categories, reviews, logout, addActivity, addNotification, systemSettings, theme, setTheme, language, setLanguage, setView, t, walletTransactions, notifications, offers, livestockHealthRecords, setConfirmModal } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const unreadNotifications = (Array.isArray(notifications) ? notifications : []).filter(n => (n.userId === 'all' || n.userId === user?.id) && !n.readBy?.includes(user?.id || '')).length;
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -79,6 +81,8 @@ export const VendorPortal: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState<{ amount: number; reason: string; actionType: string; extraData?: any } | null>(null);
   const [qrAmount, setQrAmount] = useState<string>('');
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
   const [selectedProductQR, setSelectedProductQR] = useState<Product | null>(null);
@@ -263,6 +267,52 @@ export const VendorPortal: React.FC = () => {
     } finally {
       setIsPasswordLoading(false);
     }
+  };
+
+  const handleSellAsProduct = (animal: any) => {
+    setNewProduct({
+      ...newProduct,
+      name: animal.name || `${animal.species} - ${animal.tagNumber}`,
+      price: '',
+      stock: '1',
+      category: animal.species.toLowerCase() as any,
+      unit: 'Piece',
+      image: animal.image,
+      desc: `Livestock: ${animal.breed}. Tag: ${animal.tagNumber}. Health: ${animal.healthStatus}`,
+      location: animal.location || user?.location || '',
+      isLivestock: true,
+      tagNumber: animal.tagNumber,
+      breed: animal.breed,
+      weight: animal.weight?.toString() || '',
+      gender: animal.gender,
+      healthStatus: animal.healthStatus.toLowerCase() as any,
+      birthDate: animal.birthDate
+    });
+    setActiveTab('products');
+    setIsAddModalOpen(true);
+  };
+
+  const handleSellAsAuction = (animal: any, isLive: boolean) => {
+    setAuctionForm({
+      ...auctionForm,
+      productName: animal.name || `${animal.species} - ${animal.tagNumber}`,
+      description: `Livestock: ${animal.breed}. Tag: ${animal.tagNumber}. Health: ${animal.healthStatus}`,
+      startingPrice: '',
+      minIncrement: '20000',
+      durationHours: '24',
+      location: animal.location || user?.location || '',
+      image: animal.image,
+      tagNumber: animal.tagNumber,
+      breed: animal.breed,
+      age: animal.age || '',
+      weight: animal.weight?.toString() || '',
+      gender: animal.gender,
+      healthStatus: animal.healthStatus.toLowerCase() as any,
+      birthDate: animal.birthDate,
+      isGoLive: isLive
+    });
+    setActiveTab('auctions');
+    setIsAuctionModalOpen(true);
   };
 
   const [shopSettings, setShopSettings] = useState({
@@ -567,15 +617,21 @@ export const VendorPortal: React.FC = () => {
   };
 
   const handleDeleteAuction = async (id: string) => {
-    if (!window.confirm('Je, una uhakika unataka kufuta mnada huu?')) return;
-    try {
-      await deleteDoc(doc(db, 'kuku_auctions', id));
-      toast.success('Mnada umefutwa!');
-      addActivity('🗑️', 'Umefuta mnada');
-    } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `kuku_auctions/${id}`);
-      toast.error('Imeshindwa kufuta mnada');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Futa Mnada',
+      message: 'Je, una uhakika unataka kufuta mnada huu? Hatua hii haiwezi kurudishwa.',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'kuku_auctions', id));
+          toast.success('Mnada umefutwa!');
+          addActivity('🗑️', 'Umefuta mnada');
+        } catch (err) {
+          handleFirestoreError(err, OperationType.DELETE, `kuku_auctions/${id}`);
+          toast.error('Imeshindwa kufuta mnada');
+        }
+      }
+    });
   };
 
   const handleUpdateAuction = async (e: React.FormEvent) => {
@@ -600,7 +656,15 @@ export const VendorPortal: React.FC = () => {
         minIncrement: Number(auctionForm.minIncrement),
         location: auctionForm.location,
         image: auctionForm.image,
-        endTime: endTime
+        endTime: endTime,
+        tagNumber: auctionForm.tagNumber,
+        breed: auctionForm.breed,
+        age: auctionForm.age,
+        weight: Number(auctionForm.weight) || 0,
+        gender: auctionForm.gender,
+        healthStatus: auctionForm.healthStatus,
+        birthDate: auctionForm.birthDate,
+        isLive: auctionForm.isGoLive
       });
       toast.success('Mnada umesasishwa!');
       setIsAuctionEditModalOpen(false);
@@ -726,14 +790,20 @@ export const VendorPortal: React.FC = () => {
   };
 
   const deleteOrder = async (orderId: string) => {
-    if (!confirm('Je, una uhakika unataka kufuta agizo hili?')) return;
-    try {
-      await deleteDoc(doc(db, 'kuku_orders', orderId));
-      toast.success('Agizo limefutwa');
-    } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `kuku_orders/${orderId}`);
-      toast.error('Imeshindwa kufuta agizo');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Futa Agizo',
+      message: 'Je, una uhakika unataka kufuta agizo hili? Hatua hii haiwezi kurudishwa.',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'kuku_orders', orderId));
+          toast.success('Agizo limefutwa');
+        } catch (err) {
+          handleFirestoreError(err, OperationType.DELETE, `kuku_orders/${orderId}`);
+          toast.error('Imeshindwa kufuta agizo');
+        }
+      }
+    });
   };
 
   const handleWithdrawRequest = () => {
@@ -845,14 +915,20 @@ export const VendorPortal: React.FC = () => {
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (!confirm('Una uhakika unataka kufuta bidhaa hii?')) return;
-    try {
-      await deleteDoc(doc(db, 'kuku_products', id));
-      toast.success('Bidhaa imefutwa');
-    } catch (error: any) {
-      handleFirestoreError(error, OperationType.DELETE, `kuku_products/${id}`);
-      toast.error('Hitilafu wakati wa kufuta');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Futa Bidhaa',
+      message: 'Una uhakika unataka kufuta bidhaa hii? Hatua hii haiwezi kurudishwa.',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'kuku_products', id));
+          toast.success('Bidhaa imefutwa');
+        } catch (error: any) {
+          handleFirestoreError(error, OperationType.DELETE, `kuku_products/${id}`);
+          toast.error('Hitilafu wakati wa kufuta');
+        }
+      }
+    });
   };
 
   const handlePostStatus = async (e: React.FormEvent) => {
@@ -889,14 +965,20 @@ export const VendorPortal: React.FC = () => {
   };
 
   const handleDeleteStatus = async (statusId: string) => {
-    if (!confirm('Je, una uhakika unataka kufuta status hii?')) return;
-    try {
-      await deleteDoc(doc(db, 'kuku_statuses', statusId));
-      toast.success('Status imefutwa');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `kuku_statuses/${statusId}`);
-      toast.error('Hitilafu wakati wa kufuta status');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Futa Status',
+      message: 'Je, una uhakika unataka kufuta status hii? Hatua hii haiwezi kurudishwa.',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'kuku_statuses', statusId));
+          toast.success('Status imefutwa');
+        } catch (error) {
+          handleFirestoreError(error, OperationType.DELETE, `kuku_statuses/${statusId}`);
+          toast.error('Hitilafu wakati wa kufuta status');
+        }
+      }
+    });
   };
 
   const playBeep = () => {
@@ -956,6 +1038,58 @@ export const VendorPortal: React.FC = () => {
         // console.warn(error);
       });
     }, 500);
+  };
+
+  const handleManualPaymentSubmit = async (details: { network: string; senderPhone: string; senderName: string; amount: number; sms: string }) => {
+    if (!paymentDetails || !user) return;
+
+    const { amount, reason, actionType, extraData } = paymentDetails;
+    
+    try {
+      // Save to Firestore
+      await addDoc(collection(db, 'kuku_manual_payments'), {
+        userId: user.id,
+        userName: user.name,
+        userPhone: user.phone || user.contact || '',
+        amount,
+        reason,
+        actionType,
+        extraData: extraData || null,
+        network: details.network,
+        senderPhone: details.senderPhone,
+        senderName: details.senderName,
+        sms: details.sms,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+
+      // Construct WhatsApp message for Admin
+      const msg = `*MALIPO MAPYA (MANUAL) KUTOKA KWA MUUZAJI* 🏪💰
+------------------------
+*Sababu:* ${reason}
+*Kiasi:* ${amount.toLocaleString()} TZS
+*Mtandao:* ${details.network}
+*Namba Iliyotuma:* ${details.senderPhone}
+*Jina la Aliyetuma:* ${details.senderName}
+*Muuzaji:* ${user.shopName || user.name} (${user.phone || user.contact || 'No Contact'})
+*Aina ya Action:* ${actionType}
+*SMS ya Uthibitisho:*
+"${details.sms}"
+------------------------
+Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
+
+      const adminPhone = systemSettings?.adminWhatsApp || '255764225358';
+      const waUrl = `https://wa.me/${adminPhone.replace(/\+/g, '')}?text=${encodeURIComponent(msg)}`;
+      
+      window.open(waUrl, '_blank');
+      
+      setPaymentModalOpen(false);
+      setPaymentDetails(null);
+      toast.success('Taarifa za malipo zimetumwa kwa Admin kikamilifu. Tafadhali subiri uhakiki.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'kuku_manual_payments');
+      toast.error('Imeshindwa kutuma taarifa za malipo. Tafadhali jaribu tena.');
+    }
   };
 
   const handleOfflinePayment = async () => {
@@ -1932,16 +2066,21 @@ export const VendorPortal: React.FC = () => {
                             <h4 className="font-black text-slate-900">{offer.title}</h4>
                           </div>
                           <button 
-                            onClick={async () => {
-                              if (confirm('Futa ofa hii?')) {
-                                try {
-                                  await deleteDoc(doc(db, 'kuku_offers', offer.id));
-                                  toast.success('Ofa imefutwa');
-                                } catch (error) {
-                                  handleFirestoreError(error, OperationType.DELETE, `kuku_offers/${offer.id}`);
-                                  toast.error('Imeshindwa kufuta ofa');
+                            onClick={() => {
+                              setConfirmModal({
+                                isOpen: true,
+                                title: 'Futa Ofa',
+                                message: 'Je, una uhakika unataka kufuta ofa hii? Hatua hii haiwezi kurudishwa.',
+                                onConfirm: async () => {
+                                  try {
+                                    await deleteDoc(doc(db, 'kuku_offers', offer.id));
+                                    toast.success('Ofa imefutwa');
+                                  } catch (error) {
+                                    handleFirestoreError(error, OperationType.DELETE, `kuku_offers/${offer.id}`);
+                                    toast.error('Imeshindwa kufuta ofa');
+                                  }
                                 }
-                              }
+                              });
                             }}
                             className="p-2 text-slate-300 hover:text-red-500 transition-colors"
                           >
@@ -2076,7 +2215,10 @@ export const VendorPortal: React.FC = () => {
         )}
 
         {activeTab === 'livestock' && (
-          <LivestockManager />
+          <LivestockManager 
+            onSellAsProduct={handleSellAsProduct}
+            onSellAsAuction={handleSellAsAuction}
+          />
         )}
 
         {activeTab === 'wallet' && (
@@ -2236,7 +2378,15 @@ export const VendorPortal: React.FC = () => {
                             minIncrement: a.minIncrement.toString(),
                             durationHours: '24',
                             location: a.location,
-                            image: a.image || ''
+                            image: a.image || '',
+                            tagNumber: a.tagNumber || '',
+                            breed: a.breed || '',
+                            age: a.age || '',
+                            weight: a.weight?.toString() || '',
+                            gender: a.gender || 'male',
+                            healthStatus: a.healthStatus || 'healthy',
+                            birthDate: a.birthDate || '',
+                            isGoLive: !!a.isLive
                           });
                           setIsAuctionEditModalOpen(true);
                         }}
@@ -2520,6 +2670,82 @@ export const VendorPortal: React.FC = () => {
                       className="input-field" 
                       placeholder="https://link.to/banner.png"
                     />
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-slate-50" />
+
+              {/* Subscription Settings */}
+              <div>
+                <h3 className="font-black text-slate-900 mb-4 flex items-center gap-2">
+                  <Star size={20} className="text-amber-500" /> Usajili wa Duka (Subscription)
+                </h3>
+                <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-sm font-bold text-slate-600">Hali ya Usajili</p>
+                      <p className={cn(
+                        "text-lg font-black uppercase tracking-wider",
+                        user?.subscriptionStatus === 'active' ? "text-emerald-600" : "text-amber-600"
+                      )}>
+                        {user?.subscriptionStatus === 'active' ? 'ACTIVE' : 'FREE BASIC'}
+                      </p>
+                    </div>
+                    {user?.subscriptionStatus === 'active' && user?.subscriptionExpiry && (
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inaisha Lini</p>
+                        <p className="text-sm font-bold text-slate-700">
+                          {new Date(user.subscriptionExpiry).toLocaleDateString('sw-TZ')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                    <button
+                      onClick={() => {
+                        setPaymentDetails({
+                          amount: systemSettings?.vendorSubscriptionMonthly || 10000,
+                          reason: 'Usajili wa Duka (Mwezi 1)',
+                          actionType: 'vendor_subscription',
+                          extraData: { plan: 'monthly' }
+                        });
+                        setPaymentModalOpen(true);
+                      }}
+                      className="bg-white border-2 border-amber-100 hover:border-amber-500 p-4 rounded-2xl text-left transition-all group"
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-black text-slate-900 group-hover:text-amber-600 transition-colors">Mwezi 1</span>
+                        <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">Popular</span>
+                      </div>
+                      <p className="text-2xl font-black text-amber-600 mb-1">
+                        {formatCurrency(systemSettings?.vendorSubscriptionMonthly || 10000, currency)}
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Lipia kwa Mwezi</p>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setPaymentDetails({
+                          amount: systemSettings?.vendorSubscriptionYearly || 100000,
+                          reason: 'Usajili wa Duka (Mwaka 1)',
+                          actionType: 'vendor_subscription',
+                          extraData: { plan: 'yearly' }
+                        });
+                        setPaymentModalOpen(true);
+                      }}
+                      className="bg-white border-2 border-emerald-100 hover:border-emerald-500 p-4 rounded-2xl text-left transition-all group"
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-black text-slate-900 group-hover:text-emerald-600 transition-colors">Mwaka 1</span>
+                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">Save 16%</span>
+                      </div>
+                      <p className="text-2xl font-black text-emerald-600 mb-1">
+                        {formatCurrency(systemSettings?.vendorSubscriptionYearly || 100000, currency)}
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Lipia kwa Mwaka</p>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -3969,6 +4195,97 @@ export const VendorPortal: React.FC = () => {
               onChange={e => setAuctionForm({...auctionForm, image: e.target.value})}
             />
           </div>
+
+          {/* Livestock Details Section */}
+          {auctionForm.tagNumber && (
+            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl space-y-4">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Taarifa za Mfugo</h4>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tag Number / ID</label>
+                  <input 
+                    type="text" 
+                    className="input-field text-sm"
+                    placeholder="Mf: TZ-001"
+                    value={auctionForm.tagNumber}
+                    onChange={e => setAuctionForm({...auctionForm, tagNumber: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Uzao / Breed</label>
+                  <input 
+                    type="text" 
+                    className="input-field text-sm"
+                    placeholder="Mf: Boran"
+                    value={auctionForm.breed}
+                    onChange={e => setAuctionForm({...auctionForm, breed: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Umri</label>
+                  <input 
+                    type="text" 
+                    className="input-field text-sm"
+                    placeholder="Mf: Miezi 6"
+                    value={auctionForm.age}
+                    onChange={e => setAuctionForm({...auctionForm, age: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Uzito (Kg)</label>
+                  <input 
+                    type="number" 
+                    className="input-field text-sm"
+                    placeholder="Mf: 250"
+                    value={auctionForm.weight}
+                    onChange={e => setAuctionForm({...auctionForm, weight: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Jinsia</label>
+                  <select 
+                    className="input-field text-sm"
+                    value={auctionForm.gender}
+                    onChange={e => setAuctionForm({...auctionForm, gender: e.target.value as any})}
+                  >
+                    <option value="male">Dume (Male)</option>
+                    <option value="female">Jike (Female)</option>
+                    <option value="other">Nyingine</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Hali ya Afya</label>
+                  <select 
+                    className="input-field text-sm"
+                    value={auctionForm.healthStatus}
+                    onChange={e => setAuctionForm({...auctionForm, healthStatus: e.target.value as any})}
+                  >
+                    <option value="healthy">Mzima (Healthy)</option>
+                    <option value="sick">Mgonjwa (Sick)</option>
+                    <option value="recovered">Amepona (Recovered)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tarehe ya Kuzaliwa</label>
+                <input 
+                  type="date" 
+                  className="input-field text-sm"
+                  value={auctionForm.birthDate}
+                  onChange={e => setAuctionForm({...auctionForm, birthDate: e.target.value})}
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Muda wa Mnada (Saa kuanzia sasa)</label>
             <input 
@@ -4107,6 +4424,20 @@ export const VendorPortal: React.FC = () => {
         userName={user?.name || 'Muuzaji'} 
         vendorAvatar={user?.avatar}
       />
+
+      <ManualPaymentModal
+        isOpen={paymentModalOpen}
+        onClose={() => {
+          setPaymentModalOpen(false);
+          setPaymentDetails(null);
+        }}
+        amount={paymentDetails?.amount || 0}
+        reason={paymentDetails?.reason || ''}
+        systemSettings={systemSettings}
+        onSubmit={handleManualPaymentSubmit}
+      />
+
+      {/* Global ConfirmModal is now in App.tsx */}
     </div>
   );
 };

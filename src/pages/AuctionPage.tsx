@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Auction, Bid } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Gavel, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2, Wallet, Send, CreditCard, Smartphone, Search, Globe, Trash2, Video } from 'lucide-react';
+import { Gavel, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2, Wallet, Send, CreditCard, Smartphone, Search, Globe, Trash2, Video, QrCode } from 'lucide-react';
 import { formatCurrency, cn } from '../utils';
 import { db, collection, addDoc, updateDoc, doc, serverTimestamp, query, where, orderBy, onSnapshot, increment, getDoc, deleteDoc, handleFirestoreError, OperationType } from '../services/firebase';
 import { toast } from 'react-hot-toast';
 import LiveStreamModal from '../components/LiveStreamModal';
+import { ManualPaymentModal } from '../components/ManualPaymentModal';
+import { QRCodeModal } from '../components/QRCodeModal';
 
 export const AuctionPage: React.FC = () => {
-  const { user, auctions, systemSettings, t, language, liveSessions } = useApp();
+  const { user, auctions, systemSettings, t, language, liveSessions, setConfirmModal } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
   const [liveStreamAuctionId, setLiveStreamAuctionId] = useState<string | null>(null);
@@ -18,6 +20,9 @@ export const AuctionPage: React.FC = () => {
   const [auctionBids, setAuctionBids] = useState<Bid[]>([]);
   const [isPaying, setIsPaying] = useState(false);
   const [paymentStep, setPaymentStep] = useState<'options' | 'details' | 'success'>('options');
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState<{ amount: number; reason: string; actionType: string; extraData?: any } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'tigo' | 'mpesa' | 'airtel' | 'halopesa' | 'cash'>('tigo');
   const [paymentForm, setPaymentForm] = useState({
     transactionId: '',
@@ -151,6 +156,70 @@ export const AuctionPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [auctions]);
 
+  const handleManualPaymentSubmit = async (details: { network: string; senderPhone: string; senderName: string; amount: number; sms: string }) => {
+    if (!paymentDetails || !user || !selectedAuction) return;
+
+    const { amount, reason, actionType, extraData } = paymentDetails;
+    
+    try {
+      // Save to Firestore manual payments
+      await addDoc(collection(db, 'kuku_manual_payments'), {
+        userId: user.id,
+        userName: user.name,
+        userPhone: user.phone || user.contact || '',
+        amount,
+        reason,
+        actionType,
+        extraData: extraData || null,
+        network: details.network,
+        senderPhone: details.senderPhone,
+        senderName: details.senderName,
+        sms: details.sms,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+
+      // Update auction payment status to pending
+      await updateDoc(doc(db, 'kuku_auctions', selectedAuction.id), {
+        paymentStatus: 'pending',
+        paymentMethod: details.network,
+        transactionId: details.sms.substring(0, 15), // Use part of SMS as transaction ID
+        senderPhone: details.senderPhone,
+        senderName: details.senderName,
+        totalAmount: amount,
+        paidAt: serverTimestamp()
+      });
+
+      // Construct WhatsApp message for Admin
+      const msg = `*MALIPO MAPYA (MANUAL) KUTOKA KWA MSHINDI WA MNADA* 🏆💰
+------------------------
+*Sababu:* ${reason}
+*Kiasi:* ${amount.toLocaleString()} TZS
+*Mtandao:* ${details.network}
+*Namba Iliyotuma:* ${details.senderPhone}
+*Jina la Aliyetuma:* ${details.senderName}
+*Mshindi:* ${user.name} (${user.phone || user.contact || 'No Contact'})
+*Aina ya Action:* ${actionType}
+*SMS ya Uthibitisho:*
+"${details.sms}"
+------------------------
+Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
+
+      const adminPhone = systemSettings?.adminWhatsApp || '255764225358';
+      const waUrl = `https://wa.me/${adminPhone.replace(/\+/g, '')}?text=${encodeURIComponent(msg)}`;
+      
+      window.open(waUrl, '_blank');
+      
+      setPaymentModalOpen(false);
+      setPaymentDetails(null);
+      setPaymentStep('success');
+      toast.success('Taarifa za malipo zimetumwa kwa Admin kikamilifu. Tafadhali subiri uhakiki.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'kuku_manual_payments');
+      toast.error('Imeshindwa kutuma taarifa za malipo. Tafadhali jaribu tena.');
+    }
+  };
+
   const handleAuctionPayment = async () => {
     if (!selectedAuction || !user) return;
     setIsPaying(true);
@@ -245,15 +314,20 @@ export const AuctionPage: React.FC = () => {
 
   const handleDeleteAuction = async (e: React.MouseEvent, auctionId: string) => {
     e.stopPropagation();
-    if (!window.confirm('Je, una uhakika unataka kufuta mnada huu?')) return;
-
-    try {
-      await deleteDoc(doc(db, 'kuku_auctions', auctionId));
-      toast.success('Mnada umefutwa kikamilifu!');
-    } catch (err: any) {
-      console.error('Delete error:', err);
-      toast.error('Imeshindwa kufuta mnada');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Futa Mnada',
+      message: 'Je, una uhakika unataka kufuta mnada huu? Hatua hii haiwezi kurudishwa.',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'kuku_auctions', auctionId));
+          toast.success('Mnada umefutwa kikamilifu!');
+        } catch (err: any) {
+          console.error('Delete error:', err);
+          toast.error('Imeshindwa kufuta mnada');
+        }
+      }
+    });
   };
 
   return (
@@ -372,12 +446,21 @@ export const AuctionPage: React.FC = () => {
                   alt="" 
                   className="w-full h-full object-cover"
                 />
-                <button 
-                  onClick={() => setSelectedAuction(null)}
-                  className="absolute top-4 left-4 w-10 h-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-xl flex items-center justify-center text-slate-900 dark:text-white shadow-xl"
-                >
-                  <X size={20} />
-                </button>
+                <div className="absolute top-4 left-4 flex gap-2">
+                  <button 
+                    onClick={() => setSelectedAuction(null)}
+                    className="w-10 h-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-xl flex items-center justify-center text-slate-900 dark:text-white shadow-xl"
+                  >
+                    <X size={20} />
+                  </button>
+                  <button 
+                    onClick={() => setQrModalOpen(true)}
+                    className="w-10 h-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-xl flex items-center justify-center text-emerald-600 shadow-xl"
+                    title="Share QR Code"
+                  >
+                    <QrCode size={20} />
+                  </button>
+                </div>
               </div>
 
               <div className="md:w-1/2 p-6 sm:p-10 overflow-y-auto scrollbar-hide">
@@ -479,167 +562,42 @@ export const AuctionPage: React.FC = () => {
                       <CreditCard className="text-amber-500" /> Kamilisha Malipo
                     </h3>
                     
-                    {paymentStep === 'options' && (
-                      <div className="space-y-4">
-                        <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-6 rounded-[20px] sm:rounded-[32px] border border-slate-100 dark:border-slate-800 space-y-2 sm:space-y-3 mb-4 sm:mb-6">
-                          <div className="flex justify-between items-center">
-                            <span className="font-black text-xs sm:text-base text-slate-900 dark:text-white">Jumla ya Malipo:</span>
-                            <span className="text-lg sm:text-xl font-black text-emerald-600">
-                              {formatCurrency(selectedAuction.currentBid, currency)}
-                            </span>
-                          </div>
-                        </div>
-
-                        <p className="text-sm text-slate-500 font-bold mb-4">Chagua njia ya kulipa:</p>
-                        <div className="grid grid-cols-1 gap-2">
-                          {[
-                            { id: 'wallet', label: 'Wallet Balance', icon: <Wallet size={20} />, color: 'bg-amber-50 text-amber-600' },
-                            { id: 'tigo', label: 'Mix by Yas (Tigo Pesa)', icon: <Smartphone size={20} />, color: 'bg-blue-50 text-blue-600' },
-                            { id: 'mpesa', label: 'M-Pesa', icon: <Smartphone size={20} />, color: 'bg-red-50 text-red-600' },
-                            { id: 'airtel', label: 'Airtel Money', icon: <Smartphone size={20} />, color: 'bg-red-50 text-red-600' },
-                            { id: 'halopesa', label: 'HaloPesa', icon: <Smartphone size={20} />, color: 'bg-orange-50 text-orange-600' },
-                            { id: 'cash', label: 'Pesa Taslimu (Cash)', icon: <CreditCard size={20} />, color: 'bg-emerald-50 text-emerald-600' }
-                          ].map((m) => {
-                            const total = selectedAuction.currentBid;
-                            const hasEnough = m.id === 'wallet' ? (user?.walletBalance || 0) >= total : true;
-                            
-                            return (
-                              <button
-                                key={m.id}
-                                onClick={() => {
-                                  if (m.id === 'wallet' && !hasEnough) {
-                                    toast.error('Salio la wallet halitoshi.');
-                                    return;
-                                  }
-                                  setPaymentMethod(m.id as any);
-                                  if (m.id === 'cash') {
-                                    handleAuctionPayment();
-                                  } else {
-                                    setPaymentStep('details');
-                                  }
-                                }}
-                                className={cn(
-                                  "flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left group",
-                                  paymentMethod === m.id ? "border-amber-500 bg-amber-50" : 
-                                  (!hasEnough && m.id === 'wallet' ? "opacity-50 cursor-not-allowed border-slate-100" : "border-slate-100 hover:border-slate-200")
-                                )}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <span className={cn("w-10 h-10 rounded-xl flex items-center justify-center", m.color)}>{m.icon}</span>
-                                  <div>
-                                    <p className="font-bold text-sm">{m.label}</p>
-                                    <p className="text-[10px] text-slate-400">
-                                      {m.id === 'wallet' ? `Salio: ${formatCurrency(user?.walletBalance || 0, currency)}` : m.id === 'cash' ? 'Lipa ukipokea mzigo' : 'Lipa sasa kwa usalama'}
-                                    </p>
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-6 rounded-[20px] sm:rounded-[32px] border border-slate-100 dark:border-slate-800 space-y-2 sm:space-y-3 mb-4 sm:mb-6">
+                      <div className="flex justify-between items-center">
+                        <span className="font-black text-xs sm:text-base text-slate-900 dark:text-white">Jumla ya Malipo:</span>
+                        <span className="text-lg sm:text-xl font-black text-emerald-600">
+                          {formatCurrency(selectedAuction.currentBid, currency)}
+                        </span>
                       </div>
-                    )}
+                    </div>
 
-                    {paymentStep === 'details' && (
-                      <div className="space-y-6">
-                        {paymentMethod !== 'wallet' ? (
-                          <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lipia kupitia: {paymentMethod.toUpperCase()}</p>
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-xs text-slate-500">Namba ya Malipo:</p>
-                                <p className="text-lg font-black text-slate-900">{systemSettings?.paymentNumber || '0687225353'}</p>
-                              </div>
-                              <button 
-                                onClick={() => {
-                                  navigator.clipboard.writeText(systemSettings?.paymentNumber || '0687225353');
-                                  toast.success('Namba imenakiliwa!');
-                                }}
-                                className="p-3 bg-white rounded-xl text-amber-600 shadow-sm"
-                              >
-                                <Copy size={18} />
-                              </button>
-                            </div>
-                            <div>
-                              <p className="text-xs text-slate-500">Jina:</p>
-                              <p className="text-sm font-black text-slate-900">{systemSettings?.paymentName || 'Amour'}</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center">
-                            <p className="text-sm font-bold text-emerald-800 mb-2">Salio lako la Wallet litatumika kulipia mnada huu.</p>
-                            <p className="text-2xl font-black text-emerald-600">
-                              {formatCurrency(selectedAuction.currentBid, currency)}
-                            </p>
-                            <p className="text-xs text-emerald-600 mt-2">Salio la sasa: {formatCurrency(user?.walletBalance || 0, currency)}</p>
-                          </div>
-                        )}
-
-                        <div className="space-y-4">
-                          {paymentMethod !== 'wallet' && (
-                            <div>
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Transaction ID (Kutoka kwenye SMS)</label>
-                              <input 
-                                type="text" 
-                                value={paymentForm.transactionId}
-                                onChange={(e) => setPaymentForm({...paymentForm, transactionId: e.target.value})}
-                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-bold"
-                                placeholder="Mf. 8G76H5J4K"
-                              />
-                            </div>
-                          )}
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Jina la Mtumaji</label>
-                              <input 
-                                type="text" 
-                                value={paymentForm.senderName}
-                                onChange={(e) => setPaymentForm({...paymentForm, senderName: e.target.value})}
-                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-bold"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Namba ya Mtumaji</label>
-                              <input 
-                                type="text" 
-                                value={paymentForm.senderPhone}
-                                onChange={(e) => setPaymentForm({...paymentForm, senderPhone: e.target.value})}
-                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-bold"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-3">
-                          <button 
-                            onClick={() => setPaymentStep('options')}
-                            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-sm uppercase transition-all"
-                          >
-                            RUDI
-                          </button>
-                          <button 
-                            onClick={handleAuctionPayment}
-                            disabled={isPaying || (paymentMethod !== 'wallet' && paymentMethod !== 'cash' && !paymentForm.transactionId)}
-                            className="flex-[2] bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-emerald-100 disabled:opacity-50"
-                          >
-                            {isPaying ? 'Inatuma...' : 'THIBITISHA MALIPO'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {paymentStep === 'success' && (
+                    {selectedAuction.paymentStatus === 'pending' ? (
                       <div className="text-center py-6">
-                        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 text-4xl mx-auto mb-4">✅</div>
-                        <h4 className="text-xl font-black text-slate-900 mb-2">Malipo Yametumwa!</h4>
-                        <p className="text-sm text-slate-500 font-bold mb-6">Admin anahakiki malipo yako sasa hivi. Utapokea taarifa punde tu itakapokamilika.</p>
-                        <button 
-                          onClick={() => setSelectedAuction(null)}
-                          className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest"
-                        >
-                          FUNGA
-                        </button>
+                        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-3xl mx-auto mb-4 animate-pulse">⏳</div>
+                        <h4 className="text-lg font-black text-slate-900 mb-2">Malipo Yanahakikiwa</h4>
+                        <p className="text-sm text-slate-500 font-bold">Admin anahakiki malipo yako sasa hivi. Utapokea taarifa punde tu itakapokamilika.</p>
                       </div>
+                    ) : (
+                      <button 
+                        onClick={() => {
+                          setPaymentDetails({
+                            amount: selectedAuction.currentBid,
+                            reason: `Malipo ya Mnada: ${selectedAuction.title}`,
+                            actionType: 'auction_payment',
+                            extraData: {
+                              auctionId: selectedAuction.id,
+                              vendorId: selectedAuction.vendorId,
+                              vendorName: selectedAuction.vendorName,
+                              productName: selectedAuction.title,
+                              image: selectedAuction.images?.[0] || ''
+                            }
+                          });
+                          setPaymentModalOpen(true);
+                        }}
+                        className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
+                      >
+                        LIPA SASA (MITANDAO YA SIMU)
+                      </button>
                     )}
                   </div>
                 )}
@@ -742,6 +700,30 @@ export const AuctionPage: React.FC = () => {
         userId={user?.id || `guest_${Math.floor(Math.random() * 10000)}`} 
         userName={user?.name || 'Mteja'} 
       />
+
+      {paymentDetails && (
+        <ManualPaymentModal
+          isOpen={paymentModalOpen}
+          onClose={() => {
+            setPaymentModalOpen(false);
+            setPaymentDetails(null);
+          }}
+          amount={paymentDetails.amount}
+          reason={paymentDetails.reason}
+          onSubmit={handleManualPaymentSubmit}
+        />
+      )}
+
+      {selectedAuction && (
+        <QRCodeModal
+          isOpen={qrModalOpen}
+          onClose={() => setQrModalOpen(false)}
+          url={`${window.location.origin}/auctions?id=${selectedAuction.id}`}
+          title={selectedAuction.title}
+          subtitle={`Mnada wa ${selectedAuction.category} - ${selectedAuction.vendorName}`}
+          logo={selectedAuction.images?.[0]}
+        />
+      )}
     </div>
   );
 };
