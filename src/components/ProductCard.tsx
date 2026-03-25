@@ -111,19 +111,21 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
           </h3>
         </div>
         
-        <div className="flex items-center justify-between mt-auto gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#F8FAFC] dark:bg-slate-800 flex items-center justify-center text-xs font-black text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-700">
+        <div className="flex items-center justify-between mt-auto gap-2 pt-4 border-t border-slate-50 dark:border-slate-800/30">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-[10px] sm:text-xs font-black text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-700">
               {product.vendorName[0]}
             </div>
-            <p className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-slate-500 truncate hidden xs:block">
+            <p className="text-[9px] sm:text-xs font-bold text-slate-400 dark:text-slate-500 truncate hidden xs:block">
               {product.vendorName}
             </p>
           </div>
-          <p className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100 whitespace-nowrap">
-            {formatCurrency(product.price, currency)}
-            <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 ml-0.5">/{product.unit}</span>
-          </p>
+          <div className="bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-full border border-slate-100 dark:border-slate-700/50">
+            <p className="text-[11px] sm:text-sm font-black text-slate-900 dark:text-slate-100 whitespace-nowrap">
+              {formatCurrency(product.price, currency)}
+              <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 ml-0.5">/{product.unit}</span>
+            </p>
+          </div>
         </div>
       </div>
     </motion.div>
