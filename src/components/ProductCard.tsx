@@ -8,11 +8,13 @@ import { useApp } from '../context/AppContext';
 interface ProductCardProps {
   product: Product;
   onClick: () => void;
+  onVendorClick?: (vendorId: string) => void;
   isOpen?: boolean;
   rating?: number;
+  vendorAvatar?: string;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOpen = true, rating = 0 }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, onVendorClick, isOpen = true, rating = 0, vendorAvatar }) => {
   const { t, systemSettings, cart, addToCart, updateCartQty } = useApp();
   const currency = systemSettings?.currency || 'TZS';
 
@@ -45,6 +47,27 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, isOp
             <Star size={12} className={cn(rating > 0 ? "fill-amber-400 text-amber-400" : "text-slate-300 dark:text-slate-600")} />
             <span className="text-xs font-black text-slate-900 dark:text-white">{rating > 0 ? rating.toFixed(1) : '0'}</span>
           </div>
+        </div>
+
+        {/* Vendor Profile Pic */}
+        <div className="absolute bottom-4 left-4 z-10">
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onVendorClick?.(product.vendorId);
+            }}
+            className="w-10 h-10 rounded-full border-2 border-white dark:border-slate-800 shadow-md overflow-hidden bg-white dark:bg-slate-800"
+          >
+            {vendorAvatar ? (
+              <img src={vendorAvatar} alt={product.vendorName} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-xs font-black text-slate-400">
+                {product.vendorName[0]}
+              </div>
+            )}
+          </motion.button>
         </div>
 
         {/* Status Badge (Optional, kept for functionality but styled minimally) */}

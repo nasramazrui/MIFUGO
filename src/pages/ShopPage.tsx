@@ -2385,6 +2385,14 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                       product={p} 
                       rating={avgRating}
                       isOpen={isStoreOpen(p.vendorId)}
+                      vendorAvatar={vendors.find(v => v.id === p.vendorId)?.shopIcon || vendors.find(v => v.id === p.vendorId)?.avatar}
+                      onVendorClick={(vId) => {
+                        const vendor = vendors.find(v => v.id === vId);
+                        if (vendor) {
+                          setSelectedVendor(vendor);
+                          setActiveTab('stores');
+                        }
+                      }}
                       onClick={() => {
                         setSelectedProduct(p);
                         setQty(1);
@@ -3958,6 +3966,15 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
               ) : (
                 selectedProduct.emoji
               )}
+              
+              {/* Close Button */}
+              <button 
+                onClick={() => setSelectedProduct(null)}
+                className="absolute top-4 right-4 w-10 h-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all z-20 shadow-sm"
+              >
+                <X size={20} />
+              </button>
+
               <div className="absolute bottom-4 left-4">
                 <span className={cn(
                   "badge px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
@@ -3992,6 +4009,42 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                 </span>
               </div>
               <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">{selectedProduct.desc}</p>
+            </div>
+
+            {/* Vendor Info */}
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full border-2 border-white dark:border-slate-800 shadow-sm overflow-hidden bg-white dark:bg-slate-800">
+                  {vendors.find(v => v.id === selectedProduct.vendorId)?.shopIcon || vendors.find(v => v.id === selectedProduct.vendorId)?.avatar ? (
+                    <img 
+                      src={vendors.find(v => v.id === selectedProduct.vendorId)?.shopIcon || vendors.find(v => v.id === selectedProduct.vendorId)?.avatar} 
+                      alt={selectedProduct.vendorName} 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-lg font-black text-slate-400">
+                      {selectedProduct.vendorName[0]}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{t('vendor')}</p>
+                  <p className="text-sm font-black text-slate-900 dark:text-white">{selectedProduct.vendorName}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  const vendor = vendors.find(v => v.id === selectedProduct.vendorId);
+                  if (vendor) {
+                    setSelectedVendor(vendor);
+                    setActiveTab('stores');
+                    setSelectedProduct(null);
+                  }
+                }}
+                className="px-4 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-amber-200 transition-colors"
+              >
+                {t('view_store') || 'Dukani'}
+              </button>
             </div>
 
             {selectedProduct.isLivestock && (
