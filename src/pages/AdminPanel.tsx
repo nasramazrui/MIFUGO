@@ -18,9 +18,9 @@ import { db,
   getDocs,
   getDoc,
   query,
-  onSnapshot,
   where,
   limit,
+  onSnapshot,
   handleFirestoreError,
   OperationType
 } from '../services/firebase';

@@ -2,16 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Auction, Bid } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Gavel, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2, Wallet, Send, CreditCard, Smartphone, Search, Globe, Trash2, Video, QrCode } from 'lucide-react';
+import { Gavel, Clock, Trophy, TrendingUp, AlertCircle, CheckCircle2, Wallet, Send, CreditCard, Smartphone, Search, Globe, Trash2, Video } from 'lucide-react';
 import { formatCurrency, cn } from '../utils';
 import { db, collection, addDoc, updateDoc, doc, serverTimestamp, query, where, orderBy, onSnapshot, increment, getDoc, deleteDoc, handleFirestoreError, OperationType } from '../services/firebase';
 import { toast } from 'react-hot-toast';
 import LiveStreamModal from '../components/LiveStreamModal';
 import { ManualPaymentModal } from '../components/ManualPaymentModal';
-import { QRCodeModal } from '../components/QRCodeModal';
 
 export const AuctionPage: React.FC = () => {
-  const { user, auctions, systemSettings, t, language, liveSessions, setConfirmModal } = useApp();
+  const { user, auctions, systemSettings, t, language, liveSessions } = useApp();
   const currency = systemSettings?.currency || 'TZS';
   const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
   const [liveStreamAuctionId, setLiveStreamAuctionId] = useState<string | null>(null);
@@ -21,7 +20,6 @@ export const AuctionPage: React.FC = () => {
   const [isPaying, setIsPaying] = useState(false);
   const [paymentStep, setPaymentStep] = useState<'options' | 'details' | 'success'>('options');
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [qrModalOpen, setQrModalOpen] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState<{ amount: number; reason: string; actionType: string; extraData?: any } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'tigo' | 'mpesa' | 'airtel' | 'halopesa' | 'cash'>('tigo');
   const [paymentForm, setPaymentForm] = useState({
@@ -314,20 +312,15 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
 
   const handleDeleteAuction = async (e: React.MouseEvent, auctionId: string) => {
     e.stopPropagation();
-    setConfirmModal({
-      isOpen: true,
-      title: 'Futa Mnada',
-      message: 'Je, una uhakika unataka kufuta mnada huu? Hatua hii haiwezi kurudishwa.',
-      onConfirm: async () => {
-        try {
-          await deleteDoc(doc(db, 'kuku_auctions', auctionId));
-          toast.success('Mnada umefutwa kikamilifu!');
-        } catch (err: any) {
-          console.error('Delete error:', err);
-          toast.error('Imeshindwa kufuta mnada');
-        }
-      }
-    });
+    if (!window.confirm('Je, una uhakika unataka kufuta mnada huu?')) return;
+
+    try {
+      await deleteDoc(doc(db, 'kuku_auctions', auctionId));
+      toast.success('Mnada umefutwa kikamilifu!');
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      toast.error('Imeshindwa kufuta mnada');
+    }
   };
 
   return (
@@ -446,21 +439,12 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                   alt="" 
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute top-4 left-4 flex gap-2">
-                  <button 
-                    onClick={() => setSelectedAuction(null)}
-                    className="w-10 h-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-xl flex items-center justify-center text-slate-900 dark:text-white shadow-xl"
-                  >
-                    <X size={20} />
-                  </button>
-                  <button 
-                    onClick={() => setQrModalOpen(true)}
-                    className="w-10 h-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-xl flex items-center justify-center text-emerald-600 shadow-xl"
-                    title="Share QR Code"
-                  >
-                    <QrCode size={20} />
-                  </button>
-                </div>
+                <button 
+                  onClick={() => setSelectedAuction(null)}
+                  className="absolute top-4 left-4 w-10 h-10 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-xl flex items-center justify-center text-slate-900 dark:text-white shadow-xl"
+                >
+                  <X size={20} />
+                </button>
               </div>
 
               <div className="md:w-1/2 p-6 sm:p-10 overflow-y-auto scrollbar-hide">
@@ -711,17 +695,6 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
           amount={paymentDetails.amount}
           reason={paymentDetails.reason}
           onSubmit={handleManualPaymentSubmit}
-        />
-      )}
-
-      {selectedAuction && (
-        <QRCodeModal
-          isOpen={qrModalOpen}
-          onClose={() => setQrModalOpen(false)}
-          url={`${window.location.origin}/auctions?id=${selectedAuction.id}`}
-          title={selectedAuction.title}
-          subtitle={`Mnada wa ${selectedAuction.category} - ${selectedAuction.vendorName}`}
-          logo={selectedAuction.images?.[0]}
         />
       )}
     </div>
