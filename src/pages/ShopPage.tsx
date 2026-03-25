@@ -1834,44 +1834,48 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
 
       <div className="lg:pl-72 min-h-screen flex flex-col relative">
         {/* Header */}
-        <header className="sticky top-0 z-[60] bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800/50 w-full">
+        <header className="sticky top-0 z-[60] bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800/50 w-full shadow-sm">
           <div className="max-w-7xl mx-auto px-4 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3">
               <button 
                 onClick={() => setIsMobileMenuOpen(true)}
-                className="lg:hidden w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all"
+                className="lg:hidden w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900/50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-all"
               >
                 <Menu size={20} className="sm:w-6 sm:h-6" />
               </button>
+              
               <button 
                 onClick={() => setIsQRScannerOpen(true)}
-                className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 transition-all"
+                className="hidden sm:flex w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 dark:bg-emerald-900/20 rounded-full items-center justify-center text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 transition-all"
                 title="Scan QR Code"
               >
                 <QrCode size={20} className="sm:w-6 sm:h-6" />
               </button>
+
               <button 
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
                 className={cn(
                   "w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all",
-                  isSearchOpen ? "bg-amber-500 text-white" : "bg-slate-100 dark:bg-slate-900 text-slate-400 hover:bg-slate-200"
+                  isSearchOpen ? "bg-amber-500 text-white" : "bg-slate-100 dark:bg-slate-900/50 text-slate-500 hover:bg-slate-200"
                 )}
               >
                 <Search size={20} className="sm:w-6 sm:h-6" />
               </button>
+
               <button 
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
                 className={cn(
-                  "w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all",
-                  isFilterOpen || minPrice || maxPrice ? "bg-amber-500 text-white" : "bg-slate-100 dark:bg-slate-900 text-slate-400 hover:bg-slate-200"
+                  "hidden sm:flex w-10 h-10 sm:w-12 sm:h-12 rounded-full items-center justify-center transition-all",
+                  isFilterOpen || minPrice || maxPrice ? "bg-amber-500 text-white" : "bg-slate-100 dark:bg-slate-900/50 text-slate-500 hover:bg-slate-200"
                 )}
               >
                 <Settings size={20} className="sm:w-6 sm:h-6" />
               </button>
-              <div className="relative" ref={langRef}>
+
+              <div className="hidden md:block relative" ref={langRef}>
                 <button 
                   onClick={() => setIsLangOpen(!isLangOpen)}
-                  className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-100 dark:bg-slate-900 rounded-full border border-slate-100 dark:border-slate-800 hover:bg-slate-200 transition-all"
+                  className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-100 dark:bg-slate-900/50 rounded-full border border-slate-100 dark:border-slate-800 hover:bg-slate-200 transition-all"
                 >
                   <Globe size={16} className="text-slate-400 sm:w-[18px] sm:h-[18px]" />
                   <span className="text-[10px] sm:text-sm font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">{language === 'sw' ? 'SW' : 'EN'}</span>
@@ -1900,13 +1904,14 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                   )}
                 </AnimatePresence>
               </div>
+
               {user && (
                 <>
                   <motion.button 
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={() => setIsQRScannerOpen(true)}
-                    className="relative w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all"
+                    className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900/50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-all"
                   >
                     <QrCode size={20} className="sm:w-6 sm:h-6" />
                   </motion.button>
@@ -1918,7 +1923,7 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                       transition: { repeat: Infinity, duration: 2, repeatDelay: 1 }
                     } : {}}
                     onClick={() => setIsNotificationsOpen(true)}
-                    className="relative w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all"
+                    className="relative w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900/50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-all"
                   >
                     <Bell size={20} className="sm:w-6 sm:h-6" />
                     {unreadNotifications > 0 && (
@@ -1951,7 +1956,7 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                 <div className="flex items-center gap-2 sm:gap-3">
                   <button 
                     onClick={() => setIsProfileModalOpen(true)}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-slate-800 overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm active:scale-95 transition-all"
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm active:scale-95 transition-all"
                   >
                     {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg">👤</div>}
                   </button>
@@ -2667,7 +2672,7 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
       </div> {/* End of lg:pl-72 */}
 
       {/* Bottom Nav (Mobile Only) */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#050A18] border-t border-white/5 px-4 py-4 z-40 pb-safe">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#050A18]/95 backdrop-blur-xl border-t border-white/10 px-4 py-3 z-50 pb-safe shadow-[0_-8px_32px_rgba(0,0,0,0.5)]">
         <div className="max-w-md mx-auto flex justify-between items-center">
           <button 
             onClick={() => setActiveTab('browse')}
