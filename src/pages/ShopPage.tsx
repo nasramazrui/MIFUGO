@@ -1832,9 +1832,9 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
         </div>
       </aside>
 
-      <div className="lg:pl-72 min-h-screen flex flex-col">
+      <div className="lg:pl-72 min-h-screen flex flex-col relative">
         {/* Header */}
-        <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800/50">
+        <header className="sticky top-0 z-[60] bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800/50 w-full">
           <div className="max-w-7xl mx-auto px-4 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
             <div className="flex items-center gap-2 sm:gap-3">
               <button 
