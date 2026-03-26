@@ -2842,6 +2842,29 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                       <option value="hi">हिन्दी (Hindi)</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block">Mandhari (Theme)</label>
+                    <div className="flex gap-2 bg-slate-50 dark:bg-slate-800 p-1 rounded-2xl border-2 border-slate-100 dark:border-slate-700">
+                      <button 
+                        onClick={() => setTheme('light')}
+                        className={cn(
+                          "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all",
+                          theme === 'light' ? "bg-white text-amber-600 shadow-sm" : "text-slate-400"
+                        )}
+                      >
+                        <Sun size={16} /> Mwangaza
+                      </button>
+                      <button 
+                        onClick={() => setTheme('dark')}
+                        className={cn(
+                          "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all",
+                          theme === 'dark' ? "bg-slate-700 text-amber-400 shadow-sm" : "text-slate-400"
+                        )}
+                      >
+                        <Moon size={16} /> Giza (Black)
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl">
@@ -3770,6 +3793,14 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-amber-400 to-orange-600" />
               )}
+              
+              {/* Close Button */}
+              <button 
+                onClick={() => setSelectedVendor(null)}
+                className="absolute top-4 right-4 w-10 h-10 bg-black/50 backdrop-blur-md text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all z-20"
+              >
+                <X size={20} />
+              </button>
               {/* Shop Icon */}
               <div className="absolute -bottom-10 left-6">
                 <div className="w-24 h-24 bg-white dark:bg-slate-900 rounded-[32px] p-1 shadow-2xl">
@@ -5394,18 +5425,6 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
 
       <RecentPurchases />
       <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
-
-      {/* Floating Scan Button (Mobile) */}
-      <div className="fixed bottom-24 right-6 z-40 lg:hidden">
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => setIsQRScannerOpen(true)}
-          className="w-14 h-14 bg-amber-500 text-amber-950 rounded-full shadow-2xl flex items-center justify-center border-4 border-white dark:border-slate-950"
-        >
-          <QrCode size={24} />
-        </motion.button>
-      </div>
 
       <AnimatePresence>
         {isQRScannerOpen && (

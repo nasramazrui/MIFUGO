@@ -78,50 +78,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, onVe
             </div>
           </div>
         )}
-
-        {/* Add to Cart Button - Floating between image and text */}
-        <div className="absolute -bottom-6 right-4 sm:right-6 z-10">
-          <AnimatePresence mode="wait">
-            {cartItem ? (
-              <motion.div 
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                className="flex items-center bg-amber-600 text-white rounded-[20px] p-1 shadow-lg h-12"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button 
-                  onClick={() => updateCartQty(product.id, -1)}
-                  className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-2xl transition-colors"
-                >
-                  <Minus size={16} />
-                </button>
-                <span className="w-6 text-center text-sm font-black">{cartItem.qty}</span>
-                <button 
-                  onClick={() => updateCartQty(product.id, 1)}
-                  className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-2xl transition-colors"
-                >
-                  <Plus size={16} />
-                </button>
-              </motion.div>
-            ) : (
-              <motion.button
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  addToCart(product, 1);
-                }}
-                className="w-12 h-12 bg-white dark:bg-slate-800 text-amber-600 rounded-[20px] flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:shadow-none border border-slate-50 dark:border-slate-700 hover:text-amber-700 transition-all duration-300 pointer-events-auto"
-              >
-                <Plus size={24} strokeWidth={3} />
-              </motion.button>
-            )}
-          </AnimatePresence>
-        </div>
       </div>
 
       <div className="p-5 sm:p-6 pt-8 sm:pt-10 flex-1 flex flex-col bg-white dark:bg-slate-900" onClick={onClick}>
