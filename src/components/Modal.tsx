@@ -17,7 +17,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -35,14 +35,12 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
             className
           )}
         >
-          {title && (
-            <div className={cn("p-6 flex items-center justify-between border-b border-slate-100 dark:border-slate-800", headerClassName)}>
-              <h2 className="text-xl font-black text-slate-900 dark:text-white">{title}</h2>
-              <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-400">
-                <X size={24} />
-              </button>
-            </div>
-          )}
+          <div className={cn("p-4 flex items-center justify-between", title ? "border-b border-slate-100 dark:border-slate-800 p-6" : "absolute top-2 right-2 z-20", headerClassName)}>
+            {title && <h2 className="text-xl font-black text-slate-900 dark:text-white">{title}</h2>}
+            <button onClick={onClose} className={cn("p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-400", !title && "bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm")}>
+              <X size={24} />
+            </button>
+          </div>
           <div className="overflow-y-auto p-6 flex-1 scrollbar-hide">
             {children}
           </div>

@@ -476,7 +476,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         // Filter by userId or vendorId for non-admins
         if (collName === 'kuku_chat') {
-          q = query(collection(db, collName), or(where('senderId', '==', user.id), where('receiverId', '==', user.id)), orderBy(orderField, direction));
+          q = query(collection(db, collName), where('participants', 'array-contains', user.id), orderBy(orderField, direction));
         } else if (collName === 'kuku_orders') {
           q = query(collection(db, collName), or(where('userId', '==', user.id), where('vendorId', '==', user.id)), orderBy(orderField, direction));
         } else if (collName === 'kuku_notifications') {

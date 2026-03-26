@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import { ShopPage } from './pages/ShopPage';
 import { VendorPortal } from './pages/VendorPortal';
+import { DoctorPortal } from './pages/DoctorPortal';
 import { AdminPanel } from './pages/AdminPanel';
 import { Toaster } from 'react-hot-toast';
 import { applyThemeColor } from './utils/theme';
@@ -136,6 +137,10 @@ const AppContent: React.FC = () => {
         <Route 
           path="/vendor/*" 
           element={(user?.role === 'vendor' || user?.role === 'admin') ? <VendorPortal /> : <Navigate to="/" />} 
+        />
+        <Route 
+          path="/doctor/*" 
+          element={(user?.role === 'doctor' || user?.role === 'admin') ? <DoctorPortal /> : <Navigate to="/" />} 
         />
         <Route 
           path="/vendor/livestock" 

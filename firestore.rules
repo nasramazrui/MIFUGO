@@ -49,6 +49,18 @@ service cloud.firestore {
          get(/databases/$(database)/documents/kuku_users/$(request.auth.uid)).data.role == 'admin'));
     }
 
+    function isVendor() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/kuku_users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/kuku_users/$(request.auth.uid)).data.role == 'vendor';
+    }
+
+    function isDoctor() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/kuku_users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/kuku_users/$(request.auth.uid)).data.role == 'doctor';
+    }
+
     function isValidEmail(email) {
       return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
@@ -65,11 +77,11 @@ service cloud.firestore {
       return data.keys().hasAll(['id', 'email', 'role', 'createdAt']) &&
         data.id is string &&
         isValidEmail(data.email) &&
-        data.role in ['admin', 'user'] &&
+        data.role in ['admin', 'user', 'vendor', 'doctor'] &&
         isValidDateString(data.createdAt) &&
         (!('walletBalance' in data) || ((data.walletBalance is int || data.walletBalance is float) && data.walletBalance >= 0)) &&
         (!('theme' in data) || data.theme in ['light', 'dark']) &&
-        (!('language' in data) || data.language in ['en', 'sw']);
+        (!('language' in data) || data.language in ['en', 'sw', 'ar', 'hi']);
     }
 
     function isValidManualPayment(data) {
@@ -84,7 +96,12 @@ service cloud.firestore {
     // ===============================================================
 
     // Publicly readable collections (Marketplace data)
-    match /kuku_products/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /kuku_products/{id} { 
+      allow read: if true; 
+      allow create: if isAuthenticated() && (isVendor() || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.vendorId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
     match /kuku_categories/{id} { allow read: if true; allow write: if isAdmin(); }
     match /kuku_auctions/{id} { allow read: if true; allow write: if isAuthenticated(); }
     match /kuku_reviews/{id} { allow read: if true; allow write: if isAuthenticated(); }
@@ -96,8 +113,8 @@ service cloud.firestore {
     
     // User data (PII protected)
     match /kuku_users/{userId} {
-      allow read: if (resource.data.role == 'vendor') || isOwner(userId) || isAdmin() || isAuthenticated();
-      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow read: if true; 
+      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
       allow update: if isAuthenticated() && (isOwner(userId) || isAdmin());
       allow delete: if isAdmin();
     }
@@ -112,25 +129,32 @@ service cloud.firestore {
     
     match /kuku_activity/{id} { 
       allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin()); 
-      allow create: if isAuthenticated() && (request.resource.data.get('userId', '') == request.auth.uid || request.resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('vendorId', '') == request.auth.uid || isAdmin());
       allow delete: if isAdmin();
     }
     
     match /kuku_chat/{id} { 
       allow read: if isAuthenticated() && (
-        resource.data.get('senderId', '') == request.auth.uid || 
-        resource.data.get('receiverId', '') == request.auth.uid || 
-        (resource.data.keys().contains('participants') && request.auth.uid in resource.data.participants) || 
+        isAdmin() ||
+        (resource.data.get('participants', []) is list && request.auth.uid in resource.data.get('participants', []))
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.get('senderId', '') == request.auth.uid ||
         isAdmin()
       );
-      allow create: if isAuthenticated() && (request.resource.data.get('senderId', '') == request.auth.uid || isAdmin());
-      allow update, delete: if isAdmin();
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.get('participants', []) is list && request.auth.uid in resource.data.get('participants', []))
+      );
+      allow delete: if isAdmin();
     }
     
     match /kuku_notifications/{id} { 
       allow read: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('userId', '') == 'all' || isAdmin());
-      allow write: if isAdmin(); 
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('userId', '') == 'all' || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.get('userId', '') == request.auth.uid || isAdmin()); 
     }
     
     match /kuku_wallet/{id} { 

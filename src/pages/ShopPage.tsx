@@ -9,7 +9,7 @@ import { Modal } from '../components/Modal';
 import { formatCurrency, generateId, cn } from '../utils';
 import { AuthModal } from '../components/AuthModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell, BookOpen, Tag, FileText, Syringe, QrCode, CheckCircle2, MessageCircle, Video, Activity, Clock, Save } from 'lucide-react';
+import { Search, ShoppingBag, ShoppingCart, Store, Package, Star, Plus, Minus, Send, MapPin, LogOut, Info, User as UserIcon, Settings, Trash2, Camera, X, ThumbsUp, MessageSquare, Smile, Moon, Sun, Globe, LayoutDashboard, ChevronRight, Copy, Wallet, ArrowRight, Check, Gavel, ShieldCheck, Home, Menu, Bell, BookOpen, Tag, FileText, Syringe, QrCode, CheckCircle2, MessageCircle, Video, Activity, Clock, Save, Stethoscope } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { db, auth, collection, addDoc, serverTimestamp, setDoc, doc, updateDoc, increment, deleteDoc, getDoc, createUserWithEmailAndPassword, updateProfile, deleteUser, updatePassword, handleFirestoreError, OperationType } from '../services/firebase';
 import { getAuthEmail, isEmail } from '../utils/authUtils';
@@ -44,6 +44,7 @@ export const ShopPage: React.FC = () => {
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
   const [isQRPaymentModalOpen, setIsQRPaymentModalOpen] = useState(false);
   const [qrPaymentData, setQrPaymentData] = useState<{ vendor: User | null, amount: string }>({ vendor: null, amount: '' });
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isProcessingQRPayment, setIsProcessingQRPayment] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<Status | null>(null);
   const [activeLiveRoomId, setActiveLiveRoomId] = useState<string | null>(null);
@@ -1862,6 +1863,25 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                 <Search size={20} className="sm:w-6 sm:h-6" />
               </button>
 
+              <motion.button 
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setIsCartModalOpen(true)}
+                className="relative w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 dark:bg-slate-900/50 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-all"
+              >
+                <ShoppingCart size={20} className="sm:w-6 sm:h-6" />
+                {cart.length > 0 && (
+                  <motion.span 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    key={cart.reduce((acc, item) => acc + item.quantity, 0)}
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white dark:border-slate-950"
+                  >
+                    {cart.reduce((acc, item) => acc + item.quantity, 0)}
+                  </motion.span>
+                )}
+              </motion.button>
+
               <button 
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
                 className={cn(
@@ -1956,9 +1976,17 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                 <div className="flex items-center gap-2 sm:gap-3">
                   <button 
                     onClick={() => setIsProfileModalOpen(true)}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm active:scale-95 transition-all"
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white dark:bg-slate-900 overflow-hidden border-2 border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.4)] active:scale-90 transition-all flex items-center justify-center p-0.5"
                   >
-                    {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg">👤</div>}
+                    {user.avatar ? (
+                      user.avatar.startsWith('http') ? (
+                        <img src={user.avatar} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-full h-full rounded-full flex items-center justify-center text-xl bg-amber-50 dark:bg-slate-800">{user.avatar}</div>
+                      )
+                    ) : (
+                      <div className="w-full h-full rounded-full flex items-center justify-center text-lg bg-slate-100 dark:bg-slate-800">👤</div>
+                    )}
                   </button>
                 </div>
               )}
@@ -2680,57 +2708,102 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
       </div> {/* End of lg:pl-72 */}
 
       {/* Bottom Nav (Mobile Only) */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#050A18]/95 backdrop-blur-xl border-t border-white/10 px-4 py-3 z-50 pb-safe shadow-[0_-8px_32px_rgba(0,0,0,0.5)]">
-        <div className="max-w-md mx-auto flex justify-between items-center">
+      <nav className="lg:hidden fixed bottom-6 left-4 right-4 bg-white/95 dark:bg-[#050A18]/95 backdrop-blur-2xl border border-slate-100 dark:border-white/10 px-2 py-3 z-50 rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+        <div className="flex justify-between items-center px-1">
           <button 
             onClick={() => setActiveTab('browse')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'browse' ? "text-amber-500" : "text-slate-500")}
+            className={cn(
+              "flex flex-col items-center gap-1 transition-all duration-300 relative py-1 flex-1", 
+              activeTab === 'browse' ? "text-amber-500 scale-110" : "text-slate-400 dark:text-slate-500"
+            )}
           >
-            <ShoppingBag size={22} strokeWidth={2.5} />
-            <span className="text-[9px] font-black uppercase tracking-[0.15em]">SOKO</span>
+            <ShoppingBag size={22} strokeWidth={activeTab === 'browse' ? 3 : 2} />
+            <span className="text-[9px] font-black uppercase tracking-widest">SOKO</span>
+            {activeTab === 'browse' && (
+              <motion.div layoutId="nav-active" className="absolute -bottom-1 w-1 h-1 bg-amber-500 rounded-full" />
+            )}
           </button>
           
           <button 
             onClick={() => setActiveTab('auctions')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1 relative", activeTab === 'auctions' ? "text-amber-500" : "text-slate-500")}
+            className={cn(
+              "flex flex-col items-center gap-1 transition-all duration-300 relative py-1 flex-1", 
+              activeTab === 'auctions' ? "text-red-500 scale-110" : "text-slate-400 dark:text-slate-500"
+            )}
           >
             <div className="relative">
-              <Gavel size={22} strokeWidth={2.5} />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border-2 border-[#050A18]"></span>
+              <Gavel size={22} strokeWidth={activeTab === 'auctions' ? 3 : 2} />
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse border-2 border-white dark:border-[#050A18]"></span>
             </div>
-            <span className="text-[9px] font-black uppercase tracking-[0.15em]">LIVE</span>
+            <span className="text-[9px] font-black uppercase tracking-widest">LIVE</span>
+            {activeTab === 'auctions' && (
+              <motion.div layoutId="nav-active" className="absolute -bottom-1 w-1 h-1 bg-red-500 rounded-full" />
+            )}
           </button>
 
           <button 
             onClick={() => setActiveTab('stores')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'stores' ? "text-amber-500" : "text-slate-500")}
+            className={cn(
+              "flex flex-col items-center gap-1 transition-all duration-300 relative py-1 flex-1", 
+              activeTab === 'stores' ? "text-emerald-500 scale-110" : "text-slate-400 dark:text-slate-500"
+            )}
           >
-            <Store size={22} strokeWidth={2.5} />
-            <span className="text-[9px] font-black uppercase tracking-[0.15em]">MADUKA</span>
+            <Store size={22} strokeWidth={activeTab === 'stores' ? 3 : 2} />
+            <span className="text-[9px] font-black uppercase tracking-widest">MADUKA</span>
+            {activeTab === 'stores' && (
+              <motion.div layoutId="nav-active" className="absolute -bottom-1 w-1 h-1 bg-emerald-500 rounded-full" />
+            )}
+          </button>
+
+          <button 
+            onClick={() => setIsCartModalOpen(true)}
+            className="flex flex-col items-center gap-1 transition-all duration-300 relative py-1 flex-1 text-slate-400 dark:text-slate-500"
+          >
+            <div className="relative">
+              <ShoppingCart size={22} strokeWidth={2} />
+              {cart.length > 0 && (
+                <motion.span 
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-amber-500 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white dark:border-[#050A18]"
+                >
+                  {cart.reduce((acc, item) => acc + item.quantity, 0)}
+                </motion.span>
+              )}
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-widest">KIKAPU</span>
           </button>
 
           <button 
             onClick={() => setActiveTab('doctors')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'doctors' ? "text-amber-500" : "text-slate-500")}
+            className={cn(
+              "flex flex-col items-center gap-1 transition-all duration-300 relative py-1 flex-1", 
+              activeTab === 'doctors' ? "text-blue-500 scale-110" : "text-slate-400 dark:text-slate-500"
+            )}
           >
-            <Activity size={22} strokeWidth={2.5} />
-            <span className="text-[9px] font-black uppercase tracking-[0.15em]">DOKTA</span>
-          </button>
-
-          <button 
-            onClick={() => setActiveTab('orders')}
-            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1", activeTab === 'orders' ? "text-amber-500" : "text-slate-500")}
-          >
-            <Package size={22} strokeWidth={2.5} />
-            <span className="text-[9px] font-black uppercase tracking-[0.15em]">ODA</span>
+            <Activity size={22} strokeWidth={activeTab === 'doctors' ? 3 : 2} />
+            <span className="text-[9px] font-black uppercase tracking-widest">DOKTA</span>
+            {activeTab === 'doctors' && (
+              <motion.div layoutId="nav-active" className="absolute -bottom-1 w-1 h-1 bg-blue-500 rounded-full" />
+            )}
           </button>
 
           <button 
             onClick={() => setIsProfileModalOpen(true)}
-            className={cn("flex flex-col items-center gap-1.5 transition-all flex-1 text-slate-500")}
+            className="flex flex-col items-center gap-1 transition-all duration-300 relative py-1 flex-1 text-slate-400 dark:text-slate-500"
           >
-            <UserIcon size={22} strokeWidth={2.5} />
-            <span className="text-[9px] font-black uppercase tracking-[0.15em]">WASIFU</span>
+            <div className="w-6 h-6 rounded-full overflow-hidden border-2 border-amber-500 shadow-sm flex items-center justify-center p-0.5 bg-white dark:bg-slate-900">
+              {user?.avatar ? (
+                user.avatar.startsWith('http') ? (
+                  <img src={user.avatar} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-full h-full rounded-full flex items-center justify-center text-[10px] bg-amber-50 dark:bg-slate-800">{user.avatar}</div>
+                )
+              ) : (
+                <div className="w-full h-full rounded-full flex items-center justify-center text-[10px] bg-slate-100 dark:bg-slate-800">👤</div>
+              )}
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-widest">AKANTI</span>
           </button>
         </div>
       </nav>
@@ -2905,6 +2978,18 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                           <div className="flex items-center gap-3">
                             <Store size={18} />
                             <span>PORTAL YA MUUZAJI</span>
+                          </div>
+                          <ChevronRight size={16} />
+                        </button>
+                      )}
+                      {(user.role === 'doctor' || user.role === 'admin') && (
+                        <button 
+                          onClick={() => { navigate('/doctor'); setIsProfileModalOpen(false); }}
+                          className="w-full flex items-center justify-between p-4 bg-blue-600 text-white rounded-2xl font-black text-sm hover:bg-blue-700 transition-all"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Stethoscope size={18} />
+                            <span>PANELI YA DAKTARI</span>
                           </div>
                           <ChevronRight size={16} />
                         </button>
@@ -4469,22 +4554,37 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <button 
-                disabled={!isStoreOpen(selectedProduct.vendorId)}
+              <motion.button 
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                animate={isAddingToCart ? { scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] } : {}}
+                disabled={!isStoreOpen(selectedProduct.vendorId) || isAddingToCart}
                 onClick={() => {
+                  setIsAddingToCart(true);
                   addToCart(selectedProduct, qty);
-                  toast.success('Imeongezwa kwenye kikapu! 🛒');
-                  setSelectedProduct(null);
+                  toast.success('Imeongezwa kwenye kikapu! 🛒', {
+                    icon: '🛒',
+                    style: {
+                      borderRadius: '20px',
+                      background: '#050A18',
+                      color: '#fff',
+                      border: '1px solid #f59e0b'
+                    }
+                  });
+                  setTimeout(() => {
+                    setIsAddingToCart(false);
+                    setSelectedProduct(null);
+                  }, 600);
                 }}
                 className={cn(
-                  "py-5 rounded-[24px] font-black text-sm transition-all border-2",
+                  "py-5 rounded-[24px] font-black text-sm transition-all border-2 flex items-center justify-center gap-2",
                   isStoreOpen(selectedProduct.vendorId) 
-                    ? "border-amber-600 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 active:scale-95" 
+                    ? "border-amber-600 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20" 
                     : "border-slate-200 dark:border-slate-800 text-slate-400 cursor-not-allowed"
                 )}
               >
-                {t('add_to_cart')} 🛒
-              </button>
+                {isAddingToCart ? 'IMEONGEZWA! ✅' : <>{t('add_to_cart')} 🛒</>}
+              </motion.button>
               <button 
                 disabled={!isStoreOpen(selectedProduct.vendorId)}
                 onClick={handleBuyClick}
