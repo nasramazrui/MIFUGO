@@ -64,7 +64,9 @@ import {
   Award,
   Sparkles,
   QrCode,
-  Video
+  Video,
+  Database,
+  Download
 } from 'lucide-react';
 import { cn } from '../utils';
 import { CATEGORIES } from '../constants';
@@ -114,10 +116,106 @@ export const AdminPanel: React.FC = () => {
     t
   } = useApp();
   const currency = systemSettings?.currency || 'TZS';
-  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'doctors' | 'prods' | 'orders' | 'users' | 'admins' | 'wallet' | 'settings' | 'status' | 'cats' | 'reviews' | 'announcements' | 'offers' | 'academy' | 'manual_payments'>('over');
+  const [activeTab, setActiveTab] = useState<'over' | 'analytics' | 'vendors' | 'doctors' | 'prods' | 'orders' | 'users' | 'admins' | 'wallet' | 'settings' | 'status' | 'cats' | 'reviews' | 'announcements' | 'offers' | 'academy' | 'manual_payments' | 'db_mgmt'>('over');
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
+
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const exportAllData = async () => {
+    if (!confirm('Je, unataka kupakua nakala ya data zote za mfumo?')) return;
+    
+    setIsExporting(true);
+    const toastId = toast.loading('Inatayarisha data za mfumo...');
+    
+    try {
+      const collectionsList = [
+        'kuku_users', 'kuku_products', 'kuku_orders', 'kuku_activity', 
+        'kuku_notifications', 'kuku_wallet', 'kuku_withdrawals', 
+        'kuku_categories', 'kuku_auctions', 'kuku_chat', 
+        'kuku_breeding_records', 'kuku_production_records', 
+        'kuku_nutrition_records', 'kuku_livestock_health', 
+        'kuku_recurring_orders', 'kuku_live_sessions', 
+        'kuku_live_chats', 'kuku_bids', 'kuku_manual_payments', 
+        'kuku_system_settings'
+      ];
+
+      const allData: Record<string, any[]> = {};
+
+      for (const coll of collectionsList) {
+        const snap = await getDocs(collection(db, coll));
+        allData[coll] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+
+      const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `KUKUAPP_Backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success('Backup imekamilika na kupakuliwa!', { id: toastId });
+    } catch (error) {
+      console.error('Export Error:', error);
+      toast.error('Imeshindwa kupakua data', { id: toastId });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const importData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!confirm('ONYO: Kupakia data kutaongeza rekodi hizi kwenye database yako ya sasa. Je, unataka kuendelea?')) {
+      e.target.value = '';
+      return;
+    }
+
+    setIsImporting(true);
+    const toastId = toast.loading('Inapakia data kwenye mfumo...');
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const data = JSON.parse(event.target?.result as string);
+          let count = 0;
+
+          for (const [collName, docs] of Object.entries(data)) {
+            if (Array.isArray(docs)) {
+              for (const docData of docs) {
+                const { id, ...rest } = docData;
+                // Use setDoc with the original ID to maintain relationships
+                await setDoc(doc(db, collName, id), {
+                  ...rest,
+                  importedAt: serverTimestamp()
+                });
+                count++;
+              }
+            }
+          }
+
+          toast.success(`Imefanikiwa! Rekodi ${count} zimepakiwa.`, { id: toastId });
+        } catch (err) {
+          console.error('Parse Error:', err);
+          toast.error('Faili hili halina muundo sahihi wa JSON', { id: toastId });
+        } finally {
+          setIsImporting(false);
+          e.target.value = '';
+        }
+      };
+      reader.readAsText(file);
+    } catch (error) {
+      console.error('Import Error:', error);
+      toast.error('Imeshindwa kupakia data', { id: toastId });
+      setIsImporting(false);
+    }
+  };
 
   const [manualPayments, setManualPayments] = useState<any[]>([]);
   const [isManualPaymentsLoading, setIsManualPaymentsLoading] = useState(false);
@@ -895,6 +993,7 @@ export const AdminPanel: React.FC = () => {
             { id: 'announcements', label: 'Matangazo', icon: Bell },
             { id: 'offers', label: 'Ofa & Coupons', icon: Tag },
             { id: 'academy', label: 'Academy', icon: BookOpen },
+            { id: 'db_mgmt', label: 'Database', icon: Database },
             { id: 'settings', label: 'Mipangilio', icon: Settings },
           ].map(item => (
             <button
@@ -1005,6 +1104,7 @@ export const AdminPanel: React.FC = () => {
             { id: 'announcements', label: 'Matangazo', icon: Bell },
             { id: 'offers', label: 'Ofa & Coupons', icon: Tag },
             { id: 'academy', label: 'Academy', icon: BookOpen },
+            { id: 'db_mgmt', label: 'Database', icon: Database },
             { id: 'settings', label: 'Mipangilio', icon: Settings },
           ].map(item => (
             <button
@@ -3267,6 +3367,87 @@ export const AdminPanel: React.FC = () => {
                   )}
                 </button>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'db_mgmt' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl">
+            <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mb-2">Usimamizi wa Database</h2>
+            <p className="text-sm text-slate-500 mb-6 md:mb-10">Hapa unaweza kupakua nakala ya data zote za mfumo kwa ajili ya usalama au kuhamia Firebase nyingine.</p>
+
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800 p-6 md:p-10 shadow-sm">
+                <div className="flex flex-col md:flex-row items-center gap-8">
+                  <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/20 rounded-3xl flex items-center justify-center text-amber-600">
+                    <Database size={40} />
+                  </div>
+                  <div className="flex-1 text-center md:text-left">
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Export Data (JSON)</h3>
+                    <p className="text-sm text-slate-500 mb-6">
+                      Hii itapakua faili moja la JSON lenye data zote kutoka kwenye makusanyo (collections) yote ya Firestore. 
+                      Unaweza kutumia faili hili kama backup.
+                    </p>
+                    <button
+                      onClick={exportAllData}
+                      disabled={isExporting}
+                      className="bg-amber-500 hover:bg-amber-600 text-amber-950 font-black px-8 py-4 rounded-2xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-3 mx-auto md:mx-0"
+                    >
+                      {isExporting ? (
+                        <div className="w-5 h-5 border-2 border-amber-950 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Download size={20} />
+                      )}
+                      PAKUA DATA ZOTE (EXPORT)
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[40px] border border-slate-100 dark:border-slate-800 p-6 md:p-10 shadow-sm">
+                <div className="flex flex-col md:flex-row items-center gap-8">
+                  <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/20 rounded-3xl flex items-center justify-center text-blue-600">
+                    <Save size={40} />
+                  </div>
+                  <div className="flex-1 text-center md:text-left">
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Import Data (JSON)</h3>
+                    <p className="text-sm text-slate-500 mb-6">
+                      Chagua faili la JSON ulilopakua awali ili kurudisha data zako kwenye mradi huu mpya wa Firebase.
+                    </p>
+                    <div className="relative inline-block mx-auto md:mx-0">
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={importData}
+                        disabled={isImporting}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                      />
+                      <button
+                        disabled={isImporting}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-4 rounded-2xl shadow-lg shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-3"
+                      >
+                        {isImporting ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Database size={20} />
+                        )}
+                        PAKUA DATA KWENYE MFUMO (IMPORT)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-10 bg-blue-50 dark:bg-blue-900/10 rounded-3xl p-6 border border-blue-100 dark:border-blue-900/20">
+              <h4 className="font-black text-blue-900 dark:text-blue-400 mb-2 flex items-center gap-2">
+                <Bell size={18} /> Maelekezo ya Muhimu
+              </h4>
+              <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-2 list-disc ml-5">
+                <li>Faili hili lina data zako zote muhimu (Watumiaji, Bidhaa, Oda, n.k).</li>
+                <li>Hakikisha unalihifadhi mahali salama kwani lina taarifa za siri za biashara.</li>
+                <li>Ili kuhamia Firebase mpya, utahitaji kutumia script ya ku-import data hizi kwenye mradi wako mpya.</li>
+              </ul>
             </div>
           </motion.div>
         )}
