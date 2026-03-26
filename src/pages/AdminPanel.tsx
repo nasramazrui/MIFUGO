@@ -177,10 +177,28 @@ export const AdminPanel: React.FC = () => {
       link.href = url;
       link.download = `KUKUAPP_Backup_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(link);
-      console.log('Clicking download link...');
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      
+      console.log('Attempting download...');
+      try {
+        link.click();
+        // Fallback for some WebViews that block automatic clicks
+        setTimeout(() => {
+          if (document.body.contains(link)) {
+            console.log('Download link still in DOM, trying window.open fallback');
+            window.open(url, '_blank');
+          }
+        }, 500);
+      } catch (e) {
+        console.error('Download click failed, trying window.open:', e);
+        window.open(url, '_blank');
+      }
+      
+      setTimeout(() => {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
+        }
+        URL.revokeObjectURL(url);
+      }, 1000);
       
       toast.success('Backup imekamilika na kupakuliwa!', { id: toastId });
       console.log('Export process completed successfully.');

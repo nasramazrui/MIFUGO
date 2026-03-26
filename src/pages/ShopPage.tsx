@@ -19,7 +19,7 @@ import { VaccinationCalendar } from './VaccinationCalendar';
 import { Chat } from '../components/Chat';
 import { generateInvoicePDF } from '../utils/invoice';
 import { QRScanner } from '../components/QRScanner';
-import QRCode from 'react-qr-code';
+import { QRCodeCanvas } from 'qrcode.react';
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
 import LiveStreamModal from '../components/LiveStreamModal';
@@ -1323,17 +1323,29 @@ export const ShopPage: React.FC = () => {
     try {
       toast.loading('Inatengeneza cheti...', { id: 'cert-toast' });
       
-      // Temporarily make it visible for capture
-      certElement.style.display = 'block';
+      // Temporarily make it visible for capture but off-screen
+      certElement.style.opacity = '1';
+      certElement.style.position = 'fixed';
+      certElement.style.left = '-9999px';
+      certElement.style.top = '0';
+      certElement.style.zIndex = '9999';
+      certElement.style.pointerEvents = 'auto';
+      
+      // Wait a bit for any re-rendering or image loading
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       const canvas = await html2canvas(certElement, {
         scale: 2,
         useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
+        logging: true, // Enable logging to debug image issues
+        backgroundColor: '#ffffff',
+        allowTaint: true
       });
       
-      certElement.style.display = 'none';
+      // Reset styles
+      certElement.style.opacity = '0';
+      certElement.style.pointerEvents = 'none';
+      certElement.style.zIndex = '-50';
 
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
@@ -1346,7 +1358,16 @@ export const ShopPage: React.FC = () => {
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Pasipoti_${selectedProduct.tagNumber || selectedProduct.name}.pdf`);
+      
+      // For WebView compatibility (AppCreator24), we try to open in a new tab if save fails
+      try {
+        pdf.save(`Pasipoti_${selectedProduct.tagNumber || selectedProduct.name}.pdf`);
+      } catch (e) {
+        console.error('PDF Save failed, trying blob URL:', e);
+        const blob = pdf.output('blob');
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+      }
       
       toast.success('Cheti kimepakuliwa kikamilifu!', { id: 'cert-toast' });
     } catch (error) {
@@ -4252,7 +4273,7 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
             {selectedProduct.isLivestock && (
               <div 
                 id="livestock-certificate" 
-                className="hidden absolute top-0 left-0 w-[800px] z-[-100]"
+                className="absolute opacity-0 pointer-events-none -z-50 w-[800px]"
                 style={{ fontFamily: 'sans-serif', backgroundColor: '#ffffff', padding: '40px', color: '#0f172a' }}
               >
                 <div className="p-8 rounded-3xl relative overflow-hidden" style={{ border: '8px solid #059669' }}>
@@ -4275,7 +4296,12 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                   <div className="flex gap-8 mb-10 relative z-10">
                     <div className="w-64 h-64 rounded-3xl flex items-center justify-center overflow-hidden shrink-0" style={{ backgroundColor: '#f8fafc', border: '4px solid #d1fae5' }}>
                       {selectedProduct.image ? (
-                        <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                        <img 
+                          src={`${selectedProduct.image}${selectedProduct.image.includes('?') ? '&' : '?'}t=${Date.now()}`} 
+                          alt={selectedProduct.name} 
+                          className="w-full h-full object-cover" 
+                          crossOrigin="anonymous" 
+                        />
                       ) : (
                         <span className="text-8xl">{selectedProduct.emoji}</span>
                       )}
@@ -4352,10 +4378,11 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                     </div>
                     <div className="text-center">
                       <div className="p-2 rounded-xl inline-block mb-2" style={{ backgroundColor: '#ffffff', border: '2px solid #e2e8f0' }}>
-                        <QRCode 
+                        <QRCodeCanvas 
                           value={`${window.location.origin}?productId=${selectedProduct.id}`}
                           size={100}
-                          level="M"
+                          level="H"
+                          includeMargin={false}
                         />
                       </div>
                       <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#94a3b8' }}>Scan for Verification</p>
@@ -4867,7 +4894,7 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
           {Number(offlineQRAmount) > 0 && Number(offlineQRAmount) <= (user?.walletBalance || 0) && (
             <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
               <div className="bg-white p-6 rounded-[40px] shadow-2xl mb-4 relative">
-                <QRCode 
+                <QRCodeCanvas 
                   value={JSON.stringify({ 
                     type: 'offline_pay', 
                     userId: user?.id, 
