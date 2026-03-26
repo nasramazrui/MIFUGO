@@ -4252,28 +4252,28 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
             {selectedProduct.isLivestock && (
               <div 
                 id="livestock-certificate" 
-                className="hidden absolute top-0 left-0 w-[800px] bg-white p-10 text-slate-900 z-[-100]"
-                style={{ fontFamily: 'sans-serif' }}
+                className="hidden absolute top-0 left-0 w-[800px] z-[-100]"
+                style={{ fontFamily: 'sans-serif', backgroundColor: '#ffffff', padding: '40px', color: '#0f172a' }}
               >
-                <div className="border-8 border-emerald-600 p-8 rounded-3xl relative overflow-hidden">
+                <div className="p-8 rounded-3xl relative overflow-hidden" style={{ border: '8px solid #059669' }}>
                   {/* Watermark */}
                   <div className="absolute inset-0 opacity-5 flex items-center justify-center pointer-events-none">
                     <QrCode size={400} />
                   </div>
 
-                  <div className="flex justify-between items-start mb-10 border-b-2 border-slate-100 pb-6 relative z-10">
+                  <div className="flex justify-between items-start mb-10 pb-6 relative z-10" style={{ borderBottom: '2px solid #f1f5f9' }}>
                     <div>
-                      <h1 className="text-4xl font-black text-emerald-800 uppercase tracking-tighter mb-2">Digital Livestock Passport</h1>
-                      <p className="text-slate-500 font-bold uppercase tracking-widest">Cheti cha Mfugo & Afya</p>
+                      <h1 className="text-4xl font-black uppercase tracking-tighter mb-2" style={{ color: '#065f46' }}>Digital Livestock Passport</h1>
+                      <p className="font-bold uppercase tracking-widest" style={{ color: '#64748b' }}>Cheti cha Mfugo & Afya</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Tarehe</p>
-                      <p className="text-lg font-black">{new Date().toLocaleDateString()}</p>
+                      <p className="text-sm font-bold uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Tarehe</p>
+                      <p className="text-lg font-black" style={{ color: '#0f172a' }}>{new Date().toLocaleDateString()}</p>
                     </div>
                   </div>
 
                   <div className="flex gap-8 mb-10 relative z-10">
-                    <div className="w-64 h-64 bg-slate-50 rounded-3xl border-4 border-emerald-100 flex items-center justify-center overflow-hidden shrink-0">
+                    <div className="w-64 h-64 rounded-3xl flex items-center justify-center overflow-hidden shrink-0" style={{ backgroundColor: '#f8fafc', border: '4px solid #d1fae5' }}>
                       {selectedProduct.image ? (
                         <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
                       ) : (
@@ -4283,62 +4283,61 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                     
                     <div className="flex-1 space-y-6">
                       <div>
-                        <h2 className="text-3xl font-black text-slate-900 mb-1">{selectedProduct.name}</h2>
-                        <p className="text-emerald-600 font-black text-xl">{formatCurrency(selectedProduct.price, currency)}</p>
+                        <h2 className="text-3xl font-black mb-1" style={{ color: '#0f172a' }}>{selectedProduct.name}</h2>
+                        <p className="font-black text-xl" style={{ color: '#059669' }}>{formatCurrency(selectedProduct.price, currency)}</p>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Tag Number</p>
-                          <p className="text-lg font-black text-slate-900">{selectedProduct.tagNumber || 'N/A'}</p>
+                        <div className="p-4 rounded-2xl" style={{ backgroundColor: '#f8fafc' }}>
+                          <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Tag Number</p>
+                          <p className="text-lg font-black" style={{ color: '#0f172a' }}>{selectedProduct.tagNumber || 'N/A'}</p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Breed / Uzao</p>
-                          <p className="text-lg font-black text-slate-900">{selectedProduct.breed || 'N/A'}</p>
+                        <div className="p-4 rounded-2xl" style={{ backgroundColor: '#f8fafc' }}>
+                          <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Breed / Uzao</p>
+                          <p className="text-lg font-black" style={{ color: '#0f172a' }}>{selectedProduct.breed || 'N/A'}</p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Umri</p>
-                          <p className="text-lg font-black text-slate-900">{selectedProduct.age || 'N/A'}</p>
+                        <div className="p-4 rounded-2xl" style={{ backgroundColor: '#f8fafc' }}>
+                          <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Umri</p>
+                          <p className="text-lg font-black" style={{ color: '#0f172a' }}>{selectedProduct.age || 'N/A'}</p>
                         </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Uzito</p>
-                          <p className="text-lg font-black text-slate-900">{selectedProduct.weight ? `${selectedProduct.weight} Kg` : 'N/A'}</p>
+                        <div className="p-4 rounded-2xl" style={{ backgroundColor: '#f8fafc' }}>
+                          <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Uzito</p>
+                          <p className="text-lg font-black" style={{ color: '#0f172a' }}>{selectedProduct.weight ? `${selectedProduct.weight} Kg` : 'N/A'}</p>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <div className="mb-10 relative z-10">
-                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-widest mb-4 border-b-2 border-slate-100 pb-2">Historia ya Afya & Chanjo</h3>
+                    <h3 className="text-xl font-black uppercase tracking-widest mb-4 pb-2" style={{ color: '#0f172a', borderBottom: '2px solid #f1f5f9' }}>Historia ya Afya & Chanjo</h3>
                     {livestockHealthRecords.filter(r => r.productId === selectedProduct.id).length === 0 ? (
-                      <p className="text-slate-500 italic">Hakuna rekodi za afya zilizopatikana.</p>
+                      <p className="italic" style={{ color: '#64748b' }}>Hakuna rekodi za afya zilizopatikana.</p>
                     ) : (
                       <table className="w-full text-left border-collapse">
                         <thead>
-                          <tr className="border-b-2 border-slate-200">
-                            <th className="py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Tarehe</th>
-                            <th className="py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Aina</th>
-                            <th className="py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Maelezo</th>
-                            <th className="py-3 text-xs font-black text-slate-400 uppercase tracking-widest">Daktari</th>
+                          <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                            <th className="py-3 text-xs font-black uppercase tracking-widest" style={{ color: '#94a3b8' }}>Tarehe</th>
+                            <th className="py-3 text-xs font-black uppercase tracking-widest" style={{ color: '#94a3b8' }}>Aina</th>
+                            <th className="py-3 text-xs font-black uppercase tracking-widest" style={{ color: '#94a3b8' }}>Maelezo</th>
+                            <th className="py-3 text-xs font-black uppercase tracking-widest" style={{ color: '#94a3b8' }}>Daktari</th>
                           </tr>
                         </thead>
                         <tbody>
                           {livestockHealthRecords
                             .filter(r => r.productId === selectedProduct.id)
                             .map(record => (
-                              <tr key={record.id} className="border-b border-slate-100">
-                                <td className="py-3 font-bold text-slate-900">{record.date}</td>
+                              <tr key={record.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td className="py-3 font-bold" style={{ color: '#0f172a' }}>{record.date}</td>
                                 <td className="py-3">
-                                  <span className={cn(
-                                    "px-3 py-1 rounded-full text-xs font-black uppercase",
-                                    record.type === 'vaccination' ? "bg-emerald-100 text-emerald-700" :
-                                    record.type === 'treatment' ? "bg-rose-100 text-rose-700" : "bg-blue-100 text-blue-700"
-                                  )}>
+                                  <span className="px-3 py-1 rounded-full text-xs font-black uppercase" style={{
+                                    backgroundColor: record.type === 'vaccination' ? '#d1fae5' : record.type === 'treatment' ? '#ffe4e6' : '#dbeafe',
+                                    color: record.type === 'vaccination' ? '#047857' : record.type === 'treatment' ? '#be123c' : '#1d4ed8'
+                                  }}>
                                     {record.type}
                                   </span>
                                 </td>
-                                <td className="py-3 text-sm text-slate-600">{record.title}</td>
-                                <td className="py-3 text-sm font-bold text-slate-900">{record.performedBy || '-'}</td>
+                                <td className="py-3 text-sm" style={{ color: '#475569' }}>{record.title}</td>
+                                <td className="py-3 text-sm font-bold" style={{ color: '#0f172a' }}>{record.performedBy || '-'}</td>
                               </tr>
                             ))}
                         </tbody>
@@ -4346,20 +4345,20 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                     )}
                   </div>
 
-                  <div className="flex justify-between items-end pt-6 border-t-2 border-slate-100 relative z-10">
+                  <div className="flex justify-between items-end pt-6 relative z-10" style={{ borderTop: '2px solid #f1f5f9' }}>
                     <div>
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Mmiliki / Muuzaji</p>
-                      <p className="text-xl font-black text-slate-900">{selectedProduct.vendorName}</p>
+                      <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: '#94a3b8' }}>Mmiliki / Muuzaji</p>
+                      <p className="text-xl font-black" style={{ color: '#0f172a' }}>{selectedProduct.vendorName}</p>
                     </div>
                     <div className="text-center">
-                      <div className="bg-white p-2 rounded-xl border-2 border-slate-200 inline-block mb-2">
+                      <div className="p-2 rounded-xl inline-block mb-2" style={{ backgroundColor: '#ffffff', border: '2px solid #e2e8f0' }}>
                         <QRCode 
                           value={`${window.location.origin}?productId=${selectedProduct.id}`}
                           size={100}
                           level="M"
                         />
                       </div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Scan for Verification</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#94a3b8' }}>Scan for Verification</p>
                     </div>
                   </div>
                 </div>
