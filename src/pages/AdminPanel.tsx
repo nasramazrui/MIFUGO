@@ -139,7 +139,11 @@ export const AdminPanel: React.FC = () => {
         'kuku_nutrition_records', 'kuku_livestock_health', 
         'kuku_recurring_orders', 'kuku_live_sessions', 
         'kuku_live_chats', 'kuku_bids', 'kuku_manual_payments', 
-        'kuku_system_settings'
+        'kuku_config', 'kuku_reviews', 'kuku_statuses', 
+        'kuku_academy', 'kuku_forum', 'kuku_offers', 
+        'kuku_loyalty', 'kuku_invoices', 'kuku_livestock', 
+        'kuku_vaccination_records', 'kuku_medical_records',
+        'kuku_vaccinations', 'kuku_transactions'
       ];
 
       const allData: Record<string, any[]> = {};
@@ -3394,11 +3398,16 @@ export const AdminPanel: React.FC = () => {
                       className="bg-amber-500 hover:bg-amber-600 text-amber-950 font-black px-8 py-4 rounded-2xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-3 mx-auto md:mx-0"
                     >
                       {isExporting ? (
-                        <div className="w-5 h-5 border-2 border-amber-950 border-t-transparent rounded-full animate-spin" />
+                        <>
+                          <div className="w-5 h-5 border-2 border-amber-950 border-t-transparent rounded-full animate-spin" />
+                          INAPAKUA...
+                        </>
                       ) : (
-                        <Download size={20} />
+                        <>
+                          <Download size={20} />
+                          PAKUA DATA ZOTE (EXPORT)
+                        </>
                       )}
-                      PAKUA DATA ZOTE (EXPORT)
                     </button>
                   </div>
                 </div>
@@ -3427,11 +3436,16 @@ export const AdminPanel: React.FC = () => {
                         className="bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-4 rounded-2xl shadow-lg shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-3"
                       >
                         {isImporting ? (
-                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <>
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            INAPAKIA...
+                          </>
                         ) : (
-                          <Database size={20} />
+                          <>
+                            <Database size={20} />
+                            PAKUA DATA KWENYE MFUMO (IMPORT)
+                          </>
                         )}
-                        PAKUA DATA KWENYE MFUMO (IMPORT)
                       </button>
                     </div>
                   </div>
