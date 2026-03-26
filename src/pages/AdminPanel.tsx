@@ -11,6 +11,7 @@ import { db,
   collection, 
   addDoc,
   updateDoc, 
+  setDoc,
   doc, 
   deleteDoc, 
   serverTimestamp,
@@ -123,12 +124,21 @@ export const AdminPanel: React.FC = () => {
 
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [showExportConfirm, setShowExportConfirm] = useState(false);
+  const [showImportConfirm, setShowImportConfirm] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+
+  const handleExportClick = () => {
+    setShowExportConfirm(true);
+  };
 
   const exportAllData = async () => {
-    if (!confirm('Je, unataka kupakua nakala ya data zote za mfumo?')) return;
+    setShowExportConfirm(false);
+    console.log('Export process started...');
     
     setIsExporting(true);
     const toastId = toast.loading('Inatayarisha data za mfumo...');
+    console.log('Toast loading started.');
     
     try {
       const collectionsList = [
@@ -149,20 +159,31 @@ export const AdminPanel: React.FC = () => {
       const allData: Record<string, any[]> = {};
 
       for (const coll of collectionsList) {
-        const snap = await getDocs(collection(db, coll));
-        allData[coll] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        try {
+          console.log(`Fetching collection: ${coll}...`);
+          const snap = await getDocs(collection(db, coll));
+          allData[coll] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          console.log(`Successfully fetched ${snap.docs.length} docs from ${coll}`);
+        } catch (err) {
+          console.warn(`Failed to fetch collection ${coll}:`, err);
+          allData[coll] = [];
+        }
       }
 
+      console.log('All collections processed. Creating blob...');
       const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `KUKUAPP_Backup_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(link);
+      console.log('Clicking download link...');
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       
       toast.success('Backup imekamilika na kupakuliwa!', { id: toastId });
+      console.log('Export process completed successfully.');
     } catch (error) {
       console.error('Export Error:', error);
       toast.error('Imeshindwa kupakua data', { id: toastId });
@@ -171,14 +192,18 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
-  const importData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportClick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPendingImportFile(file);
+    setShowImportConfirm(true);
+    // Reset input value so same file can be selected again if needed
+    e.target.value = '';
+  };
 
-    if (!confirm('ONYO: Kupakia data kutaongeza rekodi hizi kwenye database yako ya sasa. Je, unataka kuendelea?')) {
-      e.target.value = '';
-      return;
-    }
+  const importData = async () => {
+    if (!pendingImportFile) return;
+    setShowImportConfirm(false);
 
     setIsImporting(true);
     const toastId = toast.loading('Inapakia data kwenye mfumo...');
@@ -210,14 +235,15 @@ export const AdminPanel: React.FC = () => {
           toast.error('Faili hili halina muundo sahihi wa JSON', { id: toastId });
         } finally {
           setIsImporting(false);
-          e.target.value = '';
+          setPendingImportFile(null);
         }
       };
-      reader.readAsText(file);
+      reader.readAsText(pendingImportFile);
     } catch (error) {
       console.error('Import Error:', error);
       toast.error('Imeshindwa kupakia data', { id: toastId });
       setIsImporting(false);
+      setPendingImportFile(null);
     }
   };
 
@@ -3393,7 +3419,7 @@ export const AdminPanel: React.FC = () => {
                       Unaweza kutumia faili hili kama backup.
                     </p>
                     <button
-                      onClick={exportAllData}
+                      onClick={handleExportClick}
                       disabled={isExporting}
                       className="bg-amber-500 hover:bg-amber-600 text-amber-950 font-black px-8 py-4 rounded-2xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-3 mx-auto md:mx-0"
                     >
@@ -3427,7 +3453,7 @@ export const AdminPanel: React.FC = () => {
                       <input
                         type="file"
                         accept=".json"
-                        onChange={importData}
+                        onChange={handleImportClick}
                         disabled={isImporting}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                       />
@@ -3883,6 +3909,70 @@ export const AdminPanel: React.FC = () => {
           />
         )}
       </AnimatePresence>
+
+      {/* Confirmation Modals */}
+      <Modal
+        isOpen={showExportConfirm}
+        onClose={() => setShowExportConfirm(false)}
+        title="Thibitisha Export"
+      >
+        <div className="p-6">
+          <p className="text-slate-600 dark:text-slate-400 mb-6">
+            Je, unataka kupakua nakala ya data zote za mfumo? Hii inaweza kuchukua muda mfupi kulingana na ukubwa wa data zako.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowExportConfirm(false)}
+              className="flex-1 px-6 py-3 rounded-xl border border-slate-200 dark:border-slate-800 font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+            >
+              Ghairi
+            </button>
+            <button
+              onClick={exportAllData}
+              className="flex-1 px-6 py-3 rounded-xl bg-amber-500 text-amber-950 font-bold hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/20"
+            >
+              Ndiyo, Pakua
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showImportConfirm}
+        onClose={() => {
+          setShowImportConfirm(false);
+          setPendingImportFile(null);
+        }}
+        title="Thibitisha Import"
+      >
+        <div className="p-6">
+          <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-2xl mb-6">
+            <p className="text-red-600 dark:text-red-400 text-sm font-bold">
+              ONYO: Kupakia data kutaongeza rekodi hizi kwenye database yako ya sasa. Hakikisha faili hili ni sahihi.
+            </p>
+          </div>
+          <p className="text-slate-600 dark:text-slate-400 mb-6">
+            Je, unataka kuendelea na upakiaji wa data?
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setShowImportConfirm(false);
+                setPendingImportFile(null);
+              }}
+              className="flex-1 px-6 py-3 rounded-xl border border-slate-200 dark:border-slate-800 font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+            >
+              Ghairi
+            </button>
+            <button
+              onClick={importData}
+              className="flex-1 px-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+            >
+              Ndiyo, Pakia
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
