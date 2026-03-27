@@ -145,6 +145,7 @@ export interface Review {
   id: string;
   productId?: string;
   vendorId?: string;
+  doctorId?: string;
   userId: string;
   userName: string;
   userAvatar?: string;

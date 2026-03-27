@@ -19,7 +19,7 @@ import { VaccinationCalendar } from './VaccinationCalendar';
 import { Chat } from '../components/Chat';
 import { generateInvoicePDF } from '../utils/invoice';
 import { QRScanner } from '../components/QRScanner';
-import { QRCodeCanvas } from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import { IKContext, IKUpload } from 'imagekitio-react';
 import { IMAGEKIT_PUBLIC_KEY, IMAGEKIT_URL_ENDPOINT, IMAGEKIT_AUTH_ENDPOINT, isImageKitConfigured } from '../services/imageKitService';
 import LiveStreamModal from '../components/LiveStreamModal';
@@ -32,6 +32,8 @@ import { AcademyPage } from './AcademyPage';
 import LivestockManager from './LivestockManager';
 
 import { ManualPaymentModal } from '../components/ManualPaymentModal';
+import { BookingModal } from '../components/BookingModal';
+import { DoctorReviewModal } from '../components/DoctorReviewModal';
 
 export const ShopPage: React.FC = () => {
   const navigate = useNavigate();
@@ -84,10 +86,68 @@ export const ShopPage: React.FC = () => {
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState<{ amount: number; reason: string; actionType: string; targetId?: string; extraData?: any } | null>(null);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [bookingDoctor, setBookingDoctor] = useState<any>(null);
+  const [isDoctorReviewModalOpen, setIsDoctorReviewModalOpen] = useState(false);
+  const [reviewDoctor, setReviewDoctor] = useState<any>(null);
+  const [isSubmittingDoctorReview, setIsSubmittingDoctorReview] = useState(false);
+  const handleDoctorReviewSubmit = async (rating: number, reviewText: string) => {
+    if (!user || !reviewDoctor) return;
+    setIsSubmittingDoctorReview(true);
+    try {
+      await addDoc(collection(db, 'kuku_reviews'), {
+        doctorId: reviewDoctor.id,
+        userId: user.id,
+        userName: user.name,
+        userAvatar: user.avatar || '',
+        rating,
+        text: reviewText,
+        date: new Date().toLocaleDateString(),
+        createdAt: serverTimestamp()
+      });
+
+      // Update doctor's average rating
+      const doctorReviews = reviews.filter(r => r.doctorId === reviewDoctor.id);
+      const totalRating = doctorReviews.reduce((sum, r) => sum + r.rating, 0) + rating;
+      const newAverage = totalRating / (doctorReviews.length + 1);
+
+      await updateDoc(doc(db, 'kuku_users', reviewDoctor.id), {
+        rating: newAverage.toFixed(1)
+      });
+
+      toast.success('Asante kwa maoni yako!');
+      setIsDoctorReviewModalOpen(false);
+      setReviewDoctor(null);
+    } catch (error: any) {
+      handleFirestoreError(error, OperationType.WRITE, 'kuku_reviews');
+      toast.error('Imeshindwa kutuma maoni');
+    } finally {
+      setIsSubmittingDoctorReview(false);
+    }
+  };
+
   const handleDownloadInvoice = async (order: any) => {
     try {
       const doc = await generateInvoicePDF(order, systemSettings);
-      doc.save(`Invoice-${order.id.substring(0, 8)}.pdf`);
+      const isWebView = /(iPhone|iPod|iPad).*AppleWebKit(?!.*Safari)/i.test(navigator.userAgent) || /wv/.test(navigator.userAgent) || /Android.*Version\/[0-9].[0-9]/.test(navigator.userAgent);
+      
+      try {
+        if (isWebView) {
+          const dataUri = doc.output('datauristring');
+          const link = document.createElement('a');
+          link.href = dataUri;
+          link.download = `Invoice-${order.id.substring(0, 8)}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } else {
+          doc.save(`Invoice-${order.id.substring(0, 8)}.pdf`);
+        }
+      } catch (e) {
+        console.error('PDF Save failed, trying blob URL:', e);
+        const dataUri = doc.output('datauristring');
+        window.location.href = dataUri;
+      }
       toast.success('Risiti inapakuliwa...');
     } catch (error) {
       toast.error('Imeshindwa kupakua risiti');
@@ -1331,6 +1391,25 @@ export const ShopPage: React.FC = () => {
       certElement.style.zIndex = '9999';
       certElement.style.pointerEvents = 'auto';
       
+      // Fetch and convert image to base64 to avoid CORS issues in html2canvas
+      const imgElement = certElement.querySelector('img');
+      let originalSrc = '';
+      if (imgElement && imgElement.src) {
+        originalSrc = imgElement.src;
+        try {
+          const response = await fetch(imgElement.src);
+          const blob = await response.blob();
+          const reader = new FileReader();
+          const base64data = await new Promise((resolve) => {
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+          imgElement.src = base64data as string;
+        } catch (e) {
+          console.error("Failed to convert image to base64", e);
+        }
+      }
+
       // Wait a bit for any re-rendering or image loading
       await new Promise(resolve => setTimeout(resolve, 1000));
       
@@ -1342,6 +1421,11 @@ export const ShopPage: React.FC = () => {
         allowTaint: true
       });
       
+      // Restore original image src
+      if (imgElement && originalSrc) {
+        imgElement.src = originalSrc;
+      }
+
       // Reset styles
       certElement.style.opacity = '0';
       certElement.style.pointerEvents = 'none';
@@ -1360,13 +1444,24 @@ export const ShopPage: React.FC = () => {
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       
       // For WebView compatibility (AppCreator24), we try to open in a new tab if save fails
+      const isWebView = /(iPhone|iPod|iPad).*AppleWebKit(?!.*Safari)/i.test(navigator.userAgent) || /wv/.test(navigator.userAgent) || /Android.*Version\/[0-9].[0-9]/.test(navigator.userAgent);
+      
       try {
-        pdf.save(`Pasipoti_${selectedProduct.tagNumber || selectedProduct.name}.pdf`);
+        if (isWebView) {
+          const dataUri = pdf.output('datauristring');
+          const link = document.createElement('a');
+          link.href = dataUri;
+          link.download = `Pasipoti_${selectedProduct.tagNumber || selectedProduct.name}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } else {
+          pdf.save(`Pasipoti_${selectedProduct.tagNumber || selectedProduct.name}.pdf`);
+        }
       } catch (e) {
         console.error('PDF Save failed, trying blob URL:', e);
-        const blob = pdf.output('blob');
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
+        const dataUri = pdf.output('datauristring');
+        window.location.href = dataUri;
       }
       
       toast.success('Cheti kimepakuliwa kikamilifu!', { id: 'cert-toast' });
@@ -2511,15 +2606,25 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <h2 className="text-2xl font-black text-slate-900 dark:text-white">🩺 Madaktari wa Mifugo</h2>
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  type="text" 
-                  placeholder="Tafuta daktari, eneo, au utaalamu..." 
-                  className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                {user?.region && (
+                  <button
+                    onClick={() => setSearchQuery(user.region || '')}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl text-sm font-black hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                  >
+                    <MapPin size={16} /> Madaktari wa Karibu
+                  </button>
+                )}
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    type="text" 
+                    placeholder="Tafuta daktari, eneo, au utaalamu..." 
+                    className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
@@ -2555,7 +2660,10 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-black text-slate-900 dark:text-white">{d.name}</h3>
+                          <h3 className="font-black text-slate-900 dark:text-white flex items-center gap-1">
+                            {d.name}
+                            {d.status === 'approved' && <ShieldCheck size={14} className="text-blue-500" title="Daktari Aliyethibitishwa" />}
+                          </h3>
                           {d.isTopDoctor && (
                             <span className="bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
                               <Star size={10} /> Top
@@ -2628,6 +2736,20 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                                   setIsAuthModalOpen(true);
                                   return;
                                 }
+                                setBookingDoctor(d);
+                                setIsBookingModalOpen(true);
+                              }}
+                              className="bg-blue-500 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center gap-1"
+                            >
+                              <Calendar size={12} /> Weka Miadi
+                            </button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!user) {
+                                  setIsAuthModalOpen(true);
+                                  return;
+                                }
                                 setPaymentDetails({
                                   amount: d.consultationFee || 0,
                                   reason: `Ushauri wa Daktari: ${d.name}`,
@@ -2641,6 +2763,42 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                             >
                               <MessageCircle size={12} /> Lipia Ushauri
                             </button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!user) {
+                                  setIsAuthModalOpen(true);
+                                  return;
+                                }
+                                setReviewDoctor(d);
+                                setIsDoctorReviewModalOpen(true);
+                              }}
+                              className="bg-amber-100 text-amber-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-200 transition-all flex items-center gap-1"
+                            >
+                              <Star size={12} /> Toa Maoni
+                            </button>
+                            {d.offersEmergency && (
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!user) {
+                                    setIsAuthModalOpen(true);
+                                    return;
+                                  }
+                                  setPaymentDetails({
+                                    amount: (d.consultationFee || 0) + (systemSettings?.emergencyFee || 5000),
+                                    reason: `🚨 DHARURA: Ushauri wa Daktari: ${d.name}`,
+                                    actionType: 'doctor_consultation_emergency',
+                                    targetId: d.id,
+                                    extraData: { doctorPhone: d.phone, isEmergency: true }
+                                  });
+                                  setPaymentModalOpen(true);
+                                }}
+                                className="bg-red-500 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 transition-all flex items-center gap-1 animate-pulse"
+                              >
+                                🚨 Dharura
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -4378,7 +4536,7 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
                     </div>
                     <div className="text-center">
                       <div className="p-2 rounded-xl inline-block mb-2" style={{ backgroundColor: '#ffffff', border: '2px solid #e2e8f0' }}>
-                        <QRCodeCanvas 
+                        <QRCodeSVG 
                           value={`${window.location.origin}?productId=${selectedProduct.id}`}
                           size={100}
                           level="H"
@@ -5640,6 +5798,43 @@ Tafadhali hakiki malipo haya na uidhinishe kwenye mfumo.`;
         systemSettings={systemSettings}
         onSubmit={handleManualPaymentSubmit}
       />
+
+      {bookingDoctor && (
+        <BookingModal
+          isOpen={isBookingModalOpen}
+          onClose={() => {
+            setIsBookingModalOpen(false);
+            setBookingDoctor(null);
+          }}
+          doctorName={bookingDoctor.name}
+          consultationFee={bookingDoctor.consultationFee || 0}
+          currency={currency}
+          onSubmit={(date, time) => {
+            setIsBookingModalOpen(false);
+            setPaymentDetails({
+              amount: bookingDoctor.consultationFee || 0,
+              reason: `Miadi ya Daktari: ${bookingDoctor.name} (${date} saa ${time})`,
+              actionType: 'doctor_appointment',
+              targetId: bookingDoctor.id,
+              extraData: { doctorPhone: bookingDoctor.phone, date, time }
+            });
+            setPaymentModalOpen(true);
+          }}
+        />
+      )}
+
+      {reviewDoctor && (
+        <DoctorReviewModal
+          isOpen={isDoctorReviewModalOpen}
+          onClose={() => {
+            setIsDoctorReviewModalOpen(false);
+            setReviewDoctor(null);
+          }}
+          doctorName={reviewDoctor.name}
+          onSubmit={handleDoctorReviewSubmit}
+          isSubmitting={isSubmittingDoctorReview}
+        />
+      )}
     </div>
   );
 };

@@ -73,10 +73,29 @@ export const DoctorPortal: React.FC = () => {
     );
   }
 
+  // Calculate Earnings
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()).getTime();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+  let todayEarnings = 0;
+  let weekEarnings = 0;
+  let monthEarnings = 0;
+
+  walletTransactions?.forEach(t => {
+    if (t.userId === user?.id && t.type === 'consultation' && t.status === 'approved') {
+      const tTime = t.createdAt?.seconds ? t.createdAt.seconds * 1000 : new Date(t.date).getTime();
+      if (tTime >= todayStart) todayEarnings += t.amount;
+      if (tTime >= weekStart) weekEarnings += t.amount;
+      if (tTime >= monthStart) monthEarnings += t.amount;
+    }
+  });
+
   const stats = [
     { label: 'Ushauri', value: doctorChats.length, icon: MessageSquare, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-500/10' },
-    { label: 'Rating', value: user.rating || '5.0', icon: Star, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-500/10' },
-    { label: 'Mapato', value: formatCurrency(user.walletBalance || 0, currency), icon: Wallet, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+    { label: 'Rating', value: user?.rating || '5.0', icon: Star, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-500/10' },
+    { label: 'Mapato (Mwezi)', value: formatCurrency(monthEarnings, currency), icon: Wallet, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
   ];
 
   function formatCurrency(amount: number, curr: string) {
@@ -325,10 +344,26 @@ export const DoctorPortal: React.FC = () => {
           {activeTab === 'wallet' && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <h2 className="text-3xl font-black mb-8">Mkoba & Mapato</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Mapato ya Leo</p>
+                  <p className="text-2xl font-black text-emerald-600">{formatCurrency(todayEarnings, currency)}</p>
+                </div>
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Mapato ya Wiki Hii</p>
+                  <p className="text-2xl font-black text-blue-600">{formatCurrency(weekEarnings, currency)}</p>
+                </div>
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Mapato ya Mwezi Huu</p>
+                  <p className="text-2xl font-black text-amber-600">{formatCurrency(monthEarnings, currency)}</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
                 <div className="bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm">
                   <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">Salio Linaloweza Kutolewa</p>
-                  <p className="text-5xl font-black text-emerald-600 mb-8">{formatCurrency(user.walletBalance || 0, currency)}</p>
+                  <p className="text-5xl font-black text-emerald-600 mb-8">{formatCurrency(user?.walletBalance || 0, currency)}</p>
                   <button 
                     onClick={() => toast.error('Kipengele hiki kinakuja hivi karibuni!')}
                     className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
@@ -339,22 +374,22 @@ export const DoctorPortal: React.FC = () => {
                 <div className="bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm">
                   <h3 className="text-xl font-black mb-6">Miamala ya Hivi Karibuni</h3>
                   <div className="space-y-4">
-                    {walletTransactions.filter(t => t.userId === user.id).length === 0 ? (
+                    {walletTransactions?.filter(t => t.userId === user?.id).length === 0 ? (
                       <p className="text-center py-8 text-slate-400">Hakuna miamala bado.</p>
                     ) : (
-                      walletTransactions.filter(t => t.userId === user.id).slice(0, 5).map(tx => (
+                      walletTransactions?.filter(t => t.userId === user?.id).slice(0, 5).map(tx => (
                         <div key={tx.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
                           <div className="flex items-center gap-3">
-                            <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", tx.type === 'credit' ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-red-600")}>
-                              {tx.type === 'credit' ? '↓' : '↑'}
+                            <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", (tx.type === 'credit' || tx.type === 'consultation' || tx.type === 'deposit') ? "bg-emerald-100 text-emerald-600" : "bg-red-100 text-red-600")}>
+                              {(tx.type === 'credit' || tx.type === 'consultation' || tx.type === 'deposit') ? '↓' : '↑'}
                             </div>
                             <div>
-                              <p className="text-xs font-black">{tx.description}</p>
-                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{new Date(tx.createdAt?.seconds * 1000).toLocaleDateString()}</p>
+                              <p className="text-xs font-black">{tx.description || tx.type}</p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{new Date(tx.createdAt?.seconds ? tx.createdAt.seconds * 1000 : tx.date).toLocaleDateString()}</p>
                             </div>
                           </div>
-                          <p className={cn("font-black text-sm", tx.type === 'credit' ? "text-emerald-600" : "text-red-600")}>
-                            {tx.type === 'credit' ? '+' : '-'}{formatCurrency(tx.amount, currency)}
+                          <p className={cn("font-black text-sm", (tx.type === 'credit' || tx.type === 'consultation' || tx.type === 'deposit') ? "text-emerald-600" : "text-red-600")}>
+                            {(tx.type === 'credit' || tx.type === 'consultation' || tx.type === 'deposit') ? '+' : '-'}{formatCurrency(tx.amount, currency)}
                           </p>
                         </div>
                       ))

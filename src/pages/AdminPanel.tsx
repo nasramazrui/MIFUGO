@@ -170,35 +170,38 @@ export const AdminPanel: React.FC = () => {
         }
       }
 
-      console.log('All collections processed. Creating blob...');
-      const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `KUKUAPP_Backup_${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(link);
+      console.log('All collections processed. Creating download link...');
+      const jsonString = JSON.stringify(allData, null, 2);
+      const isWebView = /(iPhone|iPod|iPad).*AppleWebKit(?!.*Safari)/i.test(navigator.userAgent) || /wv/.test(navigator.userAgent) || /Android.*Version\/[0-9].[0-9]/.test(navigator.userAgent);
       
-      console.log('Attempting download...');
       try {
-        link.click();
-        // Fallback for some WebViews that block automatic clicks
-        setTimeout(() => {
-          if (document.body.contains(link)) {
-            console.log('Download link still in DOM, trying window.open fallback');
-            window.open(url, '_blank');
-          }
-        }, 500);
-      } catch (e) {
-        console.error('Download click failed, trying window.open:', e);
-        window.open(url, '_blank');
-      }
-      
-      setTimeout(() => {
-        if (document.body.contains(link)) {
+        if (isWebView) {
+          const base64 = btoa(unescape(encodeURIComponent(jsonString)));
+          const dataUri = `data:application/json;base64,${base64}`;
+          const link = document.createElement('a');
+          link.href = dataUri;
+          link.download = `KUKUAPP_Backup_${new Date().toISOString().split('T')[0]}.json`;
+          document.body.appendChild(link);
+          link.click();
           document.body.removeChild(link);
+        } else {
+          const blob = new Blob([jsonString], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `KUKUAPP_Backup_${new Date().toISOString().split('T')[0]}.json`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
         }
-        URL.revokeObjectURL(url);
-      }, 1000);
+      } catch (e) {
+        console.error('Download click failed:', e);
+        // Fallback
+        const base64 = btoa(unescape(encodeURIComponent(jsonString)));
+        const dataUri = `data:application/json;base64,${base64}`;
+        window.location.href = dataUri;
+      }
       
       toast.success('Backup imekamilika na kupakuliwa!', { id: toastId });
       console.log('Export process completed successfully.');
@@ -2021,8 +2024,8 @@ export const AdminPanel: React.FC = () => {
                                           subscriptionPlan: payment.extraData?.plan || 'monthly',
                                           subscriptionExpiry: new Date(Date.now() + (payment.extraData?.plan === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000).toISOString()
                                         });
-                                      } else if (payment.actionType === 'doctor_consultation') {
-                                        // Maybe add to doctor's wallet or create an appointment record
+                                      } else if (payment.actionType === 'doctor_consultation' || payment.actionType === 'doctor_consultation_emergency' || payment.actionType === 'doctor_appointment') {
+                                        // Add to doctor's wallet
                                         if (payment.targetId) {
                                           await updateDoc(doc(db, 'kuku_users', payment.targetId), {
                                             walletBalance: increment(payment.amount * (1 - ((systemSettings?.commissionRate || 0) / 100)))
@@ -2033,7 +2036,7 @@ export const AdminPanel: React.FC = () => {
                                             amount: payment.amount * (1 - ((systemSettings?.commissionRate || 0) / 100)),
                                             type: 'consultation',
                                             status: 'approved',
-                                            description: `Malipo ya ushauri kutoka kwa ${payment.userName}`,
+                                            description: `Malipo ya ${payment.actionType === 'doctor_appointment' ? 'miadi' : 'ushauri'} ${payment.actionType === 'doctor_consultation_emergency' ? '(DHARURA) ' : ''}kutoka kwa ${payment.userName}`,
                                             date: new Date().toISOString().split('T')[0],
                                             createdAt: serverTimestamp()
                                           });
