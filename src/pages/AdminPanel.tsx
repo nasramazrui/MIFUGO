@@ -67,7 +67,15 @@ import {
   QrCode,
   Video,
   Database,
-  Download
+  Download,
+  Ban,
+  Unlock,
+  CheckCircle2,
+  UserCheck,
+  UserX,
+  Eye,
+  LogIn,
+  Key
 } from 'lucide-react';
 import { cn } from '../utils';
 import { CATEGORIES } from '../constants';
@@ -114,6 +122,8 @@ export const AdminPanel: React.FC = () => {
     language,
     setLanguage,
     setView,
+    resetUserPassword,
+    setViewingAsUser,
     t
   } = useApp();
   const currency = systemSettings?.currency || 'TZS';
@@ -127,6 +137,11 @@ export const AdminPanel: React.FC = () => {
   const [showExportConfirm, setShowExportConfirm] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+
+  // User Management States
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [userFilterRole, setUserFilterRole] = useState<'all' | 'user' | 'vendor' | 'doctor' | 'admin'>('all');
+  const [viewingUser, setViewingUser] = useState<any>(null);
 
   const handleExportClick = () => {
     setShowExportConfirm(true);
@@ -461,6 +476,9 @@ export const AdminPanel: React.FC = () => {
     pointsPerOrder: 10, // 10 points per 1000 TZS
     pointsValue: 1, // 1 point = 1 TZS
     firebase_service_account: '',
+    firebase_storage_bucket: '',
+    firebase_messaging_sender_id: '',
+    firebase_app_id: '',
     maintenanceMode: false,
     themeColor: 'amber',
     qrColor: '#000000',
@@ -492,6 +510,9 @@ export const AdminPanel: React.FC = () => {
         pointsPerOrder: systemSettings.pointsPerOrder || 10,
         pointsValue: systemSettings.pointsValue || 1,
         firebase_service_account: systemSettings.firebase_service_account || '',
+        firebase_storage_bucket: systemSettings.firebase_storage_bucket || '',
+        firebase_messaging_sender_id: systemSettings.firebase_messaging_sender_id || '',
+        firebase_app_id: systemSettings.firebase_app_id || '',
         maintenanceMode: systemSettings.maintenanceMode || false,
         themeColor: systemSettings.themeColor || 'amber',
         qrColor: systemSettings.qrColor || '#000000',
@@ -940,6 +961,48 @@ export const AdminPanel: React.FC = () => {
     } catch (error: any) {
       handleFirestoreError(error, OperationType.DELETE, `kuku_users/${id}`);
       toast.error('Hitilafu wakati wa kufuta');
+    }
+  };
+
+  const handleBulkStatusUpdate = async (status: 'approved' | 'suspended' | 'rejected' | 'pending') => {
+    if (!selectedUsers.length) return;
+    if (!confirm(`Una uhakika unataka kubadilisha hali ya watumiaji ${selectedUsers.length} kuwa ${status}?`)) return;
+    
+    try {
+      await Promise.all(selectedUsers.map(id => updateDoc(doc(db, 'kuku_users', id), { status })));
+      toast.success(`Hali imebadilishwa kwa watumiaji ${selectedUsers.length}`);
+      setSelectedUsers([]);
+    } catch (error: any) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_users (bulk status)`);
+      toast.error('Hitilafu wakati wa kubadilisha hali');
+    }
+  };
+
+  const handleBulkRoleUpdate = async (role: 'user' | 'vendor' | 'doctor' | 'admin') => {
+    if (!selectedUsers.length) return;
+    if (!confirm(`Una uhakika unataka kubadilisha role ya watumiaji ${selectedUsers.length} kuwa ${role}?`)) return;
+    
+    try {
+      await Promise.all(selectedUsers.map(id => updateDoc(doc(db, 'kuku_users', id), { role })));
+      toast.success(`Role imebadilishwa kwa watumiaji ${selectedUsers.length}`);
+      setSelectedUsers([]);
+    } catch (error: any) {
+      handleFirestoreError(error, OperationType.UPDATE, `kuku_users (bulk role)`);
+      toast.error('Hitilafu wakati wa kubadilisha role');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedUsers.length) return;
+    if (!confirm(`Una uhakika unataka kufuta watumiaji ${selectedUsers.length}? Hatua hii haiwezi kurudishwa.`)) return;
+    
+    try {
+      await Promise.all(selectedUsers.map(id => deleteDoc(doc(db, 'kuku_users', id))));
+      toast.success(`Watumiaji ${selectedUsers.length} wamefutwa`);
+      setSelectedUsers([]);
+    } catch (error: any) {
+      handleFirestoreError(error, OperationType.DELETE, `kuku_users (bulk delete)`);
+      toast.error('Hitilafu wakati wa kufuta watumiaji');
     }
   };
 
@@ -1497,6 +1560,27 @@ export const AdminPanel: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          setViewingAsUser(v);
+                          navigate('/');
+                        }}
+                        className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center hover:bg-blue-100 transition-all"
+                        title="Ingia kama Mtumiaji huyu"
+                      >
+                        <LogIn size={18} />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if (window.confirm(`Je, una uhakika unataka kutuma barua pepe ya kubadilisha nywila kwa ${v.name}?`)) {
+                            resetUserPassword(v.email);
+                          }
+                        }}
+                        className="w-10 h-10 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center hover:bg-amber-100 transition-all"
+                        title="Reset Password"
+                      >
+                        <Key size={18} />
+                      </button>
                       {v.status === 'pending' && (
                         <button 
                           onClick={() => approveVendor(v.id)}
@@ -1567,6 +1651,27 @@ export const AdminPanel: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex gap-2">
+                        <button 
+                          onClick={() => {
+                            setViewingAsUser(d);
+                            navigate('/');
+                          }}
+                          className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center hover:bg-blue-100 transition-all"
+                          title="Ingia kama Mtumiaji huyu"
+                        >
+                          <LogIn size={18} />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (window.confirm(`Je, una uhakika unataka kutuma barua pepe ya kubadilisha nywila kwa ${d.name}?`)) {
+                              resetUserPassword(d.email);
+                            }
+                          }}
+                          className="w-10 h-10 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center hover:bg-amber-100 transition-all"
+                          title="Reset Password"
+                        >
+                          <Key size={18} />
+                        </button>
                         {d.status === 'pending' && (
                           <button 
                             onClick={() => approveDoctor(d.id)}
@@ -1853,30 +1958,121 @@ export const AdminPanel: React.FC = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
               <h2 className="text-3xl font-black text-slate-900">Watumiaji Wote</h2>
-              <button
-                onClick={() => {
-                  setAnnouncementForm(prev => ({ ...prev, target: 'all' }));
-                  setActiveTab('announcements');
-                }}
-                className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-2xl font-black transition-all flex items-center gap-2 shadow-sm"
-              >
-                <MessageSquare size={18} />
-                Tuma Ujumbe kwa Wote
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <select
+                  value={userFilterRole}
+                  onChange={(e) => setUserFilterRole(e.target.value as any)}
+                  className="bg-white border-2 border-slate-100 rounded-2xl px-4 py-2 font-bold text-slate-700 outline-none focus:border-amber-500"
+                >
+                  <option value="all">Wote</option>
+                  <option value="user">Watumiaji Kawaida</option>
+                  <option value="vendor">Wauzaji</option>
+                  <option value="doctor">Madaktari</option>
+                  <option value="admin">Admins</option>
+                </select>
+                <button
+                  onClick={() => {
+                    setAnnouncementForm(prev => ({ ...prev, target: 'all' }));
+                    setActiveTab('announcements');
+                  }}
+                  className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2 rounded-2xl font-black transition-all flex items-center gap-2 shadow-sm"
+                >
+                  <MessageSquare size={18} />
+                  Tuma Ujumbe
+                </button>
+              </div>
             </div>
+
+            {selectedUsers.length > 0 && (
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-6 flex flex-wrap items-center justify-between gap-4">
+                <span className="font-bold text-blue-800">Wamechaguliwa: {selectedUsers.length}</span>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => handleBulkStatusUpdate('approved')} className="px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center gap-1 hover:bg-emerald-600"><CheckCircle2 size={14} /> Activate</button>
+                  <button onClick={() => handleBulkStatusUpdate('suspended')} className="px-4 py-2 bg-amber-500 text-white rounded-xl font-bold text-xs flex items-center gap-1 hover:bg-amber-600"><Ban size={14} /> Suspend</button>
+                  <button onClick={() => handleBulkStatusUpdate('rejected')} className="px-4 py-2 bg-slate-500 text-white rounded-xl font-bold text-xs flex items-center gap-1 hover:bg-slate-600"><UserX size={14} /> Reject</button>
+                  <button onClick={() => handleBulkDelete()} className="px-4 py-2 bg-red-500 text-white rounded-xl font-bold text-xs flex items-center gap-1 hover:bg-red-600"><Trash2 size={14} /> Delete</button>
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleBulkRoleUpdate(e.target.value as any);
+                        e.target.value = '';
+                      }
+                    }}
+                    className="bg-white border border-blue-200 rounded-xl px-3 py-2 font-bold text-xs text-blue-800 outline-none"
+                  >
+                    <option value="">Change Role...</option>
+                    <option value="user">User</option>
+                    <option value="vendor">Vendor</option>
+                    <option value="doctor">Doctor</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
             <div className="grid gap-4">
-              {users.filter(u => u.role === 'user').map(u => (
-                <div key={u.id} className="bg-white rounded-[28px] border border-slate-100 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+              {users.filter(u => userFilterRole === 'all' || u.role === userFilterRole).map(u => (
+                <div key={u.id} className={cn("bg-white rounded-[28px] border p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm transition-all", selectedUsers.includes(u.id) ? "border-blue-400 ring-2 ring-blue-100" : "border-slate-100")}>
                   <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-2xl font-black text-blue-800">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedUsers.includes(u.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedUsers(prev => [...prev, u.id]);
+                        } else {
+                          setSelectedUsers(prev => prev.filter(id => id !== u.id));
+                        }
+                      }}
+                      className="w-5 h-5 rounded text-amber-500 focus:ring-amber-500 cursor-pointer"
+                    />
+                    <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black", 
+                      u.role === 'admin' ? "bg-purple-50 text-purple-800" :
+                      u.role === 'doctor' ? "bg-cyan-50 text-cyan-800" :
+                      u.role === 'vendor' ? "bg-emerald-50 text-emerald-800" :
+                      "bg-blue-50 text-blue-800"
+                    )}>
                       {u.name[0].toUpperCase()}
                     </div>
                     <div>
-                      <h4 className="font-black text-slate-900">{u.name}</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-black text-slate-900">{u.name}</h4>
+                        {u.status === 'suspended' && <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-md text-[10px] font-bold uppercase">Suspended</span>}
+                        {u.status === 'pending' && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md text-[10px] font-bold uppercase">Pending</span>}
+                        {u.role !== 'user' && <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-bold uppercase">{u.role}</span>}
+                      </div>
                       <p className="text-xs text-slate-400">{u.email} · {u.contact || 'No contact'}</p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <button 
+                      onClick={() => {
+                        setViewingAsUser(u);
+                        navigate('/');
+                      }}
+                      className="w-10 h-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center hover:bg-blue-100 transition-all"
+                      title="Ingia kama Mtumiaji huyu"
+                    >
+                      <LogIn size={18} />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if (window.confirm(`Je, una uhakika unataka kutuma barua pepe ya kubadilisha nywila kwa ${u.name}?`)) {
+                          resetUserPassword(u.email);
+                        }
+                      }}
+                      className="w-10 h-10 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center hover:bg-amber-100 transition-all"
+                      title="Reset Password"
+                    >
+                      <Key size={18} />
+                    </button>
+                    <button 
+                      onClick={() => setViewingUser(u)}
+                      className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center hover:bg-indigo-100 transition-all"
+                      title="View Profile"
+                    >
+                      <Eye size={18} />
+                    </button>
                     <button 
                       onClick={() => {
                         setAnnouncementForm(prev => ({ ...prev, target: u.id }));
@@ -3368,6 +3564,42 @@ export const AdminPanel: React.FC = () => {
                       className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Auth Domain</label>
+                    <input 
+                      type="text"
+                      value={localSettings.firebase_auth_domain}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, firebase_auth_domain: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Storage Bucket</label>
+                    <input 
+                      type="text"
+                      value={localSettings.firebase_storage_bucket}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, firebase_storage_bucket: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Messaging Sender ID</label>
+                    <input 
+                      type="text"
+                      value={localSettings.firebase_messaging_sender_id}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, firebase_messaging_sender_id: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">App ID</label>
+                    <input 
+                      type="text"
+                      value={localSettings.firebase_app_id}
+                      onChange={(e) => setLocalSettings(prev => ({ ...prev, firebase_app_id: e.target.value }))}
+                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 outline-none focus:border-amber-500 transition-all font-bold text-sm"
+                    />
+                  </div>
                   <div className="md:col-span-2 space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Service Account JSON (Sensitive)</label>
                     <textarea 
@@ -3536,7 +3768,24 @@ export const AdminPanel: React.FC = () => {
                   >
                     <option value="user">User</option>
                     <option value="vendor">Vendor</option>
+                    <option value="doctor">Doctor</option>
                     <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Status</label>
+                  <select 
+                    defaultValue={editingItem.data.status || 'approved'}
+                    onChange={async (e) => {
+                      await updateDoc(doc(db, 'kuku_users', editingItem.data.id), { status: e.target.value });
+                      toast.success('Hali imesasishwa');
+                    }}
+                    className="input-field"
+                  >
+                    <option value="approved">Active (Approved)</option>
+                    <option value="pending">Pending</option>
+                    <option value="suspended">Suspended</option>
+                    <option value="rejected">Rejected</option>
                   </select>
                 </div>
                 <div>
@@ -3993,6 +4242,138 @@ export const AdminPanel: React.FC = () => {
             </button>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!viewingUser}
+        onClose={() => setViewingUser(null)}
+        title="Taarifa za Mtumiaji"
+      >
+        {viewingUser && (
+          <div className="p-6 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center gap-4 mb-6 pb-6 border-b border-slate-100">
+              <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center text-4xl font-black text-blue-800">
+                {viewingUser.name[0].toUpperCase()}
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-slate-900">{viewingUser.name}</h3>
+                <p className="text-slate-500">{viewingUser.email}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold uppercase">{viewingUser.role}</span>
+                  <span className={cn("px-2 py-1 rounded-lg text-xs font-bold uppercase", 
+                    viewingUser.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                    viewingUser.status === 'suspended' ? 'bg-red-100 text-red-700' :
+                    'bg-amber-100 text-amber-700'
+                  )}>
+                    {viewingUser.status || 'Active'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                  <Wallet size={18} className="text-amber-500" />
+                  Muamala (Wallet)
+                </h4>
+                <div className="bg-slate-50 rounded-2xl p-4">
+                  <p className="text-3xl font-black text-slate-900 mb-4">{formatCurrency(viewingUser.walletBalance || 0)}</p>
+                  <div className="space-y-2">
+                    {walletTransactions.filter(t => t.userId === viewingUser.id).slice(0, 5).map(t => (
+                      <div key={t.id} className="flex items-center justify-between text-sm bg-white p-3 rounded-xl border border-slate-100">
+                        <div>
+                          <p className="font-bold text-slate-700">{t.type === 'deposit' ? 'Kuweka' : t.type === 'withdrawal' ? 'Kutoa' : 'Malipo'}</p>
+                          <p className="text-xs text-slate-400">{new Date(t.createdAt?.toDate ? t.createdAt.toDate() : t.createdAt).toLocaleDateString()}</p>
+                        </div>
+                        <span className={cn("font-bold", t.type === 'deposit' ? 'text-emerald-600' : 'text-red-600')}>
+                          {t.type === 'deposit' ? '+' : '-'}{formatCurrency(t.amount)}
+                        </span>
+                      </div>
+                    ))}
+                    {walletTransactions.filter(t => t.userId === viewingUser.id).length === 0 && (
+                      <p className="text-sm text-slate-500 text-center py-2">Hakuna miamala</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                  <ShoppingBag size={18} className="text-blue-500" />
+                  Historia ya Oda / Bookings
+                </h4>
+                <div className="space-y-2">
+                  {orders.filter(o => o.userId === viewingUser.id || o.vendorId === viewingUser.id).slice(0, 5).map(o => (
+                    <div key={o.id} className="flex items-center justify-between text-sm bg-slate-50 p-3 rounded-xl">
+                      <div>
+                        <p className="font-bold text-slate-700">Oda #{o.id.substring(0,8)}</p>
+                        <p className="text-xs text-slate-500">{new Date(o.createdAt?.toDate ? o.createdAt.toDate() : o.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-slate-900">{formatCurrency(o.total)}</p>
+                        <span className="text-[10px] font-bold uppercase text-slate-500">{o.status}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {orders.filter(o => o.userId === viewingUser.id || o.vendorId === viewingUser.id).length === 0 && (
+                    <p className="text-sm text-slate-500 text-center py-4 bg-slate-50 rounded-2xl">Hakuna oda</p>
+                  )}
+                </div>
+              </div>
+
+              {viewingUser.role === 'vendor' && (
+                <div>
+                  <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                    <Store size={18} className="text-emerald-500" />
+                    Taarifa za Duka
+                  </h4>
+                  <div className="bg-slate-50 rounded-2xl p-4 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Jina la Duka:</span>
+                      <span className="font-bold text-slate-900">{viewingUser.shopName || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Mkoa:</span>
+                      <span className="font-bold text-slate-900">{viewingUser.region || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Bidhaa:</span>
+                      <span className="font-bold text-slate-900">{products.filter(p => p.vendorId === viewingUser.id).length}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(viewingUser.role === 'doctor' || viewingUser.role === 'vendor') && (
+                <div>
+                  <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                    <Star size={18} className="text-amber-500" />
+                    Maoni (Reviews)
+                  </h4>
+                  <div className="space-y-2">
+                    {reviews.filter(r => viewingUser.role === 'doctor' ? r.doctorId === viewingUser.id : r.vendorId === viewingUser.id).slice(0, 5).map(r => (
+                      <div key={r.id} className="bg-slate-50 p-3 rounded-xl text-sm">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-slate-700">{r.userName}</span>
+                          <div className="flex text-amber-400">
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} size={12} fill={i < r.rating ? "currentColor" : "none"} />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-slate-600">{r.comment}</p>
+                      </div>
+                    ))}
+                    {reviews.filter(r => viewingUser.role === 'doctor' ? r.doctorId === viewingUser.id : r.vendorId === viewingUser.id).length === 0 && (
+                      <p className="text-sm text-slate-500 text-center py-4 bg-slate-50 rounded-2xl">Hakuna maoni</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

@@ -15,7 +15,7 @@ import LivestockManager from './pages/LivestockManager';
 import LivestockDetails from './pages/LivestockDetails';
 
 const AppContent: React.FC = () => {
-  const { user, loading, systemSettings, confirmModal, setConfirmModal } = useApp();
+  const { user, realUser, viewingAsUser, setViewingAsUser, loading, systemSettings, confirmModal, setConfirmModal } = useApp();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
@@ -125,6 +125,24 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="relative min-h-screen">
+      {realUser?.role === 'admin' && viewingAsUser && (
+        <div className="fixed top-0 left-0 right-0 bg-amber-600 text-white py-2 px-4 z-[9999] flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center font-black">
+              {user?.name[0].toUpperCase()}
+            </div>
+            <p className="text-sm font-bold">
+              Unatazama kama: <span className="underline">{user?.name}</span> ({user?.role})
+            </p>
+          </div>
+          <button 
+            onClick={() => setViewingAsUser(null)}
+            className="bg-white text-amber-600 px-4 py-1 rounded-full text-xs font-black uppercase hover:bg-amber-50 transition-colors"
+          >
+            Acha Kutazama
+          </button>
+        </div>
+      )}
       <Routes>
         <Route path="/" element={<ShopPage />} />
         <Route path="/livestock/:id" element={<LivestockDetails />} />

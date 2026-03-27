@@ -7,9 +7,8 @@ import {
   signInWithEmailAndPassword, 
   updateProfile, 
   deleteUser, 
-  updatePassword, 
-  GoogleAuthProvider, 
-  signInWithPopup 
+  updatePassword,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -38,7 +37,6 @@ import firebaseConfig from '../../firebase-applet-config.json';
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const googleProvider = new GoogleAuthProvider();
 
 export enum OperationType {
   CREATE = 'create',
@@ -99,7 +97,7 @@ export {
   updateProfile,
   deleteUser,
   updatePassword,
-  signInWithPopup,
+  sendPasswordResetEmail,
   collection,
   doc,
   query,

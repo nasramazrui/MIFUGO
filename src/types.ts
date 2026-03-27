@@ -6,7 +6,7 @@ export interface User {
   avatar?: string;
   contact?: string;
   hasWhatsApp?: boolean;
-  status?: 'pending' | 'approved' | 'rejected';
+  status?: 'pending' | 'approved' | 'rejected' | 'suspended';
   points?: number; // Loyalty points
   // Vendor specific
   shopName?: string;

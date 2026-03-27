@@ -7,6 +7,7 @@ import {
   db,
   onAuthStateChanged, 
   signOut,
+  sendPasswordResetEmail,
   collection, 
   onSnapshot, 
   query, 
@@ -54,6 +55,7 @@ export interface Offer {
 
 interface AppContextType {
   user: User | null;
+  realUser: User | null;
   setUser: (user: User | null) => void;
   products: Product[];
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
@@ -89,6 +91,9 @@ interface AppContextType {
   systemSettings: any;
   updateSystemSettings: (settings: any) => Promise<void>;
   logout: () => void;
+  resetUserPassword: (email: string) => Promise<void>;
+  viewingAsUser: User | null;
+  setViewingAsUser: (user: User | null) => void;
   t: (key: string) => string;
   loading: boolean;
   theme: 'light' | 'dark';
@@ -130,6 +135,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [viewingAsUser, setViewingAsUser] = useState<User | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [vendors, setVendors] = useState<User[]>([]);
@@ -323,7 +329,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (fbUser) {
           unsubUser = onSnapshot(doc(db, 'kuku_users', fbUser.uid), (snap) => {
             if (snap.exists()) {
-              setUser({ id: fbUser.uid, ...snap.data() } as User);
+              const userData = { id: fbUser.uid, ...snap.data() } as User;
+              if (userData.status === 'suspended') {
+                toast.error('Akaunti yako imesimamishwa. Tafadhali wasiliana na uongozi.');
+                auth.signOut();
+                setUser(null);
+                setLoading(false);
+                clearTimeout(safetyTimer);
+                return;
+              }
+              setUser(userData);
             } else if (fbUser.email === ADMIN_EMAIL) {
               const adminData: User = {
                 id: fbUser.uid,
@@ -612,7 +627,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = () => {
+    setViewingAsUser(null);
     signOut(auth);
+  };
+
+  const resetUserPassword = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast.success(`Barua pepe ya kubadilisha nywila imetumwa kwa ${email}`);
+    } catch (error: any) {
+      toast.error('Imeshindwa kutuma barua pepe ya kubadilisha nywila: ' + error.message);
+    }
   };
 
   const t = (key: string) => {
@@ -669,7 +694,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
-      user, setUser,
+      user: viewingAsUser || user, 
+      realUser: user,
+      setUser,
       products, setProducts,
       orders, setOrders,
       vendors, setVendors,
@@ -688,6 +715,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addNotification,
       systemSettings, updateSystemSettings,
       logout,
+      resetUserPassword,
+      viewingAsUser,
+      setViewingAsUser,
       t,
       loading,
       theme,
